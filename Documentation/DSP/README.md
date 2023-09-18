@@ -15,9 +15,9 @@ $`V_{out}=\frac{1}{2}V_Scos\left(\phi \right)`$
 Given this result we run into a small issue, at certain phase offsets we lose the ability to properly resolve the signal.  
 This is due to the constant term going to zero at a $`\phi =\pi `$ phase offset.  
 To fix this issue we can simply multiply our input by two signals: the aforementioned sine term, and a cosine term.  
-In this way we observe two results:
-$`X\:=\:V_Scos\left(\phi \right)`$  
-$`Y=V_Ssin\left(\phi \right)`$  
+In this way we observe two results:  
+$`X=\frac{V_S}{2}cos\left(\phi \right)`$  
+$`Y=\frac{V_S}{2}sin\left(\phi \right)`$  
 In this way we create the vector components representing the amplitude and phase of our input signal relative to the reference cosine.  
 To recover the phase offset of the wave, which much always be a delay to maintain causality (the only outcome of real world circuits) as well as reference  
 the input to the generated sine wave we see: $`\theta =\frac{\pi }{2}-tan^{-1}\left(\frac{Y}{X}\right)`$ gives us the correct result.  
