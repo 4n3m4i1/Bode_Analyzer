@@ -1,0 +1,8 @@
+*.exe
+*.bin
+*.dblite
+*.json
+*.o
+*.asc
+build/
+
