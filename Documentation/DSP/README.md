@@ -7,8 +7,9 @@ $`V_s\left(t\right)=V_Xsin\left(\omega _st\:+\:\phi \right)`$
 is provided to a system.  
 This system can multiply this input by a sine wave $`V_R\left(t\right)=V_Rsin\left(\omega _Rt\right)`$  
 This results in the output $`V_R\left(t\right)V_S\left(t\right)=\frac{1}{2}V_RV_X\left[cos\left[\left(\omega _St\:+\:\omega _Rt\right)\:+\:\phi \right]\:-\:cos\left[\left(\omega \:_{St}\:-\:\omega \:_{Rt}\right)\:+\:\phi \:\right]\right]`$  
-This may look long, however given out reference frequency is equal to our signal frequency, or: $`\omega _S=\omega _R`$  
-A lot of this cancels over time.  
+This may look long, however given out reference frequency is equal to our signal frequency, or: $`\omega _S=\omega _R`$  and $`V_R=1V`$ then:  
+$`V_R\left(t\right)V_S\left(t\right)=\frac{1}{2}V_X\left[cos\left(2\omega t\:+\:\phi \right)\:-\:cos\left(\phi \right)\right]`$  
+As seen here the frequency component with double the rate will average to zero over time, while the $`cos\left(\phi \right)`$ term is constant and will accumulate over some large averaging period.
   
 This results in:
 $`V_{out}=\frac{1}{2}V_Scos\left(\phi \right)`$
