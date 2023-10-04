@@ -38,7 +38,7 @@ void main(int argc, char **argv){
     
     for(uint32_t n = 0; n < nsamp; ++n){
         double sin_term = sin((2.0 * M_PI) * (((double)n)/((double)nsamp)));
-        fprintf(sin_ofp,"0x%04X",(uint16_t)float_2_Q15(sin_term));
+        fprintf(sin_ofp,"0x%04X",(uint16_t)float_2_Q15(sin_term - (1 / FL_CVT_CONST)));
         if(n != (nsamp - 1)) fprintf(sin_ofp,",\n\t\t");
     }
     fprintf(sin_ofp, "\n};\n");
@@ -55,10 +55,7 @@ void main(int argc, char **argv){
     
             for(uint32_t n = 0; n < nsamp; ++n){
                 double cos_term = cos((2.0 * M_PI) * (((double)n)/((double)nsamp)));
-
-                Q15 term = float_2_Q15(cos_term);
-
-                fprintf(sin_ofp,"0x%04X", (uint16_t)term);
+                fprintf(cos_ofp,"0x%04X",(uint16_t)float_2_Q15(cos_term - (1 / FL_CVT_CONST)));
                 if(n != (nsamp - 1)) fprintf(cos_ofp,",\n\t\t");
             }
             fprintf(cos_ofp, "\n};\n");
