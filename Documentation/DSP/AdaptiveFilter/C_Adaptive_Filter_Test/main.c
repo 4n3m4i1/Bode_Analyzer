@@ -85,6 +85,10 @@ void main(int argc, char **argv){
         for(uint32_t n = 0; n < num_taps; ++n){
             fscanf(tapfp,"%lf",&rval);
             ideal_taps[n] = rval;
+        
+            adaptive_taps[n] = 0;
+            x[n] = 0;
+            ideal_delay_line[n] = 0;
         }
         
         // Run main sampling loop simulation
@@ -110,7 +114,7 @@ void main(int argc, char **argv){
             update_h_hat(adaptive_taps, x, err, beta, num_taps);
         }
 
-        double error_avg = error_accum / (double)iterations;
+        double error_avg = fabs(error_accum / (double)iterations);
 
         if(error_avg > LIMIT_FOR_ERROR){
             printf("Failed to converge under error limit!! :^(\n");
@@ -126,20 +130,23 @@ void main(int argc, char **argv){
         //      e
         //      Tap error
 
-        FILE *fpo;
-        fpo = fopen("simulation_results.csv","w");
-        fprintf(fpo,"IDX,H_HAT,H_IDEAL,H_ERROR\n");
-        for(uint32_t n = 0; n < num_taps; ++n){
-            fprintf(fpo,"%u,%lf,%lf,%lf\n", n, adaptive_taps[n], ideal_taps[n], adaptive_taps[n] - ideal_taps[n]);
-        }
-        fclose(fpo);
+        if(error_avg <= LIMIT_FOR_ERROR){
+            FILE *fpo;
+            fpo = fopen("simulation_results.csv","w");
+            fprintf(fpo,"IDX,H_HAT,H_IDEAL,H_ERROR\n");
+            for(uint32_t n = 0; n < num_taps; ++n){
+                fprintf(fpo,"%u,%lf,%lf,%lf\n", n, adaptive_taps[n], ideal_taps[n], adaptive_taps[n] - ideal_taps[n]);
+            }
+            fclose(fpo);
 
-        fpo = fopen("error_plot.csv","w");
-        fprintf(fpo,"IDX,ERR\n");
-        for(uint32_t n = 0; n < iterations; ++n){
-            fprintf(fpo,"%u,%lf\n",n,error_plot[n]);
+            fpo = fopen("error_plot.csv","w");
+            fprintf(fpo,"IDX,ERR\n");
+            for(uint32_t n = 0; n < iterations; ++n){
+                fprintf(fpo,"%u,%lf\n",n,error_plot[n]);
+            }
+            fclose(fpo);
         }
-        fclose(fpo);
+        
 
         free(ideal_taps);
         free(adaptive_taps);
