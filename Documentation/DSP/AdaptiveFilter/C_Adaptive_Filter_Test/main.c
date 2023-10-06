@@ -13,7 +13,9 @@
 uint32_t    num_taps = 0;
 uint32_t    iterations = DFL_ITERATIONS;
 
-
+// Different algorithms for H_HAT updates, leave all commented for DFL
+//#define HALG_2        // DOESN'T WORK!!!!
+//#define HALG_3        // DOESN'T WORK EVEN W /0 FIX!!
 
 
 // Sorta kinda Box-Muller + Lazy Programming
@@ -38,9 +40,23 @@ double perform_fir(double *ideal_taps, double *idt_delay_line, double new_value,
 
 void update_h_hat(double *h_hat_taps, double *idt_delay_line, double error, double beta_rate, uint32_t len){
     if(h_hat_taps && idt_delay_line){
+#ifdef HALG_2
+        for(uint32_t n = 0; n < len - 1; ++n){
+            h_hat_taps[n + 1] = h_hat_taps[n] + beta_rate * (error * idt_delay_line[n]);
+        }
+#elif defined(HALG_3)
+// Normalized
+        for(uint32_t n = 0; n < len; ++n){
+            if(!idt_delay_line[n]) idt_delay_line[n] += 1e-12;
+            h_hat_taps[n] += (beta_rate * error) / (idt_delay_line[n]);
+            printf("HE %lf\n",h_hat_taps[n]);
+        }
+
+#else
         for(uint32_t n = 0; n < len; ++n){
             h_hat_taps[n] += beta_rate * (error * idt_delay_line[n]);
         }
+#endif
     }
 }
 
