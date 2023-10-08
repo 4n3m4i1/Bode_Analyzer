@@ -12,7 +12,9 @@
 
 
 uint32_t    print_options = 0;
-#define CSV_OI4V_FMT    1u
+#define CSV_OI4V_FMT        1u
+#define TGT_VIDEO_FRAMES    1000
+
 
 uint32_t    num_taps = 0;
 uint32_t    iterations = DFL_ITERATIONS;
@@ -98,6 +100,21 @@ void main(int argc, char **argv){
     printf("Number of Ideal Taps: %u\n",num_taps);
     rewind(tapfp);
 
+
+    // Establish skip count
+    uint32_t frame_skip;
+    if(print_options == CSV_OI4V_FMT){
+        double ratio_t_2_i = iterations / TGT_VIDEO_FRAMES;
+        if(iterations - TGT_VIDEO_FRAMES <= 0.5){
+            frame_skip = (uint32_t)ratio_t_2_i;
+        } else {
+            frame_skip = (uint32_t) ratio_t_2_i + 1;
+        }
+        fprintf(printfp,"%lu\n",frame_skip);
+    }
+
+
+
     double *ideal_taps = malloc(num_taps * sizeof(double));
     double *ideal_delay_line = malloc(num_taps * sizeof(double));
 
@@ -155,10 +172,19 @@ void main(int argc, char **argv){
 
             // Add new line for newest tap stuff
             if(print_options == CSV_OI4V_FMT){
-                for(uint32_t q = 0; q < num_taps - 1; ++q){
-                    fprintf(printfp,"%.14lf,",adaptive_taps[q]);
+                if(frame_skip){
+                    if(!(n % frame_skip)){
+                        for(uint32_t q = 0; q < num_taps - 1; ++q){
+                            fprintf(printfp,"%.14lf,",adaptive_taps[q]);
+                        }
+                        fprintf(printfp,"%.14lf\n",adaptive_taps[num_taps - 1]);
+                    }
+                } else {
+                    for(uint32_t q = 0; q < num_taps - 1; ++q){
+                        fprintf(printfp,"%.14lf,",adaptive_taps[q]);
+                    }
+                    fprintf(printfp,"%.14lf\n",adaptive_taps[num_taps - 1]);
                 }
-                fprintf(printfp,"%.14lf\n",adaptive_taps[num_taps - 1]);
             }
         }
 

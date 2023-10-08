@@ -20,6 +20,11 @@ def main(argv):
     # Store Beta
     learning_rate = float(dat_file.readline())
     print(f"\t  Learning Rate: {learning_rate}")
+
+    # Get frame stride to reduce file sizes
+    frame_stride = int(dat_file.readline())
+    print(f"\t   Frame Stride: {frame_stride}")
+
     # Get number of adaptive taps
     adaptive_tap_ct = int(dat_file.readline())
     print(f"Number of Adaptive Taps: {adaptive_tap_ct}\n")
@@ -37,6 +42,8 @@ def main(argv):
     ideal_taps = [float(q) for q in ideal_taps]
     #print(ideal_taps)
     
+    number_of_pics = 0
+
     # Then: IDX vs. H_HATs
     ctr = 0
     ctr_char_w = 1
@@ -46,7 +53,7 @@ def main(argv):
         fly = [float(q) for q in spl]
         #print(fly)
         # now we finally have an array of floats....
-        coolstr = "iter_frame_" + str(ctr) + ".png"
+        coolstr = "iter_frame_" + str(number_of_pics) + ".png"
         
         plt.plot(graph_Xax,ideal_taps, color='b',label='ideal')
         
@@ -62,15 +69,16 @@ def main(argv):
         plt.savefig('./oi4v/' + coolstr, bbox_inches='tight')
         #plt.show()
         plt.clf()
-        ctr = ctr + 1
+        number_of_pics = number_of_pics + 1
+        ctr = ctr + frame_stride
         ctr_char_w = len(str(ctr))
         shamt = num_chars - ctr_char_w
 
     dat_file.close()
     t1 = time.time()
     t1 = (t1 - t0)
-    print(f"Completed Image Generation in: \t{t1} s\n")
-
+    print(f"Completed Image Generation in: \t{t1} s")
+    print(f"Generated {number_of_pics} images!\n")
 
 
 
@@ -78,4 +86,5 @@ if __name__ == "__main__":
     if(len(sys.argv) > 1): 
         main(sys.argv[1:])
 
+    exit()
 
