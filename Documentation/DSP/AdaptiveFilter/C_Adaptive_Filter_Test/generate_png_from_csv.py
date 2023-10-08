@@ -1,0 +1,81 @@
+## Joseph A. De Vico
+##  10-8-2023
+##  Massive CSV -> PNG -> Movie... horrific efficiency, but pretty :)
+##
+
+import sys
+import time
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+def main(argv):
+    print("\nFile Okay!");
+    dat_file = open(argv[0],"r")
+    # Store num pts as first entry
+    file_len = int(dat_file.readline())
+    print(f"\t     Iterations: {file_len}")
+    num_chars = len(str(file_len))
+
+    # Store Beta
+    learning_rate = float(dat_file.readline())
+    print(f"\t  Learning Rate: {learning_rate}")
+    # Get number of adaptive taps
+    adaptive_tap_ct = int(dat_file.readline())
+    print(f"Number of Adaptive Taps: {adaptive_tap_ct}\n")
+
+    print(" Starting Image Generation")
+
+    t0 = time.time()
+    graph_Xax = np.linspace(0,adaptive_tap_ct - 1,adaptive_tap_ct)
+    ##print(graph_Xax)
+
+    plt.rcParams["font.family"] = "monospace"
+
+    # First Line == Ideal Taps
+    ideal_taps = dat_file.readline().split(',')
+    ideal_taps = [float(q) for q in ideal_taps]
+    #print(ideal_taps)
+    
+    # Then: IDX vs. H_HATs
+    ctr = 0
+    ctr_char_w = 1
+    shamt = num_chars - ctr_char_w
+    for n in dat_file:
+        spl = n.split(',')
+        fly = [float(q) for q in spl]
+        #print(fly)
+        # now we finally have an array of floats....
+        coolstr = "iter_frame_" + str(ctr) + ".png"
+        
+        plt.plot(graph_Xax,ideal_taps, color='b',label='ideal')
+        
+        frame_label_ctr = str(ctr) + " "*shamt
+        plt.plot(graph_Xax,fly, color='r', label='adaptive ' + frame_label_ctr + '/' + str(file_len))
+        
+        plt.xlabel("Tap") 
+        plt.ylabel("Magnitude") 
+        plt.title(str(adaptive_tap_ct) + " Tap Adaptive Filter @ " + str(learning_rate) + " Alpha") 
+
+        plt.legend()
+
+        plt.savefig('./oi4v/' + coolstr, bbox_inches='tight')
+        #plt.show()
+        plt.clf()
+        ctr = ctr + 1
+        ctr_char_w = len(str(ctr))
+        shamt = num_chars - ctr_char_w
+
+    dat_file.close()
+    t1 = time.time()
+    t1 = (t1 - t0)
+    print(f"Completed Image Generation in: \t{t1} s\n")
+
+
+
+
+if __name__ == "__main__":
+    if(len(sys.argv) > 1): 
+        main(sys.argv[1:])
+
+

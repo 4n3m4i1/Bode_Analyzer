@@ -10,6 +10,10 @@
 
 #define DFL_BETA_RATE       0.005
 
+
+uint32_t    print_options = 0;
+#define CSV_OI4V_FMT    1u
+
 uint32_t    num_taps = 0;
 uint32_t    iterations = DFL_ITERATIONS;
 
@@ -75,6 +79,16 @@ void main(int argc, char **argv){
 
     printf("Beta adaptive rate: %lf\n",beta);
 
+
+    FILE *printfp;
+    if(argc > 3){
+        print_options = CSV_OI4V_FMT;
+        printf("Print History as Images: On!\n");
+        printfp = fopen("adaptive_tap_frames.csv","w");
+        fprintf(printfp,"%lu\n%.14lf\n", iterations, beta);
+    }
+
+
     FILE *tapfp;
     tapfp = fopen("test_ideal_tap_weights.txt","r");
 
@@ -106,6 +120,15 @@ void main(int argc, char **argv){
             x[n] = 0;
             ideal_delay_line[n] = 0;
         }
+
+        // Save ideal taps
+        if(print_options == CSV_OI4V_FMT){
+            fprintf(printfp,"%lu\n",num_taps);          // Print number of taps
+            for(uint32_t q = 0; q < num_taps - 1; ++q){
+                fprintf(printfp,"%.14lf,",ideal_taps[q]);
+            }
+            fprintf(printfp,"%.14lf\n",ideal_taps[num_taps - 1]);
+        }
         
         // Run main sampling loop simulation
         for(uint32_t n = 0; n < iterations; ++n){
@@ -128,6 +151,20 @@ void main(int argc, char **argv){
             // Iterate and reconfigure adaptive taps to correct for measured
             //  error.
             update_h_hat(adaptive_taps, x, err, beta, num_taps);
+        
+
+            // Add new line for newest tap stuff
+            if(print_options == CSV_OI4V_FMT){
+                for(uint32_t q = 0; q < num_taps - 1; ++q){
+                    fprintf(printfp,"%.14lf,",adaptive_taps[q]);
+                }
+                fprintf(printfp,"%.14lf\n",adaptive_taps[num_taps - 1]);
+            }
+        }
+
+        // Close file, turn into video
+        if(print_options == CSV_OI4V_FMT){
+            fclose(printfp);
         }
 
         double error_avg = fabs(error_accum / (double)iterations);
@@ -135,7 +172,7 @@ void main(int argc, char **argv){
         if(error_avg > LIMIT_FOR_ERROR){
             printf("Failed to converge under error limit!! :^(\n");
         } else {
-            printf("Completed simulation with an average error of:\n\t%lf\n",error_avg);    
+            printf("Completed simulation with an average error of:\n\t%.14lf\n",error_avg);    
         }
         
 
@@ -151,14 +188,14 @@ void main(int argc, char **argv){
             fpo = fopen("simulation_results.csv","w");
             fprintf(fpo,"IDX,H_HAT,H_IDEAL,H_ERROR\n");
             for(uint32_t n = 0; n < num_taps; ++n){
-                fprintf(fpo,"%u,%lf,%lf,%lf\n", n, adaptive_taps[n], ideal_taps[n], adaptive_taps[n] - ideal_taps[n]);
+                fprintf(fpo,"%u,%.14lf,%.14lf,%.14lf\n", n, adaptive_taps[n], ideal_taps[n], adaptive_taps[n] - ideal_taps[n]);
             }
             fclose(fpo);
 
             fpo = fopen("error_plot.csv","w");
             fprintf(fpo,"IDX,ERR\n");
             for(uint32_t n = 0; n < iterations; ++n){
-                fprintf(fpo,"%u,%lf\n",n,error_plot[n]);
+                fprintf(fpo,"%u,%.14lf\n",n,error_plot[n]);
             }
             fclose(fpo);
         }
