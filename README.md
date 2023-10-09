@@ -2,6 +2,7 @@
 The Bode Bandits Analysis Tool provides frequency response characteristics of a multitude of filters.
 A Python GUI allows interface with the tool...  
   
+## Example
 ~[](https://github.com/4n3m4i1/Bode_Analyzer/blob/main/img/anim_output.gif)
 
 ## Repo Layout
