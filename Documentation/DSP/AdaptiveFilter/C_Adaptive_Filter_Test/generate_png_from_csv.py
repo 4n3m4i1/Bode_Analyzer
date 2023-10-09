@@ -29,11 +29,15 @@ def main(argv):
     adaptive_tap_ct = int(dat_file.readline())
     print(f"Number of Adaptive Taps: {adaptive_tap_ct}\n")
 
+    ideal_tap_ct = int(dat_file.readline())
+    print(f"   Number of Ideal Taps: {ideal_tap_ct}\n")
+
     print(" Starting Image Generation")
 
     t0 = time.time()
-    graph_Xax = np.linspace(0,adaptive_tap_ct - 1,adaptive_tap_ct)
-    ##print(graph_Xax)
+    adaptive_Xax = np.linspace(0,adaptive_tap_ct - 1,adaptive_tap_ct)
+    ideal_Xax = np.linspace(0,adaptive_tap_ct - 1,ideal_tap_ct)
+    ##print(adaptive_Xax)
 
     plt.rcParams["font.family"] = "monospace"
 
@@ -55,10 +59,10 @@ def main(argv):
         # now we finally have an array of floats....
         coolstr = "iter_frame_" + str(number_of_pics) + ".png"
         
-        plt.plot(graph_Xax,ideal_taps, color='b',label='ideal')
+        plt.plot(ideal_Xax,ideal_taps, color='b',label='ideal')
         
         frame_label_ctr = str(ctr) + " "*shamt
-        plt.plot(graph_Xax,fly, color='r', label='adaptive ' + frame_label_ctr + '/' + str(file_len))
+        plt.plot(adaptive_Xax,fly, color='r', label='adaptive ' + frame_label_ctr + '/' + str(file_len))
         
         plt.xlabel("Tap") 
         plt.ylabel("Magnitude") 

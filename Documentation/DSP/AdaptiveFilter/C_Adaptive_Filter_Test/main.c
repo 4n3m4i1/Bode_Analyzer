@@ -16,7 +16,8 @@ uint32_t    print_options = 0;
 #define TGT_VIDEO_FRAMES    1000
 
 
-uint32_t    num_taps = 0;
+uint32_t    ideal_tap_num = 0;
+uint32_t    adaptive_tap_num = 1024;
 uint32_t    iterations = DFL_ITERATIONS;
 
 // Different algorithms for H_HAT updates, leave all commented for DFL
@@ -96,10 +97,11 @@ void main(int argc, char **argv){
 
     double rval;
 
-    while(fscanf(tapfp,"%lf",&rval) != EOF) num_taps += 1;
-    printf("Number of Ideal Taps: %u\n",num_taps);
+    while(fscanf(tapfp,"%lf",&rval) != EOF) ideal_tap_num += 1;
+    printf("Number of Ideal Taps: %u\n",ideal_tap_num);
     rewind(tapfp);
 
+    adaptive_tap_num = ideal_tap_num;
 
     // Establish skip count
     uint32_t frame_skip;
@@ -115,11 +117,11 @@ void main(int argc, char **argv){
 
 
 
-    double *ideal_taps = malloc(num_taps * sizeof(double));
-    double *ideal_delay_line = malloc(num_taps * sizeof(double));
+    double *ideal_taps = malloc(ideal_tap_num * sizeof(double));
+    double *ideal_delay_line = malloc(ideal_tap_num * sizeof(double));
 
-    double *adaptive_taps = malloc(num_taps * sizeof(double));
-    double *x = malloc(num_taps * sizeof(double));
+    double *adaptive_taps = malloc(adaptive_tap_num * sizeof(double));
+    double *x = malloc(adaptive_tap_num * sizeof(double));
 
     double err;
 
@@ -129,33 +131,37 @@ void main(int argc, char **argv){
 
     if(ideal_taps && adaptive_taps && x && ideal_delay_line && error_plot){
         
-        for(uint32_t n = 0; n < num_taps; ++n){
+        for(uint32_t n = 0; n < ideal_tap_num; ++n){
             fscanf(tapfp,"%lf",&rval);
             ideal_taps[n] = rval;
-        
+            ideal_delay_line[n] = 0;
+        }
+
+        for(uint32_t n = 0; n < adaptive_tap_num; ++n){
             adaptive_taps[n] = 0;
             x[n] = 0;
-            ideal_delay_line[n] = 0;
         }
 
         // Save ideal taps
         if(print_options == CSV_OI4V_FMT){
-            fprintf(printfp,"%lu\n",num_taps);          // Print number of taps
-            for(uint32_t q = 0; q < num_taps - 1; ++q){
+            fprintf(printfp,"%lu\n",adaptive_tap_num);                  // print adaptive tap count
+            fprintf(printfp,"%lu\n",ideal_tap_num);                     // Print number of ideal taps
+            for(uint32_t q = 0; q < ideal_tap_num - 1; ++q){
                 fprintf(printfp,"%.14lf,",ideal_taps[q]);
             }
-            fprintf(printfp,"%.14lf\n",ideal_taps[num_taps - 1]);
+            fprintf(printfp,"%.14lf\n",ideal_taps[ideal_tap_num - 1]);
         }
+
         
         // Run main sampling loop simulation
         for(uint32_t n = 0; n < iterations; ++n){
             double new_data = generate_awgn_sample();
             
             // Simulate a system under test's output given white noise input
-            double target_sample_d = perform_fir(ideal_taps, ideal_delay_line, new_data, num_taps);
+            double target_sample_d = perform_fir(ideal_taps, ideal_delay_line, new_data, ideal_tap_num);
 
             // Run "internal" FIR structure
-            double y_hat = perform_fir(adaptive_taps, x, new_data, num_taps);
+            double y_hat = perform_fir(adaptive_taps, x, new_data, adaptive_tap_num);
         
             // Determine output error
             err = target_sample_d - y_hat;
@@ -167,23 +173,23 @@ void main(int argc, char **argv){
 
             // Iterate and reconfigure adaptive taps to correct for measured
             //  error.
-            update_h_hat(adaptive_taps, x, err, beta, num_taps);
+            update_h_hat(adaptive_taps, x, err, beta, adaptive_tap_num);
         
 
             // Add new line for newest tap stuff
             if(print_options == CSV_OI4V_FMT){
                 if(frame_skip){
                     if(!(n % frame_skip)){
-                        for(uint32_t q = 0; q < num_taps - 1; ++q){
+                        for(uint32_t q = 0; q < adaptive_tap_num - 1; ++q){
                             fprintf(printfp,"%.14lf,",adaptive_taps[q]);
                         }
-                        fprintf(printfp,"%.14lf\n",adaptive_taps[num_taps - 1]);
+                        fprintf(printfp,"%.14lf\n",adaptive_taps[adaptive_tap_num - 1]);
                     }
                 } else {
-                    for(uint32_t q = 0; q < num_taps - 1; ++q){
+                    for(uint32_t q = 0; q < adaptive_tap_num - 1; ++q){
                         fprintf(printfp,"%.14lf,",adaptive_taps[q]);
                     }
-                    fprintf(printfp,"%.14lf\n",adaptive_taps[num_taps - 1]);
+                    fprintf(printfp,"%.14lf\n",adaptive_taps[adaptive_tap_num - 1]);
                 }
             }
         }
@@ -211,10 +217,17 @@ void main(int argc, char **argv){
 
         if(error_avg <= LIMIT_FOR_ERROR){
             FILE *fpo;
-            fpo = fopen("simulation_results.csv","w");
-            fprintf(fpo,"IDX,H_HAT,H_IDEAL,H_ERROR\n");
-            for(uint32_t n = 0; n < num_taps; ++n){
-                fprintf(fpo,"%u,%.14lf,%.14lf,%.14lf\n", n, adaptive_taps[n], ideal_taps[n], adaptive_taps[n] - ideal_taps[n]);
+            fpo = fopen("ideal_tap_results.csv","w");
+            fprintf(fpo,"IDX,IDEAL_TAP\n");
+            for(uint32_t n = 0; n < ideal_tap_num; ++n){
+                fprintf(fpo,"%u,%.14lf\n", n, ideal_taps[n]);
+            }
+            fclose(fpo);
+
+            fpo = fopen("adaptive_tap_results.csv","w");
+            fprintf(fpo,"IDX_ADAP,H_HAT\n");
+            for(uint32_t n = 0; n < adaptive_tap_num; ++n){
+                fprintf(fpo,"%u,%.14f\n",n,adaptive_taps[n]);
             }
             fclose(fpo);
 
