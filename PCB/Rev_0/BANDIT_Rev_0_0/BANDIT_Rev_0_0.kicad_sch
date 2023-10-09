@@ -274,6 +274,10 @@
   )
 
 
+  (text "josh was here\n" (at 161.29 101.6 0)
+    (effects (font (size 1.27 1.27)) (justify left bottom))
+    (uuid 46769d94-5abb-444e-97f1-b03d49edfd8b)
+  )
   (text "BANDIT: Frequency Response Analyzer" (at 132.08 22.86 0)
     (effects (font (size 5 5) (thickness 1) bold) (justify left bottom))
     (uuid 573f155b-da9c-48e6-a71c-de3f4266ef9f)
