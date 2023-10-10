@@ -127,9 +127,11 @@ void main(int argc, char **argv){
 
     double *error_plot = malloc(iterations * sizeof(double));
 
+    double *integral_error = malloc(iterations * sizeof(double));
+
     double error_accum = 0;
 
-    if(ideal_taps && adaptive_taps && x && ideal_delay_line && error_plot){
+    if(ideal_taps && adaptive_taps && x && ideal_delay_line && error_plot && integral_error){
         
         for(uint32_t n = 0; n < ideal_tap_num; ++n){
             fscanf(tapfp,"%lf",&rval);
@@ -170,11 +172,13 @@ void main(int argc, char **argv){
             error_accum += err;
             error_plot[n] = err;
 
-
             // Iterate and reconfigure adaptive taps to correct for measured
             //  error.
             update_h_hat(adaptive_taps, x, err, beta, adaptive_tap_num);
-        
+
+            // Riemann sum taps, take difference
+            for(uint32_t m = 0; m < adaptive_tap_num; ++m) integral_error[n] += adaptive_taps[m];
+            for(uint32_t m = 0; m < ideal_tap_num; ++m) integral_error[n] -= ideal_taps[m];
 
             // Add new line for newest tap stuff
             if(print_options == CSV_OI4V_FMT){
@@ -232,9 +236,9 @@ void main(int argc, char **argv){
             fclose(fpo);
 
             fpo = fopen("error_plot.csv","w");
-            fprintf(fpo,"IDX,ERR\n");
+            fprintf(fpo,"IDX,ERR,INT_ERR\n");
             for(uint32_t n = 0; n < iterations; ++n){
-                fprintf(fpo,"%u,%.14lf\n",n,error_plot[n]);
+                fprintf(fpo,"%u,%.14lf,%.14lf\n",n,error_plot[n],integral_error[n]);
             }
             fclose(fpo);
         }
@@ -245,6 +249,7 @@ void main(int argc, char **argv){
         free(x);
         free(ideal_delay_line);
         free(error_plot);
+        free(integral_error);
     } else {
         printf("Error allocating memory!\n");
     }
