@@ -23,20 +23,55 @@
  *
  */
 
+// Generic Include
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <string.h>   // memcpy
 #include <ctype.h>
+#include <inttypes.h>
 
+// TinyUSB Stack
 #include "bsp/board.h"
 #include "tusb.h"
 
-//------------- prototypes -------------//
+// RP2040 Project Specific
+#include "pico/stdlib.h"
+#include "pico/multicore.h"
+#include "hardware/i2c.h"
+#include "hardware/timer.h"
+#include "hardware/pwm.h"
+#include "hardware/structs/rosc.h"
+#include "generic_include.h"
+
+
+
+// Fake Data Transfer Stuff
+/*
+  A fixed large length of buffer
+  This can hold less data, but will always
+  send at full length to make life easy.
+*/
+#define CDC_PACKET_LEN  64
+#define BUF_LEN 1024
+#define NUM_PACKET_PER_BUF  (BUF_LEN / CDC_PACKET_LEN)
+
+
+
+
+
+uint8_t header_data[CDC_PACKET_LEN];
+Q15     h_hat_fake[BUF_LEN];
+Q15     fft_r_fake[BUF_LEN];
+Q15     fft_i_fake[BUF_LEN];
+
+
 static void cdc_task(void);
 
-/*------------- MAIN -------------*/
-int main(void)
-{
+
+
+
+
+int main(){
   board_init();
 
   // init device stack on configured roothub port

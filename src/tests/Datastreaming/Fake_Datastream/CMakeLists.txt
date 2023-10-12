@@ -16,15 +16,28 @@ family_initialize_project(${PROJECT} ${CMAKE_CURRENT_LIST_DIR})
 add_executable(${PROJECT})
 
 # Example source
-target_sources(${PROJECT} PUBLIC
+target_sources(
+        ${PROJECT} PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/main.c
         ${CMAKE_CURRENT_SOURCE_DIR}/usb_descriptors.c
         )
 
 # Example include
-target_include_directories(${PROJECT} PUBLIC
+target_include_directories(
+        ${PROJECT} PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
         )
+
+target_link_libraries(
+        ${PROJECT} PUBLIC
+        pico_stdlib
+        pico_multicore
+        hardware_i2c
+        hardware_timer
+        hardware_pwm
+        )
+
+
 
 # Configure compilation flags and libraries for the example... see the corresponding function
 # in hw/bsp/FAMILY/family.cmake for details.
