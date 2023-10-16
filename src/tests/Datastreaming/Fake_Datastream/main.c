@@ -44,6 +44,8 @@
 #include "generic_include.h"
 
 
+#define CDC_DATA_CHAN   0
+#define CDC_CTRL_CHAN   1
 
 // Fake Data Transfer Stuff
 /*
@@ -53,7 +55,7 @@
 */
 #define CDC_PACKET_LEN  64
 #define BUF_LEN 1024
-#define NUM_PACKET_PER_BUF  (BUF_LEN / CDC_PACKET_LEN)
+#define NUM_PACKET_PER_BUF  ((BUF_LEN / CDC_PACKET_LEN) * sizeof(Q15))
 
 
 
@@ -65,74 +67,149 @@ Q15     fft_r_fake[BUF_LEN];
 Q15     fft_i_fake[BUF_LEN];
 
 
-static void cdc_task(void);
-
+//static void cdc_task(void);
+static void send_data_packet(Q15 *h_hats, Q15 *fftrr, Q15 *fftri, uint16_t num_h_hats);
 
 
 
 
 int main(){
-  board_init();
+    board_init();
 
-  // init device stack on configured roothub port
-  tud_init(BOARD_TUD_RHPORT);
+    // init device stack on configured roothub port
+    tud_init(BOARD_TUD_RHPORT);
 
-  while (1)
-  {
-    tud_task(); // tinyusb device task
-    cdc_task();
-  }
+    for(uint n = 0; n < BUF_LEN; ++n){
+        h_hat_fake[n] = n;
+        fft_r_fake[n] = n << 1;
+        fft_i_fake[n] = n << 2;
+    }
 
-  return 0;
+
+    while (1)
+    {
+        tud_task(); // tinyusb device task
+        //cdc_task();
+        if(tud_cdc_n_available(CDC_CTRL_CHAN)){
+            send_data_packet(h_hat_fake,fft_r_fake,fft_i_fake,BUF_LEN);
+        }
+    }
+
+    return 0;
 }
 
+static void send_data_packet(Q15 *h_hats, Q15 *fftrr, Q15 *fftri, uint16_t num_h_hats){
+    /*
+        Data: All LSB first / little endian
+        Header sample:
+        - 1 byte Start of Field
+        - 2 bytes Message Type
+        - 60 bytes idk yet
+        - 1 byte End of Field
+    */
+    static char usb_2_send_buf[CDC_PACKET_LEN] = {0x00};
+
+    //static const char waitmsg[CDC_PACKET_LEN] = "Waiting for TX buffer..\r\n";
+    
+    char tmp[64] = {0x00};
+
+    uint16_t sentbytes = 0;
+
+    sprintf(tmp,"Can Write: %u bytes!\r\n", (uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN));
+    tud_cdc_n_write(CDC_CTRL_CHAN, tmp, CDC_PACKET_LEN);
+    tud_cdc_n_write_flush(CDC_CTRL_CHAN);
+
+    tud_task(); // tinyusb device task
+
+    for(uint32_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
+        while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
+            tud_task(); // tinyusb device task
+            busy_wait_us(10);
+        }
+        sentbytes += (uint16_t)tud_cdc_n_write(CDC_DATA_CHAN, ((uint8_t *)h_hats + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
+    }
+
+    tud_task(); // tinyusb device task
+    
+    if((fftri && fftrr) || num_h_hats){
+        num_h_hats = 0;
+        usb_2_send_buf[0] = '\0';
+    }
+    //tud_cdc_n_write(CDC_DATA_CHAN, h_hats, BUF_LEN * sizeof(Q15));
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
+
+    tud_task(); // tinyusb device task
+/*
+    for(uint32_t n = 0; n < NUM_PACKET_PER_BUF >> 1; ++n){
+        tud_cdc_n_write(CDC_DATA_CHAN, (fftrr + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
+        tud_cdc_n_write_flush(CDC_DATA_CHAN);
+    }
+    for(uint32_t n = 0; n < NUM_PACKET_PER_BUF >> 1; ++n){
+        tud_cdc_n_write(CDC_DATA_CHAN, (fftri + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
+        tud_cdc_n_write_flush(CDC_DATA_CHAN);
+    }
+*/      
+        
+        
+
+        uint16_t count = (uint16_t)tud_cdc_n_read(CDC_CTRL_CHAN, usb_2_send_buf, sizeof(usb_2_send_buf));
+
+        sprintf(usb_2_send_buf,"BA: %u\tRead: %u\tSent: %u\r\n", (uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN),count, sentbytes);
+        tud_cdc_n_write(CDC_CTRL_CHAN,usb_2_send_buf,CDC_PACKET_LEN);
+    //}
+}
+
+/*
 // echo to either Serial0 or Serial1
 // with Serial0 as all lower case, Serial1 as all upper case
 static void echo_serial_port(uint8_t itf, uint8_t buf[], uint32_t count)
 {
-  uint8_t const case_diff = 'a' - 'A';
+    uint8_t const case_diff = 'a' - 'A';
 
-  for(uint32_t i=0; i<count; i++)
-  {
-    if (itf == 0)
+    for(uint32_t i=0; i<count; i++)
     {
-      // echo back 1st port as lower case
-      if (isupper(buf[i])) buf[i] += case_diff;
-    }
-    else
-    {
-      // echo back 2nd port as upper case
-      if (islower(buf[i])) buf[i] -= case_diff;
-    }
+        if (itf == 0)
+        {
+        // echo back 1st port as lower case
+        if (isupper(buf[i])) buf[i] += case_diff;
+        }
+        else
+        {
+        // echo back 2nd port as upper case
+        if (islower(buf[i])) buf[i] -= case_diff;
+        }
 
-    tud_cdc_n_write_char(itf, buf[i]);
-  }
-  tud_cdc_n_write_flush(itf);
+        tud_cdc_n_write_char(itf, buf[i]);
+    }
+    tud_cdc_n_write_flush(itf);
 }
-
+*/
 //--------------------------------------------------------------------+
 // USB CDC
 //--------------------------------------------------------------------+
+/*
 static void cdc_task(void)
 {
-  uint8_t itf;
+    uint8_t itf;
 
-  for (itf = 0; itf < CFG_TUD_CDC; itf++)
-  {
-    // connected() check for DTR bit
-    // Most but not all terminal client set this when making connection
-    // if ( tud_cdc_n_connected(itf) )
+    for (itf = 0; itf < CFG_TUD_CDC; itf++)
     {
-      if ( tud_cdc_n_available(itf) )
-      {
-        uint8_t buf[64];
+        // connected() check for DTR bit
+        // Most but not all terminal client set this when making connection
+        // if ( tud_cdc_n_connected(itf) )
+        {
+        if ( tud_cdc_n_available(itf) )
+        {
+            uint8_t buf[64];
 
-        uint32_t count = tud_cdc_n_read(itf, buf, sizeof(buf));
+            uint32_t count = tud_cdc_n_read(itf, buf, sizeof(buf));
 
-        // echo back to both serial ports
-        echo_serial_port(0, buf, count);
-        echo_serial_port(1, buf, count);
-      }
+            // echo back to both serial ports
+            echo_serial_port(0, buf, count);
+            echo_serial_port(1, buf, count);
+        }
+        }
     }
-  }
 }
+
+*/

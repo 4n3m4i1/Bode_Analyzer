@@ -23,7 +23,8 @@ uint32_t    iterations = DFL_ITERATIONS;
 // Different algorithms for H_HAT updates, leave all commented for DFL
 //#define HALG_2        // DOESN'T WORK!!!!
 //#define HALG_3        // DOESN'T WORK EVEN W /0 FIX!!
-
+//#define HALG_4        // kinda a joke to try this one
+//#define HALG_5
 
 // Sorta kinda Box-Muller + Lazy Programming
 double generate_awgn_sample(){
@@ -58,7 +59,14 @@ void update_h_hat(double *h_hat_taps, double *idt_delay_line, double error, doub
             h_hat_taps[n] += (beta_rate * error) / (idt_delay_line[n]);
             printf("HE %lf\n",h_hat_taps[n]);
         }
-
+#elif defined(HALG_4)
+        for(uint32_t n = 0; n < len; ++n){
+            h_hat_taps[n] -= beta_rate * (error * idt_delay_line[n]);
+        }
+#elif defined(HALG_5)
+        for(uint32_t n = 0; n < len; ++n){
+            h_hat_taps[n] += beta_rate * (2.0 * error * idt_delay_line[n]);
+        }
 #else
         for(uint32_t n = 0; n < len; ++n){
             h_hat_taps[n] += beta_rate * (error * idt_delay_line[n]);
@@ -208,7 +216,8 @@ void main(int argc, char **argv){
         if(error_avg > LIMIT_FOR_ERROR){
             printf("Failed to converge under error limit!! :^(\n");
         } else {
-            printf("Completed simulation with an average error of:\n\t%.14lf\n",error_avg);    
+            printf("Completed simulation with an average error of:\n\t\t\t%.14lf\n",error_avg);
+            printf("Final Integral Error:\t%.14lf\n",integral_error[iterations - 1]);    
         }
         
 
