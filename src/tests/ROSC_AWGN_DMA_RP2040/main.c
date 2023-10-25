@@ -24,13 +24,6 @@ const uint32_t awgn_txfer_ct = 0x0FFFFFFF;
 void main(){
     stdio_init_all();
 
-    gpio_init(0);
-//    gpio_init(2);
-    gpio_set_dir(0, GPIO_OUT);
-//    gpio_set_dir(2, GPIO_OUT);
-//    gpio_put(0, 0);
-//    gpio_put(2, 0);
-//
     busy_wait_ms(1000);
 
     rosc_hw->ctrl   = ROSC_CTRL_FREQ_RANGE_VALUE_HIGH;
