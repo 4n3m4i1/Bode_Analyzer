@@ -18,28 +18,21 @@
 
 int dma_awgn_data_chan, dma_awgn_ctrl_chan;
 
-uint32_t awgn_txfer_ct = 0xFFFFFFFF;
+const uint32_t awgn_txfer_ct = 0x0FFFFFFF;
 
 
 void main(){
     stdio_init_all();
 
-//    gpio_init(0);
+    gpio_init(0);
 //    gpio_init(2);
-//    gpio_set_dir(0, GPIO_OUT);
+    gpio_set_dir(0, GPIO_OUT);
 //    gpio_set_dir(2, GPIO_OUT);
 //    gpio_put(0, 0);
 //    gpio_put(2, 0);
 //
     busy_wait_ms(1000);
 
-    
-
-/*
-  *rosc_ctl =  ROSC_CTRL_FREQ_RANGE_VALUE_HIGH ;// | ROSC_CTRL_ENABLE_VALUE_ENABLE;
-  *rosc_freqA = (ROSC_FREQA_PASSWD_VALUE_PASS<<16) | 0xffff ;
-  *rosc_freqB = (ROSC_FREQB_PASSWD_VALUE_PASS<<16) | 0xffff ;
-*/
     rosc_hw->ctrl   = ROSC_CTRL_FREQ_RANGE_VALUE_HIGH;
     rosc_hw->freqa  = (ROSC_FREQA_PASSWD_VALUE_PASS << 16) | 0xFFFF;
     rosc_hw->freqb  = (ROSC_FREQB_PASSWD_VALUE_PASS << 16) | 0xFFFF;
@@ -47,12 +40,15 @@ void main(){
     PIO awgn_pio = pio0;
     int awgn_sm = 0;
     uint offset = pio_add_program(awgn_pio, &val2pin_program);
-    awgn_pio->sm[awgn_sm].clkdiv = (uint32_t) ((3 << 16));
+    awgn_pio->sm[awgn_sm].clkdiv = (uint32_t) ((15 << 16));
     val2pin_program_init(awgn_pio, awgn_sm, offset, DMA_ROSC_PIN);
 
 
-    dma_awgn_ctrl_chan = dma_claim_unused_channel(true);
-    dma_awgn_data_chan = dma_claim_unused_channel(true);
+    //dma_awgn_ctrl_chan = dma_claim_unused_channel(true);
+    //dma_awgn_data_chan = dma_claim_unused_channel(true);
+
+    dma_awgn_ctrl_chan = 1;
+    dma_awgn_data_chan = 0;
 
     dma_channel_config c = dma_channel_get_default_config(dma_awgn_ctrl_chan);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_32);
@@ -63,13 +59,13 @@ void main(){
     dma_channel_configure(
         dma_awgn_ctrl_chan,
         &c,
-        &dma_hw->ch[dma_awgn_data_chan].al3_transfer_count, // Write address (only need to set this once)
+        // Write to data channel transfer count to refill it
+        ((volatile uint32_t *)(0x50000000 + 0x01C)),
+        //&dma_hw->ch[dma_awgn_data_chan].al2_transfer_count,
         &awgn_txfer_ct,   // Number of DMA transfers the data channel should make
-        1,                // Write the same value many times, then halt and interrupt
+        1,                // Write the transfer count once to the data channel
         false             // Don't start yet
     );
-
-
     
     c = dma_channel_get_default_config(dma_awgn_data_chan);
     channel_config_set_transfer_data_size(&c, DMA_SIZE_8);
@@ -81,17 +77,21 @@ void main(){
     dma_channel_configure(
         dma_awgn_data_chan,
         &c,
-        &pio0_hw->txf[0], // Write address (only need to set this once)
-        NULL,             // Don't provide a read address yet
-        0xFFFFFFFF,       // Write the same value many times, then halt and interrupt
-        false             // Don't start yet
+        &pio0_hw->txf[0],       // Write to PIO0 TX FIFO to put randombit on pin
+        &rosc_hw->randombit,    // Read random bit from ROSC
+        0,                      // Wait for ctrl channel to fill tx count
+        false                   // Don't start yet
     );
     
-    dma_channel_set_read_addr(dma_awgn_data_chan, &rosc_hw->randombit, true);
+    dma_start_channel_mask(1 << dma_awgn_ctrl_chan);
 
     while(1){
-        //awgn_pio->txf[0] = rosc_hw->randombit;
-
+        //if(dma_hw->ch[dma_awgn_data_chan].al2_transfer_count == 0) {
+        //    printf("Refill! @ 0x%08X\n", &(dma_hw->ch[dma_awgn_data_chan].al2_transfer_count));
+        //    *((volatile uint32_t *)(0x50000000 + 0x01C)) = awgn_txfer_ct;
+           // dma_hw->ch[dma_awgn_data_chan].al2_transfer_count = awgn_txfer_ct;
+        //}
+        busy_wait_ms(10);
         tight_loop_contents();
     }
 }
