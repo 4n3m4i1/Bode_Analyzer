@@ -52,9 +52,8 @@ void main(){
     dma_channel_configure(
         dma_awgn_ctrl_chan,
         &c,
-        // Write to data channel transfer count to refill it
-        ((volatile uint32_t *)(0x50000000 + 0x01C)),
-        //&dma_hw->ch[dma_awgn_data_chan].al2_transfer_count,
+        // Write to data channel 0 transfer count to refill it
+        ((volatile uint32_t *)(DMA_BASE + 0x1C)),
         &awgn_txfer_ct,   // Number of DMA transfers the data channel should make
         1,                // Write the transfer count once to the data channel
         false             // Don't start yet
