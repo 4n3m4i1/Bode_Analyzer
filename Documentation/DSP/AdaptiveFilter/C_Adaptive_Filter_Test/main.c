@@ -110,6 +110,7 @@ void main(int argc, char **argv){
     rewind(tapfp);
 
     adaptive_tap_num = ideal_tap_num;
+    //adaptive_tap_num = 128;
 
     // Establish skip count
     uint32_t frame_skip;

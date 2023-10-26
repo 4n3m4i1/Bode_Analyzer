@@ -34,7 +34,7 @@ void main(int argc, char **argv){
     FILE *sin_ofp;
     sin_ofp = fopen("Q15_sin_table.h","w");
 
-    setup_table_file(sin_ofp,"sin_table",nsamp);
+    setup_table_file(sin_ofp,"sin",nsamp);
     
     for(uint32_t n = 0; n < nsamp; ++n){
         double sin_term = sin((2.0 * M_PI) * (((double)n)/((double)nsamp)));
@@ -51,7 +51,7 @@ void main(int argc, char **argv){
             FILE *cos_ofp;
             cos_ofp = fopen("Q15_cos_table.h","w");
 
-            setup_table_file(cos_ofp,"cos_table",nsamp);
+            setup_table_file(cos_ofp,"cos",nsamp);
     
             for(uint32_t n = 0; n < nsamp; ++n){
                 double cos_term = cos((2.0 * M_PI) * (((double)n)/((double)nsamp)));
