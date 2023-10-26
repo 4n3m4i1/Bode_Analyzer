@@ -5,7 +5,7 @@
 *.o
 *.asc
 build/
-*.cmake
+#*.cmake
 *.uf2
 *.dis
 *.s
