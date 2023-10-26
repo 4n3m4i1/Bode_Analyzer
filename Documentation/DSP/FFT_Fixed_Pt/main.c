@@ -9,6 +9,7 @@
 
 double dfl_scale = 2.0;
 double amp_scale = 1.0;
+double phase = 0.0;
 
 #define NUM_SAMPLES 64
 
@@ -18,8 +19,9 @@ void main(int argc, char **argv){
     fft.log2_num_samples = get_log_2(NUM_SAMPLES);
     fft.shift_amount = get_shift_amt(fft.log2_num_samples);
 
-    printf("Shift Amt: %u\n",fft.log2_num_samples);
-    printf("Shift Amt: %u\n",fft.shift_amount);
+    printf("NumSamples: %u\n", NUM_SAMPLES);
+    printf("Log2NS:     %u\n",fft.log2_num_samples);
+    printf("Shift Amt:  %u\n",fft.shift_amount);
 
     Q15 ffr[NUM_SAMPLES];
     Q15 ffi[NUM_SAMPLES];
@@ -29,9 +31,10 @@ void main(int argc, char **argv){
     
     if(argc > 1) dfl_scale = strtod(argv[1],NULL);
     if(argc > 2) amp_scale = strtod(argv[2],NULL);
+    if(argc > 3) phase = strtod(argv[3],NULL);
 
     for(int n = 0; n < NUM_SAMPLES; ++n){
-        fft.fr[n] = float_2_Q15(amp_scale * sin(dfl_scale * 6.283 * ((float) n) / (float)NUM_SAMPLES));
+        fft.fr[n] = float_2_Q15(amp_scale * sin((dfl_scale * 6.283 * ((float) n) / (float)NUM_SAMPLES) + phase));
         fft.fi[n] = int_2_Q15(0);
     }
 

@@ -68,7 +68,8 @@ void FFT_fixdpt(struct FFT_PARAMS *fft) {
     //////////////////////////////////////////////////////////////////////////
     // Bit reversal code below based on that found here: 
     // https://graphics.stanford.edu/~seander/bithacks.html#BitReverseObvious
-    for (m = 1; m < fft->num_samples; ++m) {
+
+    for (m = 1; m < fft->num_samples - 1; ++m) {
         // swap odd and even bits
         mr = ((m >> 1) & 0x5555) | ((m & 0x5555) << 1);
         // swap consecutive pairs
