@@ -45,7 +45,7 @@ int main(){
 
     board_init();
     tud_init(BOARD_TUD_RHPORT);
-    STATE = HEADER_STATE;
+    STATE = IDLE;
 
     for(int16_t n = 0; n < BUF_LEN; ++n){
         h_hat_fake[n] = n;
