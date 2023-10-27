@@ -29,7 +29,7 @@
 #define FFI_STATE 0x03
 #define IDLE 0x04
 
-uint16_t STATE = IDLE;
+static uint16_t STATE = IDLE;
 
 Q15 header_data[CDC_PACKET_LEN];
 Q15 h_hat_fake[BUF_LEN];
