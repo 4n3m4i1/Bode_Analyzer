@@ -2,7 +2,7 @@ clc;
 clear;
 close all;
 
-Fs = 10000;
+Fs = 100000;
 LPF = dsp.LowpassFilter;
 x = wgn(Fs+1,1,0);
 x1= x(1:Fs);
@@ -11,7 +11,8 @@ x2= x(2:(Fs+1));
 d = LPF(x1);
 
 Taps = 64;
-mu = 1/1024;
+mu = 1/64;
+mu1 = 1/2;
 
 h_hat = zeros(Taps,1);
 h_hat1 = zeros(Taps,1);
@@ -26,10 +27,11 @@ end
 
 
 for i = Taps:Fs
-    u1 = x2(i:-1:i-Taps+1);
+    u1 = x1(i:-1:i-Taps+1);
     y1(i) = h_hat1' * u1;
     e1(i) = d(i) - y1(i);
-    h_hat1 = h_hat1 + mu * u1 * e1(i);
+    xh1 = u1' * u1;
+    h_hat1 = h_hat1 + mu1 * u1 * e1(i) / xh1;
 end
 
 figure(1);
