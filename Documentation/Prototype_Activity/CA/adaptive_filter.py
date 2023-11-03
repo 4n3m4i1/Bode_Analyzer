@@ -6,16 +6,13 @@ num_samples = 10000
 
 noise = np.random.normal(0, 1, size=num_samples)
 
-# plt.plot(noise)
-# plt.show()
 
 LPF_sos = signal.butter(5, 0.5, btype='lowpass', output='sos')
 w, h = signal.sosfreqz(LPF_sos)
 
 D = signal.sosfilt(sos=LPF_sos, x=noise)
 
-plt.plot(w, np.abs(h), 'b')
-plt.show()
+
 
 num_taps = 64
 mu = 1/1024
@@ -37,5 +34,16 @@ y_fft = np.abs(y_fft)
 y_fft = fft.fftshift(y_fft)
 
 
+plt.subplot(6, 1, 1)
+plt.plot(noise)
+plt.subplot(6, 1, 2)
+plt.plot(w, np.abs(h), 'b')
+plt.subplot(6, 1, 3)
+plt.plot(D)
+plt.subplot(6, 1, 4)
+plt.plot(y)
+plt.subplot(6, 1, 5)
+plt.plot(e)
+plt.subplot(6, 1, 6)
 plt.plot(y_fft)
 plt.show()
