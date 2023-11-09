@@ -4,6 +4,7 @@
 #include <string.h>   // memcpy
 #include <ctype.h>
 #include <inttypes.h>
+#include <time.h>
 
 // TinyUSB Stack
 #include "bsp/board.h"
@@ -31,6 +32,8 @@
 #define IDLE 0x04
 
 static uint16_t STATE = IDLE;
+static uint32_t START_TIME = 0;
+static uint32_t END_TIME = 0;
 
 Q15 header_data[CDC_PACKET_LEN];
 Q15 h_hat_fake[BUF_LEN];
@@ -85,10 +88,16 @@ int main(){
                 break;
             case FFI_STATE:
                 send_ffi_packets(fft_i_fake);
+                char tmp[64] = {0x00};
+                END_TIME = time_us_32();
+                sprintf(tmp,"Sent in: %lu us\r\n",END_TIME - START_TIME);
+                tud_cdc_n_write(CDC_CTRL_CHAN, tmp, CDC_PACKET_LEN);
+                tud_cdc_n_write_flush(CDC_CTRL_CHAN);
                 STATE = IDLE;
                 tud_task();
                 break;
             case IDLE:
+                START_TIME = time_us_32();
                 idle_work();
                 tud_task();
                 STATE = HEADER_STATE;
