@@ -18,6 +18,7 @@ void main(int argc, char **argv){
     fft.num_samples = NUM_SAMPLES;
     fft.log2_num_samples = get_log_2(NUM_SAMPLES);
     fft.shift_amount = get_shift_amt(fft.log2_num_samples);
+    fft.true_max = NUM_SAMPLES;
 
     printf("NumSamples: %u\n", NUM_SAMPLES);
     printf("Log2NS:     %u\n",fft.log2_num_samples);
