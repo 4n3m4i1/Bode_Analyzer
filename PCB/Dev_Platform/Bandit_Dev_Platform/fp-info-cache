@@ -1,4 +1,4 @@
-22231647438865486
+22240142583890861
 ADS8584SIPM
 BNC_THT
 
@@ -81613,12 +81613,47 @@ Potentiometer vertical Vishay T73YP
 3
 3
 ProgrammaGull_Logic
+10164359-00011LF
+
+
+0
+10
+7
+ProgrammaGull_Logic
+Alps_SKQGAKE010
+
+
+0
+4
+2
+ProgrammaGull_Logic
+MHDA3641SRBW
+
+
+0
+12
+12
+ProgrammaGull_Logic
 PGL_Castle_Pin
 
 
 0
 1
 1
+ProgrammaGull_Logic
+SC70
+
+
+0
+5
+5
+ProgrammaGull_Logic
+SLW-121586-5A-D
+
+
+0
+5
+4
 ProgrammaGull_Logic
 TDFN-16-1EP_3x2_mm
 https://www.analog.com/media/en/package-pcb-resources/package/pkg_pdf/tdfn/21-100030.pdf
