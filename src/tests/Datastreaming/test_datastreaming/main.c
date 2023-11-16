@@ -4,6 +4,7 @@
 #include <string.h>   // memcpy
 #include <ctype.h>
 #include <inttypes.h>
+#include <time.h>
 
 // TinyUSB Stack
 #include "bsp/board.h"
@@ -19,6 +20,7 @@
 #include "generic_include.h"
 
 #define CDC_DATA_CHAN 0
+#define CDC_CTRL_CHAN 1
 #define CDC_PACKET_LEN  64
 #define BUF_LEN 128
 #define NUM_PACKET_PER_BUF  ((BUF_LEN / CDC_PACKET_LEN) * sizeof(Q15))
@@ -30,6 +32,8 @@
 #define IDLE 0x04
 
 static uint16_t STATE = IDLE;
+static uint32_t START_TIME = 0;
+static uint32_t END_TIME = 0;
 
 Q15 header_data[CDC_PACKET_LEN];
 Q15 h_hat_fake[BUF_LEN];
@@ -40,13 +44,13 @@ static void send_header_packet(Q15 *h_data);
 static void send_hh_packets(Q15 *hh_data);
 static void send_ffr_packets(Q15 *ffr_data);
 static void send_ffi_packets(Q15 *ffi_data);
-static bool usb_port_write_available(void);
+// static bool usb_port_write_available(void);
 int main(){
 
     board_init();
     tud_init(BOARD_TUD_RHPORT);
     STATE = IDLE;
-
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
     for(int16_t n = 0; n < BUF_LEN; ++n){
         h_hat_fake[n] = n;
         fft_r_fake[n] = n << 1;
@@ -56,14 +60,15 @@ int main(){
     header_data[0] = 0x01;
     header_data[1] = 0x1A;
     header_data[CDC_PACKET_LEN - 1] = 0x1F;
-
+    // Q15 test_data = 0x01;
     while(1){
 
         tud_task(); //tinyusb task
 
-        //send packets
-
-        if (usb_port_write_available()) {
+        // busy_wait_ms(10);
+        // //send packets
+        // tud_cdc_write((uint8_t *)&test_data, CDC_PACKET_LEN);
+        if (tud_cdc_n_available(CDC_CTRL_CHAN)) {
             switch (STATE)
             {
             case HEADER_STATE:
@@ -83,10 +88,16 @@ int main(){
                 break;
             case FFI_STATE:
                 send_ffi_packets(fft_i_fake);
+                char tmp[64] = {0x00};
+                END_TIME = time_us_32();
+                sprintf(tmp,"Sent in: %lu us\r\n",END_TIME - START_TIME);
+                tud_cdc_n_write(CDC_CTRL_CHAN, tmp, CDC_PACKET_LEN);
+                tud_cdc_n_write_flush(CDC_CTRL_CHAN);
                 STATE = IDLE;
                 tud_task();
                 break;
             case IDLE:
+                START_TIME = time_us_32();
                 idle_work();
                 tud_task();
                 STATE = HEADER_STATE;
@@ -96,42 +107,37 @@ int main(){
             }
         }
     }
-    return 0;
 }
-
 static void send_header_packet(Q15 *h_data){
-    tud_cdc_write((uint8_t *)h_data, CDC_PACKET_LEN);
+    tud_cdc_n_write(CDC_DATA_CHAN, (uint8_t *)h_data, CDC_PACKET_LEN);
 }
 static void send_hh_packets(Q15 *hh_data){
     for(uint32_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
-        while(!usb_port_write_available()){
+        while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
             tud_task(); // tinyusb device task
         }
-        tud_cdc_write(((uint8_t *)hh_data + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
+        tud_cdc_n_write(CDC_DATA_CHAN, ((uint8_t *)hh_data + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
     }
 }
 static void send_ffr_packets(Q15 *ffr_data){
     for(uint32_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
-        while(!usb_port_write_available()){
+        while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
             tud_task(); // tinyusb device task
         }
-        tud_cdc_write(((uint8_t *)ffr_data + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
+        tud_cdc_n_write(CDC_DATA_CHAN, ((uint8_t *)ffr_data + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
     }
 }
 static void send_ffi_packets(Q15 *ffi_data){
     for(uint32_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
-        while(!usb_port_write_available()){
+        while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
             tud_task(); // tinyusb device task
         }
-        tud_cdc_write(((uint8_t *)ffi_data + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
+        tud_cdc_n_write(CDC_DATA_CHAN, ((uint8_t *)ffi_data + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
     }
-    tud_cdc_write_flush();
-}
-static bool usb_port_write_available(void){
-    return tud_cdc_write_available() == CDC_PACKET_LEN;
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
 }
 static void idle_work(void){
     Q15 tmp[CDC_PACKET_LEN] = {0x00};
-    tud_cdc_write((uint8_t*)tmp, CDC_PACKET_LEN);
-    tud_cdc_write_flush();
+    tud_cdc_n_write(CDC_DATA_CHAN, (uint8_t *)tmp, CDC_PACKET_LEN);
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
 }

@@ -29,6 +29,7 @@ struct FFT_PARAMS {
     uint16_t    num_samples;
     uint16_t    log2_num_samples;
     uint16_t    shift_amount;
+    uint16_t    true_max;
 
     Q15 *fr;
     Q15 *fi;

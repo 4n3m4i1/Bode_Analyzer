@@ -79,7 +79,7 @@ int main(){
     // init device stack on configured roothub port
     tud_init(BOARD_TUD_RHPORT);
 
-    for(uint n = 0; n < BUF_LEN; ++n){
+    for(int16_t n = 0; n < BUF_LEN; ++n){
         h_hat_fake[n] = n;
         fft_r_fake[n] = n << 1;
         fft_i_fake[n] = n << 2;
