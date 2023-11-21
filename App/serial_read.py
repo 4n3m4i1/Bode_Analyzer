@@ -1,7 +1,7 @@
 import serial
 CDC_PACKET_LENGTH = 64
 DATA_PACKET_LENGTH = 128
-
+START = b"0"
 
 def serial_read(dataPortName, ctrlPortName):
     STATE = -1
@@ -21,7 +21,7 @@ def serial_read(dataPortName, ctrlPortName):
     while True:
         match STATE:
             case -1:
-                sentBytes = CTRLCHANNEL.write(b"0")
+                sentBytes = CTRLCHANNEL.write(START)
                 print(sentBytes)
                 STATE = 0
             case 0:
