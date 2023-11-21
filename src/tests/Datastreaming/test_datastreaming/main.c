@@ -31,6 +31,9 @@
 #define FFI_STATE 0x03
 #define IDLE 0x04
 
+
+static uint16_t ACK_FLAG = 0;
+
 static uint16_t STATE = IDLE;
 static uint32_t START_TIME = 0;
 static uint32_t END_TIME = 0;
@@ -72,35 +75,109 @@ int main(){
             switch (STATE)
             {
             case HEADER_STATE:
-                send_header_packet(header_data);
-                STATE = HH_STATE;
+                if (ACK_FLAG == 0) {
+                    send_header_packet(header_data);
+                    ACK_FLAG = 1;
+                    tud_task();
+                    break;
+                } else if (ACK_FLAG == 1) {
+                    if(tud_cdc_n_read_char(CDC_DATA_CHAN)!=(-1)){
+                        tud_cdc_n_read_flush(CDC_DATA_CHAN);
+                        tud_cdc_n_write_clear(CDC_DATA_CHAN);
+                        STATE = HH_STATE;
+                        ACK_FLAG = 0;
+                        break;
+                    } else {
+                        // timeout error
+                        break;
+                    }
+                }
                 tud_task();
                 break;
             case HH_STATE:
-                send_hh_packets(h_hat_fake);
-                STATE = FFR_STATE;
+                if (!ACK_FLAG) {
+                    send_hh_packets(h_hat_fake);
+                    ACK_FLAG = 1;
+                    tud_task();
+                    break;
+                } else {
+                    if (tud_cdc_n_read_char(CDC_DATA_CHAN)!=(-1)){
+                        tud_cdc_n_read_flush(CDC_DATA_CHAN);
+                        tud_cdc_n_write_clear(CDC_DATA_CHAN);
+                        STATE = FFR_STATE;
+                        ACK_FLAG = 0;
+                        break;
+                    } else {
+                        //timeout error
+                        break;
+                    }
+                }
+
                 tud_task();
                 break;
             case FFR_STATE:
-                send_ffr_packets(fft_r_fake);
-                STATE = FFI_STATE;
+                if (!ACK_FLAG) {
+                    send_ffr_packets(fft_r_fake);
+                    ACK_FLAG = 1;
+                    tud_task();
+                    break;
+                } else {
+                    if (tud_cdc_n_read_char(CDC_DATA_CHAN)!=(-1)){
+                        tud_cdc_n_read_flush(CDC_DATA_CHAN);
+                        tud_cdc_n_write_clear(CDC_DATA_CHAN);
+                        STATE = FFI_STATE;
+                        ACK_FLAG = 0;
+                        break;
+                    } else {
+                        //timeout error
+                        break;
+                    }
+                }
                 tud_task();
                 break;
             case FFI_STATE:
-                send_ffi_packets(fft_i_fake);
-                char tmp[64] = {0x00};
-                END_TIME = time_us_32();
-                sprintf(tmp,"Sent in: %lu us\r\n",END_TIME - START_TIME);
-                tud_cdc_n_write(CDC_CTRL_CHAN, tmp, CDC_PACKET_LEN);
-                tud_cdc_n_write_flush(CDC_CTRL_CHAN);
-                STATE = IDLE;
+                if (!ACK_FLAG){
+                    send_ffi_packets(fft_i_fake);
+                    ACK_FLAG = 1;
+                    tud_task();
+                    break;
+                } else {
+                    if (tud_cdc_n_read_char(CDC_DATA_CHAN)!=(-1)){
+                        tud_cdc_n_read_flush(CDC_DATA_CHAN);
+                        tud_cdc_n_write_clear(CDC_DATA_CHAN);
+                        ACK_FLAG = 0;
+                        char tmp[64] = {0x00};
+                        END_TIME = time_us_32();
+                        sprintf(tmp,"Sent in: %lu us\r\n",END_TIME - START_TIME);
+                        tud_cdc_n_write(CDC_CTRL_CHAN, tmp, CDC_PACKET_LEN);
+                        tud_cdc_n_write_flush(CDC_CTRL_CHAN);
+                        STATE = IDLE;
+                        break;
+                    } else {
+                        break;
+                    }
+                }
                 tud_task();
                 break;
             case IDLE:
                 START_TIME = time_us_32();
-                idle_work();
-                tud_task();
-                STATE = HEADER_STATE;
+                if (ACK_FLAG == 0) {
+                    idle_work();
+                    ACK_FLAG = 1;
+                    tud_task();
+                    break;
+                } else if (ACK_FLAG == 1) {
+                    if(tud_cdc_n_read_char(CDC_DATA_CHAN)!=(-1)) { //if recieved acknowledgement byte
+                        tud_cdc_n_read_flush(CDC_DATA_CHAN); //clear both rx and tx channels
+                        tud_cdc_n_write_clear(CDC_DATA_CHAN);
+                        STATE = HEADER_STATE; //move to next state
+                        ACK_FLAG = 0;
+                        break;
+                    } else {
+                        // some sort of timeout if never recieve ACK
+                        break;
+                    }
+                }
                 break;
             default:
                 break;
@@ -139,5 +216,4 @@ static void send_ffi_packets(Q15 *ffi_data){
 static void idle_work(void){
     Q15 tmp[CDC_PACKET_LEN] = {0x00};
     tud_cdc_n_write(CDC_DATA_CHAN, (uint8_t *)tmp, CDC_PACKET_LEN);
-    tud_cdc_n_write_flush(CDC_DATA_CHAN);
 }
