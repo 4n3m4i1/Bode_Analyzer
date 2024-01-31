@@ -39,6 +39,10 @@ void static inline add_sample_to_buffer(struct Circular_Buffer_Int32 *a, int32_t
     if(++a->curr_zero >= a->size) a->curr_zero = 0;
 }
 
+void static inline add_sample_to_2n_buffer_I32(const struct Circular_Buffer_Int32 *a, int32_t val){
+    a->data[a->curr_zero++ & a->size_mask] = val;
+}
+
 int32_t static inline recall_sample_from_buffer(struct Circular_Buffer_Int32 *a, int offset){
     return a->data[(((offset + a->curr_zero) >= a->size) ? a->curr_zero + (offset -= a->size) : (a->curr_zero + offset))];
 }
@@ -66,7 +70,8 @@ void main(){
 
     // Simulae FIR style fill
     for(int m = 0; m < 12; ++m){        // 12 samples go in
-        add_sample_to_buffer(&sbuf, m + 100);
+        //add_sample_to_buffer(&sbuf, m + 100);
+        add_sample_to_2n_buffer_I32(&sbuf, m+100);
     }
 
     sbuf.curr_zero = 0;
