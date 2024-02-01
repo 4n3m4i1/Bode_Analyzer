@@ -39,7 +39,7 @@ void static inline add_sample_to_buffer(struct Circular_Buffer_Int32 *a, int32_t
     if(++a->curr_zero >= a->size) a->curr_zero = 0;
 }
 
-void static inline add_sample_to_2n_buffer_I32(const struct Circular_Buffer_Int32 *a, int32_t val){
+void static inline add_sample_to_2n_buffer_I32(struct Circular_Buffer_Int32 *a, int32_t val){
     a->data[a->curr_zero++ & a->size_mask] = val;
 }
 

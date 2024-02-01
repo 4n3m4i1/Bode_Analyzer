@@ -23,21 +23,21 @@ struct Circular_Buffer_Int16 {
     int16_t     *data;
 };
 
-void setup_circular_buffer_I32(const struct Circular_Buffer_Int32 *a, int size);
+void setup_circular_buffer_I32(struct Circular_Buffer_Int32 *a, int size);
 
-void static inline add_sample_to_buffer_I32(const struct Circular_Buffer_Int32 *a, int32_t val);
-void static inline add_sample_to_2n_buffer_I32(const struct Circular_Buffer_Int32 *a, int32_t val);
-int32_t static inline recall_sample_from_buffer_I32(const struct Circular_Buffer_Int32 *a, int offset);
-int32_t static inline recall_sample_from_2n_buffer_I32(const struct Circular_Buffer_Int32 *a, int offset);
-void destroy_circular_buffer_I32(const struct Circular_Buffer_Int32 *a);
+void static inline add_sample_to_buffer_I32(struct Circular_Buffer_Int32 *a, int32_t val);
+void static inline add_sample_to_2n_buffer_I32(struct Circular_Buffer_Int32 *a, int32_t val);
+int32_t static inline recall_sample_from_buffer_I32(struct Circular_Buffer_Int32 *a, int offset);
+int32_t static inline recall_sample_from_2n_buffer_I32(struct Circular_Buffer_Int32 *a, int offset);
+void destroy_circular_buffer_I32(struct Circular_Buffer_Int32 *a);
 
 
-void setup_circular_buffer_I16(const struct Circular_Buffer_Int16 *a, int size);
+void setup_circular_buffer_I16(struct Circular_Buffer_Int16 *a, int size);
 
-void static inline add_sample_to_buffer_I16(const struct Circular_Buffer_Int16 *a, int16_t val);
-void static inline add_sample_to_2n_buffer_I16(const struct Circular_Buffer_Int16 *a, int32_t val);
-int16_t static inline recall_sample_from_buffer_I16(const struct Circular_Buffer_Int16 *a, int offset);
-int16_t static inline recall_sample_from_2n_buffer_I16(const struct Circular_Buffer_Int16 *a, int offset);
-void destroy_circular_buffer_I16(const struct Circular_Buffer_Int16 *a);
+void static inline add_sample_to_buffer_I16(struct Circular_Buffer_Int16 *a, int16_t val);
+void static inline add_sample_to_2n_buffer_I16(struct Circular_Buffer_Int16 *a, int32_t val);
+int16_t static inline recall_sample_from_buffer_I16(struct Circular_Buffer_Int16 *a, int offset);
+int16_t static inline recall_sample_from_2n_buffer_I16(struct Circular_Buffer_Int16 *a, int offset);
+void destroy_circular_buffer_I16(struct Circular_Buffer_Int16 *a);
 
 #endif

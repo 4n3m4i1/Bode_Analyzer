@@ -14,6 +14,7 @@ double phase = 0.0;
 #define NUM_SAMPLES 64
 
 void main(int argc, char **argv){
+    printf("ZERO 4: 0x%08X\n", zero_point_4);
     struct FFT_PARAMS fft;
     fft.num_samples = NUM_SAMPLES;
     fft.log2_num_samples = get_log_2(NUM_SAMPLES);

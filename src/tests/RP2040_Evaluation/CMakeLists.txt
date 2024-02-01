@@ -12,21 +12,39 @@ set(PICO_EXAMPLES_PATH ${PROJECT_SOURCE_DIR})
 pico_sdk_init()
 
 add_executable(
-                RP2040_ADAPTIVE_FILTER_EVAL
+                ${PROJECT_NAME}
                 main.c
                 core_0_exec.c
                 core_1_exec.c
+
+                FFT/fft_half.c
+                circular_buffers/RP2040_Circ_Buffer.c
                 )
 
 # Link Libraries
 target_link_libraries(
-                        RP2040_ADAPTIVE_FILTER_EVAL
+                        ${PROJECT_NAME}
                         pico_stdlib
                         pico_multicore
                         hardware_i2c
+                        hardware_spi
                         hardware_timer
                         hardware_pwm
                         )
+
+
+
+add_library(FFT FFT/fft_half.c FFT/fft_half.h)
+add_library(circular_buffers circular_buffers/RP2040_Circ_Buffer.c circular_buffers/RP2040_Circ_Buffer.h)
+
+target_link_libraries(FFT
+    pico_stdlib
+)
+
+target_link_libraries(circular_buffers
+    pico_stdlib
+)
+
 
 pico_enable_stdio_usb(RP2040_ADAPTIVE_FILTER_EVAL 1)
 pico_enable_stdio_uart(RP2040_ADAPTIVE_FILTER_EVAL 0)

@@ -2,8 +2,10 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "hardware/i2c.h"
+#include "hardware/spi.h"
 #include "hardware/timer.h"
 #include "hardware/pwm.h"
+
 
 #include "core_0_exec.h"
 #include "core_1_exec.h"
