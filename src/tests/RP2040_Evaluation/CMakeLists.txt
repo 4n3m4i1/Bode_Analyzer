@@ -57,5 +57,6 @@ pico_add_extra_outputs(RP2040_ADAPTIVE_FILTER_EVAL)
 ## Okay the .. is a total hack but it works so... idk man I'm not fighting cmake this much
 # I think it derives from some weird "build is the current working directory" thing
 # even tho cmake source dir should be the right place
-pico_set_linker_script(${PROJECT_NAME}  ../linking_scripts/memmap_blocked_ram.ld)
+#pico_set_linker_script(${PROJECT_NAME}  ../linking_scripts/memmap_blocked_ram.ld)
+pico_set_linker_script(${PROJECT_NAME}  ../linking_scripts/memmap_custom_blocks.ld)
 
