@@ -30,7 +30,7 @@ uint16_t get_shift_amt(uint16_t log2ns){
 // Requires both to be 2**n!!!!
 void get_table_offset_shift(struct FFT_PARAMS *fft, uint16_t table_max_size){
     uint16_t table_size_2n = get_log_2(table_max_size);
-    fft->table_scalar_offset = get_log_2(table_mul - get_log_2(fft->num_samples));
+    fft->table_scalar_offset = get_log_2(table_size_2n - get_log_2(fft->num_samples));
 }
 
 
@@ -94,8 +94,8 @@ void FFT_fixdpt(struct FFT_PARAMS *fft) {
         for (m=0; m<L; ++m) { 
             // Lookup the trig values for that element
             j = m << k ;                         // index of the sine table
-            wr =  sin_table[(j + (fft->num_samples >> 2)) << table_scalar_offset] ; // cos(2pi m/N)
-            wi = -sin_table[(j) << table_scalar_offset] ;                 // sin(2pi m/N)
+            wr =  sin_table_table[(j + (fft->num_samples >> 2)) << fft->table_scalar_offset] ; // cos(2pi m/N)
+            wi = -sin_table_table[(j) << fft->table_scalar_offset] ;                 // sin(2pi m/N)
             wr >>= 1 ;                          // divide by two
             wi >>= 1 ;                          // divide by two
             // i gets the index of one of the FFT elements being combined
@@ -127,7 +127,7 @@ int FFT_mag(struct FFT_PARAMS *fft){
 
     for (int i = 0; i < (fft->num_samples >> 1); i++) {  
         // get the approx magnitude
-        fft->fr[i] = abs(fft->fr[i]); //>>9
+        fft->fr[i] = abs_Q15(fft->fr[i]); //>>9
         //fft->fi[i] = abs(fft->fi[i]);
         // reuse fr to hold magnitude
         fft->fr[i] = max(fft->fr[i], abs(fft->fi[i])) + mul_Q15(min(fft->fr[i], abs(fft->fi[i])), zero_point_4); 

@@ -43,13 +43,19 @@ target_link_libraries(FFT
 
 target_link_libraries(circular_buffers
     pico_stdlib
+    stdlib
+    pico_malloc
 )
-
-# Important Memory Management!!!!!!!!!!!!
-#pico_set_linker_script(${PROJECT_NAME}  )
 
 pico_enable_stdio_usb(RP2040_ADAPTIVE_FILTER_EVAL 1)
 pico_enable_stdio_uart(RP2040_ADAPTIVE_FILTER_EVAL 0)
 
 # Create EXEC binaries like uf2
 pico_add_extra_outputs(RP2040_ADAPTIVE_FILTER_EVAL)
+
+# Important Memory Management!!!!!!!!!!!!
+## Okay the .. is a total hack but it works so... idk man I'm not fighting cmake this much
+# I think it derives from some weird "build is the current working directory" thing
+# even tho cmake source dir should be the right place
+pico_set_linker_script(${PROJECT_NAME}  ../linking_scripts/memmap_blocked_ram.ld)
+

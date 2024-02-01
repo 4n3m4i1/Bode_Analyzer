@@ -10,9 +10,6 @@
 #include "core_0_exec.h"
 #include "core_1_exec.h"
 
-#include "./trig_tables/Q15_sin_table.h"
-#include "./trig_tables/Q15_cos_table.h"
-
 ///////////////////// MAIN //////////////////////////////
 int main(){
     stdio_init_all();

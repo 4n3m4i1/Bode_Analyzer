@@ -2,6 +2,8 @@
 #define RP2040_CIRC_BUFFER_h
 
 #include "pico/stdlib.h"
+#include <stdlib.h>
+#include "pico/malloc.h"
 #include <inttypes.h>
 
 /*

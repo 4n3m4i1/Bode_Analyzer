@@ -3,13 +3,14 @@
 
 #include <pico/stdlib.h>
 #include "generic_include.h"
-#include "./trig_tables/Q15_sin_table.h"
-#include "./trig_tables/Q15_cos_table.h"
+#include "Q15_sin_table.h"
+#include "Q15_cos_table.h"
 
 #define TABLE_SIZE_2N       10
 
-#define max(a,b) ((a>b)?a:b)
-#define min(a,b) ((a<b)?a:b)
+#define max(a,b)    ((a>b)?a:b)
+#define min(a,b)    ((a<b)?a:b)
+#define abs(a)      ((a<0)?-1*a:a)
 
 
 struct FFT_PARAMS {
