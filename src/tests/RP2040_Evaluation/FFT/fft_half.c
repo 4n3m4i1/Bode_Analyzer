@@ -27,6 +27,12 @@ uint16_t get_shift_amt(uint16_t log2ns){
     return ((sizeof(Q15) * 8) - log2ns);
 }
 
+// Requires both to be 2**n!!!!
+void get_table_offset_shift(struct FFT_PARAMS *fft, uint16_t table_max_size){
+    uint16_t table_size_2n = get_log_2(table_max_size);
+    fft->table_scalar_offset = get_log_2(table_mul - get_log_2(fft->num_samples));
+}
+
 
 void FFT_fixdpt(struct FFT_PARAMS *fft) {
 
@@ -88,8 +94,8 @@ void FFT_fixdpt(struct FFT_PARAMS *fft) {
         for (m=0; m<L; ++m) { 
             // Lookup the trig values for that element
             j = m << k ;                         // index of the sine table
-            wr =  sin_table[j + (fft->num_samples >> 2)] ; // cos(2pi m/N)
-            wi = -sin_table[j] ;                 // sin(2pi m/N)
+            wr =  sin_table[(j + (fft->num_samples >> 2)) << table_scalar_offset] ; // cos(2pi m/N)
+            wi = -sin_table[(j) << table_scalar_offset] ;                 // sin(2pi m/N)
             wr >>= 1 ;                          // divide by two
             wi >>= 1 ;                          // divide by two
             // i gets the index of one of the FFT elements being combined
