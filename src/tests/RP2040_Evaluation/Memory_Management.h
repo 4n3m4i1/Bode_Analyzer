@@ -23,8 +23,8 @@
     The banks are allocated as follows:
         - Bank 0:   SRAM0_BASE 0x21000000 General
         - Bank 1:   SRAM1_BASE 0x21010000 General
-        - Bank 2:   SRAM2_BASE 0x21020000 Core 0 Data
-        - Bank 3:   SRAM3_BASE 0x21030000 Core 1 Data
+        - Bank 2:   SRAM2_BASE 0x21020000 Core 0 exclusive Data
+        - Bank 3:   SRAM3_BASE 0x21030000 Core 1 exclusive Data
         - Bank 4:   SRAM4_BASE 0x20040000 Core 0 (X scratch)
         - Bank 5:   SRAM5_BASE 0x20041000 Core 1 (Y scratch)
         - RAM_END:  0x20042000

@@ -226,7 +226,7 @@ SECTIONS
         . = ALIGN(4);
         KEEP(*(.coreonedata));
         . = ALIGN(4);
-    } > RAM_3 AT >FLASH
+    } > RAM_3 AT > FLASH
 
     /* .stack*_dummy section doesn't contains any symbols. It is only
      * used for linker to calculate size of stack sections, and assign

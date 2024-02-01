@@ -11,8 +11,6 @@
 #include "core_0_exec.h"
 #include "core_1_exec.h"
 
-CORE_0_MEM int abc0[2048] = {0};
-CORE_1_MEM int abc1[2048] = {0};
 
 ///////////////////// MAIN //////////////////////////////
 int main(){
