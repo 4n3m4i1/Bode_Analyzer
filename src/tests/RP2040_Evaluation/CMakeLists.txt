@@ -45,6 +45,8 @@ target_link_libraries(circular_buffers
     pico_stdlib
 )
 
+# Important Memory Management!!!!!!!!!!!!
+#pico_set_linker_script(${PROJECT_NAME}  )
 
 pico_enable_stdio_usb(RP2040_ADAPTIVE_FILTER_EVAL 1)
 pico_enable_stdio_uart(RP2040_ADAPTIVE_FILTER_EVAL 0)
