@@ -59,8 +59,79 @@
 
 /*
     42kB left to play with on Core 1, more than enough for like... anything
+    
+    Downsampling of N length requires:
+        N MADDS, 4 * N memaccesses
+        1 MADD -> 2 cycles
+        4 memaccess -> 8 cycles best case
+        Thus:
+            10 * N cycles best case per sample
+        With final commit and initial load:
+            10 * N + 4 ish cycles
+
+    At 500ksps and 125MHz core clk:
+        125e6 / 500e3 = 250 cycles per sample
+
+    10N + 4 = 250
+    N = 24.6 length allowance, maybe enough?
+
+    Shoot for N = 20, safety margin
+    10 * 20 + 4 = 204 cycles. 
+    
+    This is dumb though, go polyphase so multiply by some B branch count.
+
+    ISR overhead will consume most of the free time.
+    Maybe just use wait loops for the sampling? really won't be much deadtime there
+    and then there is less context switch overhead. Can better optimize, and split load
+    better too...
 */
+#define DDSAMP_FIR_LEN      20
+/*
+    Analysis Ranges:
+        f_max   /n
+        250k    1   (none)
+        125k    2
+        62.5k   4
+        31.25k  8
+        25k     10
+*/
+enum DDSAMP_FREQ_RANGE_IDX {
+    DDSAMP_250K,
+    DDSAMP_125K,
+    DDSAMP_62K5,
+    DDSAMP_31K25,
+    DDSAME_25K
+};
+#define DDSAMP_TAP_OPTIONS  5
 
 
+/*
+    Settings predominantly handled via bitfields for status
+*/
+enum BANDIT_SETTINGS_BF {
+    BS_ENABLE,
+    BS_RES0,
+    BS_AUTO_RUN,
+    BS_AUTO_SEND,
+    BS_WGN_ON,
+    BS_RES1,
+    BS_MAN_ERROR,
+    BS_MAN_TAP_LEN,
+    BS_MAN_FREQ_RANGE
+};
+
+struct BANDIT_SETTINGS {
+    uint32_t        settings_bf;
+    uint16_t        manual_tap_len_setting;
+    uint32_t        manual_error_limit;
+    uint32_t        manual_freq_range;
+};
+
+#define CHK_BANDIT_SETTING(a, b)        (a & (1u << b))
+#define SET_BANDIT_SETTING(a, b)        (a |= (1u << b))
+#define CLR_BANDIT_SETTING(a, b)        (a &= (1u << b))
+
+#define BANDIT_DFL_SETTINGS     (1 << BS_ENABLE) | \
+                                (1 << BS_AUTO_SEND)
 
 #endif
