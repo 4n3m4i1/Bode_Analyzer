@@ -14,11 +14,11 @@ pico_sdk_init()
 add_executable(
                 ${PROJECT_NAME}
                 main.c
-                core_0_exec.c
-                core_1_exec.c
 
                 FFT/fft_half.c
                 circular_buffers/RP2040_Circ_Buffer.c
+                FIR/FIR_Fast_Fixed.c
+                LMS/LMS_Fixed.c
                 )
 
 # Link Libraries
@@ -33,9 +33,11 @@ target_link_libraries(
                         )
 
 
-
 add_library(FFT FFT/fft_half.c FFT/fft_half.h)
 add_library(circular_buffers circular_buffers/RP2040_Circ_Buffer.c circular_buffers/RP2040_Circ_Buffer.h)
+add_library(FIR FIR/FIR_Fast_Fixed.c FIR/FIR_Fast_Fixed.h)
+add_library(LMS LMS/LMS_Fixed.c LMS/LMS_Fixed.h)
+
 
 target_link_libraries(FFT
     pico_stdlib
@@ -45,6 +47,15 @@ target_link_libraries(circular_buffers
     pico_stdlib
     stdlib
     pico_malloc
+)
+
+target_link_libraries(FIR
+    pico_stdlib
+)
+
+target_link_libraries(LMS
+    pico_stdlib
+    FIR
 )
 
 pico_enable_stdio_usb(RP2040_ADAPTIVE_FILTER_EVAL 1)

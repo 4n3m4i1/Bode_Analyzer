@@ -30,29 +30,29 @@
         - RAM_END:  0x20042000
 */
 
-#ifndef SRAM0_BASE
-#define SRAM0_BASE  0x21000000u
-#endif
-
-#ifndef SRAM1_BASE
-#define SRAM1_BASE  0x21010000u
-#endif
-
-#ifndef SRAM2_BASE
-#define SRAM2_BASE  0x21020000u
-#endif
-
-#ifndef SRAM3_BASE
-#define SRAM3_BASE  0x21030000u
-#endif
-
-#ifndef SRAM4_BASE
-#define SRAM4_BASE  0x20040000u
-#endif
-
-#ifndef SRAM5_BASE
-#define SRAM5_BASE  0x20041000u
-#endif
+//#ifndef SRAM0_BASE
+//#define SRAM0_BASE  0x21000000u
+//#endif
+//
+//#ifndef SRAM1_BASE
+//#define SRAM1_BASE  0x21010000u
+//#endif
+//
+//#ifndef SRAM2_BASE
+//#define SRAM2_BASE  0x21020000u
+//#endif
+//
+//#ifndef SRAM3_BASE
+//#define SRAM3_BASE  0x21030000u
+//#endif
+//
+//#ifndef SRAM4_BASE
+//#define SRAM4_BASE  0x20040000u
+//#endif
+//
+//#ifndef SRAM5_BASE
+//#define SRAM5_BASE  0x20041000u
+//#endif
 
 #define CORE_0_MEM  __attribute__((section(".corezerodata")))
 #define CORE_1_MEM  __attribute__((section(".coreonedata")))
