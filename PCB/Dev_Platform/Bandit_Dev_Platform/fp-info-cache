@@ -1,4 +1,4 @@
-22279356061455700
+22282770399000976
 ADS8584SIPM
 BNC_THT
 
@@ -27,6 +27,20 @@ audio belton reverb
 0
 7
 7
+BANDIT_PCB_Lib
+DOSIN-801-0050
+
+
+0
+5
+2
+BANDIT_PCB_Lib
+Logo_25mm
+
+
+0
+0
+0
 BANDIT_PCB_Lib
 Pi Pico
 
