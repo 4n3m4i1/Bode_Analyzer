@@ -7,6 +7,7 @@
 #include "circular_buffers/RP2040_Circ_Buffer.h"
 #include "FIR/FIR_Fast_Fixed.h"
 #include "LMS/LMS_Fixed.h"
+#include "AWGN_ROSC.h"
 
 
 /*

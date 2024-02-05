@@ -21,6 +21,9 @@ add_executable(
                 LMS/LMS_Fixed.c
                 )
 
+#pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_val_2_pin.pio)
+pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/PIO_PROG/pio_val_2_pin.pio)
+
 # Link Libraries
 target_link_libraries(
                         ${PROJECT_NAME}
@@ -30,6 +33,8 @@ target_link_libraries(
                         hardware_spi
                         hardware_timer
                         hardware_pwm
+                        hardware_dma
+                        hardware_pio
                         )
 
 

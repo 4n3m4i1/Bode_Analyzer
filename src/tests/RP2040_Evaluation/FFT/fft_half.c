@@ -130,7 +130,7 @@ int FFT_mag(struct FFT_PARAMS *fft){
         fft->fr[i] = abs_fft(fft->fr[i]); //>>9
         //fft->fi[i] = abs_fft(fft->fi[i]);
         // reuse fr to hold magnitude
-        fft->fr[i] = max(fft->fr[i], abs_fft(fft->fi[i])) + mul_Q15(min(fft->fr[i], abs_fft(fft->fi[i])), zero_point_4); 
+        fft->fr[i] = max_fft(fft->fr[i], abs_fft(fft->fi[i])) + mul_Q15(min(fft->fr[i], abs_fft(fft->fi[i])), zero_point_4); 
 
         // Keep track of maximum
         if ((fft->fr[i] > max_fr) && (i > 0)) {

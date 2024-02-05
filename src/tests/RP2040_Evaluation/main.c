@@ -5,6 +5,7 @@
 #include "hardware/spi.h"
 #include "hardware/timer.h"
 #include "hardware/pwm.h"
+#include "hardware/dma.h"
 
 #include "Bode_Bandit.h"
 
@@ -58,7 +59,8 @@ struct BANDIT_SETTINGS  Global_Bandit_Settings;
 //////////////////////////////////////////////////////////////////////
 // Core 0 Function Definitions
 static void core_0_main();
-static inline void fft_start_setup(struct FFT_PARAMS *cool_fft);
+static void USB_Handler();
+static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len);
 static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 //void setup_tiny_usb();
 //void execute_fft(struct FFT_PARAMS *fft);
@@ -82,6 +84,8 @@ static void    core_1_main();
 // Start up in Core 0
 int main(){
     stdio_init_all();
+    
+    //start_randombit_dma_chain();
 
     // Setup for peripherals done on core 0
     multicore_launch_core1(core_1_main);
@@ -105,10 +109,23 @@ static void core_0_main(){
     Global_Bandit_Settings.manual_error_limit = 0;
     Global_Bandit_Settings.manual_freq_range = 0;
 
+
+    // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
+    setup_rosc_full_tilt();
+    setup_PIO_for_switching();
+    setup_chained_dma_channels();
+
+    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
+        start_randombit_dma_chain(dma_awgn_ctrl_chan);
+    }
+
+    // Setup Structs and Default Parameters for FFT
     struct FFT_PARAMS cool_fft;
-    fft_start_setup(&cool_fft);
+    fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
 
 
+
+    // USB State Machine, Settings Application, FFT
     while(1){
         tight_loop_contents();
     }
@@ -120,7 +137,13 @@ static void core_0_main(){
 static void core_1_main(){
     // Setup LMS controller and buffering
     struct LMS_Fixed_Inst LMS_Inst;
-    LMS_Struct_Init(&LMS_Inst, 0x1111, 0x1111, 0, STD_MAX_SAMPLES, 0); // Errors are just straight guesses rn, offset as well
+    LMS_Struct_Init(&LMS_Inst, 
+                        0x1111, 
+                        0x1111, 
+                        0, 
+                        STD_MAX_SAMPLES, 
+                        0
+                        ); // Errors are just straight guesses rn, offset as well
     LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
     LMS_Inst.d_n = D_N_0;
     LMS_Inst.x_n = X_N_0;
@@ -149,11 +172,18 @@ static void core_1_main(){
 //////////////////////////////////////////////////////////////////////
 
 ////////////////////// CORE 0: FFT, USB, CTRL /////////////
-static inline void fft_start_setup(struct FFT_PARAMS *cool_fft){
-    cool_fft->num_samples = DEFAULT_LMS_TAP_LEN;
-    cool_fft->log2_num_samples = get_log_2(DEFAULT_LMS_TAP_LEN);
+static void USB_Handler(){
+    // tusb here!
+    // No stall states, this should whizz thru and be fine with the
+    //  potential to not be handled for some time.
+    //  Either use ISRs or hardware buffers
+}
+
+static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len){
+    cool_fft->num_samples = len;
+    cool_fft->log2_num_samples = get_log_2(len);
     cool_fft->shift_amount = get_shift_amt(cool_fft->log2_num_samples);
-    get_table_offset_shift(&cool_fft, DEFAULT_LMS_TAP_LEN);
+    get_table_offset_shift(&cool_fft, len);
     cool_fft->fr = FR_BUFF;
     cool_fft->fi = FI_BUFF;
 }
