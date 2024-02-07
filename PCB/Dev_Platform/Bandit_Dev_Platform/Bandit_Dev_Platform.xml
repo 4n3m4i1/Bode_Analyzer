@@ -2,7 +2,7 @@
 <export version="E">
   <design>
     <source>/home/Gemelli/School/COMPE496W/Bode_Analyzer/PCB/Dev_Platform/Bandit_Dev_Platform/Bandit_Dev_Platform.kicad_sch</source>
-    <date>Mon 05 Feb 2024 06:10:52 PM PST</date>
+    <date>Mon 05 Feb 2024 08:37:53 PM PST</date>
     <tool>Eeschema 7.0.7</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -1373,7 +1373,7 @@
       <property name="ki_description" value="Quad Low-Noise JFET-Input Operational Amplifiers, DIP-14/SOIC-14"/>
       <property name="ki_keywords" value="quad opamp"/>
       <sheetpath names="/" tstamps="/"/>
-      <tstamps>afcc9ae3-cfba-4380-ad68-2f1e3e02ab2e acd7c6ef-1de3-4cfa-aa03-c430c0beea5f beb082ba-305e-483c-811d-e64746dfa0a0 a54b8e60-0f62-4e20-bac8-b640c6896e41 2221a657-9635-433f-ab8e-40ac92208598</tstamps>
+      <tstamps>beb082ba-305e-483c-811d-e64746dfa0a0 acd7c6ef-1de3-4cfa-aa03-c430c0beea5f afcc9ae3-cfba-4380-ad68-2f1e3e02ab2e a54b8e60-0f62-4e20-bac8-b640c6896e41 2221a657-9635-433f-ab8e-40ac92208598</tstamps>
     </comp>
     <comp ref="U10">
       <value>OPA1664</value>
@@ -1385,7 +1385,7 @@
       <property name="ki_description" value="Quad Low-Noise JFET-Input Operational Amplifiers, DIP-14/SOIC-14"/>
       <property name="ki_keywords" value="quad opamp"/>
       <sheetpath names="/" tstamps="/"/>
-      <tstamps>be22c194-eee1-4d2c-843e-1dc12858b0aa 85134e61-eb22-4743-9f35-3e6cace9fcd3 6cae3abd-0176-4009-922d-c800cff14abd b4ef0416-3106-4739-b260-2361c968fb01 5b80d63d-b62b-42e3-afab-8d69a111fafe</tstamps>
+      <tstamps>b4ef0416-3106-4739-b260-2361c968fb01 be22c194-eee1-4d2c-843e-1dc12858b0aa 85134e61-eb22-4743-9f35-3e6cace9fcd3 6cae3abd-0176-4009-922d-c800cff14abd 5b80d63d-b62b-42e3-afab-8d69a111fafe</tstamps>
     </comp>
     <comp ref="U11">
       <value>XC6206PxxxMR</value>
