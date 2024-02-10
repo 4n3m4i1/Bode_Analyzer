@@ -1,4 +1,4 @@
-22284477578637816
+22294721363258597
 ADS8584SIPM
 BNC_THT
 
@@ -28,12 +28,26 @@ audio belton reverb
 7
 7
 BANDIT_PCB_Lib
+Banana_Horizontal
+
+
+0
+2
+2
+BANDIT_PCB_Lib
 DOSIN-801-0050
 
 
 0
 5
 2
+BANDIT_PCB_Lib
+Keystone 575 Banana
+
+
+0
+1
+1
 BANDIT_PCB_Lib
 Logo_25mm
 
@@ -49,12 +63,33 @@ Logo_30mm
 0
 0
 BANDIT_PCB_Lib
+Logo_50mm
+
+
+0
+0
+0
+BANDIT_PCB_Lib
+Logo_50mm_Light
+
+
+0
+0
+0
+BANDIT_PCB_Lib
 Pi Pico
 
 
 0
 40
 40
+BANDIT_PCB_Lib
+SOT23 Thin 14
+
+
+0
+14
+14
 Battery
 BatteryClip_Keystone_54_D16-19mm
 Battery clip for batteries with a diameter between 16-19 mm: https://www.keyelco.com/product.cfm/product_id/826
@@ -81787,6 +81822,13 @@ Alps_SKQGAKE010
 0
 4
 2
+ProgrammaGull_Logic
+CH87102V200
+
+
+0
+10
+10
 ProgrammaGull_Logic
 MHDA3641SRBW
 
