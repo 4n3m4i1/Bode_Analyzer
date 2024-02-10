@@ -7297,7 +7297,7 @@
     (property "ki_description" "Polarized capacitor, small symbol")
     (property "ki_keywords" "cap capacitor")
     (attr smd)
-    (fp_text reference "C70" (at 0 -1.68 90) (layer "F.SilkS") hide
+    (fp_text reference "C75" (at 0 -1.68 90) (layer "F.SilkS") hide
         (effects (font (size 1 1) (thickness 0.15)))
       (tstamp ee89dc75-a030-4d05-a006-e274a06fa4cc)
     )
