@@ -37,6 +37,7 @@ static uint16_t ACK_FLAG = 0;
 static uint16_t STATE = IDLE;
 static uint32_t START_TIME = 0;
 static uint32_t END_TIME = 0;
+static uint32_t NUM_PACKETS = 0;
 
 Q15 header_data[CDC_PACKET_LEN];
 Q15 h_hat_fake[BUF_LEN];

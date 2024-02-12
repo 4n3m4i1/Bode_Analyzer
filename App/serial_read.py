@@ -1,10 +1,8 @@
 import serial
 CDC_PACKET_LENGTH = 64
 DATA_PACKET_LENGTH = 128
-START = b"0"
 
 def serial_read(dataPortName, ctrlPortName):
-    STATE = -1
     DATACHANNEL = serial.Serial(
         port = dataPortName,
         baudrate = 9600,
@@ -18,16 +16,17 @@ def serial_read(dataPortName, ctrlPortName):
         bytesize=8,
         timeout=1,
     )
+
+    CTRLCHANNEL.write(b'1')
+
     while True:
-        match STATE:
-            case -1:
-                sentBytes = CTRLCHANNEL.write(START)
-                print(sentBytes)
-                STATE = 0
-            case 0:
-                print(DATACHANNEL.read(64))
+        idle = int(DATACHANNEL.read(CDC_PACKET_LENGTH).hex())
 
+        if idle == 0:
+            CTRLCHANNEL.write(b'1')
 
+            header = DATACHANNEL.read(CDC_PACKET_LENGTH).hex(' ').split(' ')
+            if 
 
 
 if __name__ == "__main__":
