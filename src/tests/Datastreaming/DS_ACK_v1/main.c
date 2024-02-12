@@ -68,7 +68,6 @@ int main(){
     while(1){
 
         tud_task(); //tinyusb task
-
         // if (tud_cdc_n_available(CDC_CTRL_CHAN) >= 1) {
             switch (STATE)
             {
