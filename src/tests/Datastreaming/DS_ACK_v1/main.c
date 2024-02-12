@@ -33,7 +33,8 @@
 // #define WAIT 0x05
 
 static uint16_t STATE = IDLE;
-static volatile uint16_t ACK = 0;
+static uint16_t NEXT_STATE = IDLE;
+static char WANTED_CHAR = 'a';
 Q15 header_data[CDC_PACKET_LEN];
 Q15 h_hat_fake[BUF_LEN];
 Q15 fft_r_fake[BUF_LEN];
@@ -50,8 +51,7 @@ int main(){
 
     board_init();
     tud_init(BOARD_TUD_RHPORT);
-    char wanted = 'a';
-    tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, wanted);
+    tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, WANTED_CHAR);
     STATE = IDLE;
     for(int16_t n = 0; n < BUF_LEN; ++n){
         h_hat_fake[n] = n;
@@ -69,64 +69,53 @@ int main(){
 
         tud_task(); //tinyusb task
 
-        if (tud_cdc_n_available(CDC_CTRL_CHAN)) {
+        // if (tud_cdc_n_available(CDC_CTRL_CHAN) >= 1) {
             switch (STATE)
             {
             case HEADER_STATE:
-                send_header_packet(header_data);
-                while (!ACK) {
-                    tud_task();
+                if (STATE == NEXT_STATE) {
+                    send_header_packet(header_data);
                 }
-                ACK = 0;
-                STATE = HH_STATE;
+                tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, WANTED_CHAR);
+                NEXT_STATE = HH_STATE;
                 tud_task();
                 break;
             case HH_STATE:
-                send_hh_packets(h_hat_fake);
-                while (!ACK) {
-                    tud_task();
+                if (STATE == NEXT_STATE) {
+                    send_hh_packets(h_hat_fake);
                 }
-                ACK = 0;
-                STATE = FFR_STATE;
+                tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, WANTED_CHAR);
+                NEXT_STATE = FFR_STATE;
                 tud_task();
                 break;
             case FFR_STATE:
-                send_ffr_packets(fft_r_fake);
-                while (!ACK) {
-                    tud_task();
+                if (STATE == NEXT_STATE) {
+                    send_ffr_packets(fft_r_fake);
                 }
-                ACK = 0;
-                STATE = FFI_STATE;
+                tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, WANTED_CHAR);
+                NEXT_STATE = FFI_STATE;
                 tud_task();
                 break;
             case FFI_STATE:
-                send_ffi_packets(fft_i_fake);
-                //while (!ACK) {
-                //    tud_task();
-                //}
-                //ACK = 0;
-                //STATE = IDLE;
-                
-                if(ACK) {
-                    STATE = IDLE;
-                    ACK = 0;
+                if (STATE == NEXT_STATE) {
+                    send_ffi_packets(fft_i_fake);
                 }
+                tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, WANTED_CHAR);
+                NEXT_STATE = IDLE;
                 tud_task();
                 break;
             case IDLE:
 
-                idle_work();
-
-                while (!ACK) {
-                    tud_task();
+                if (STATE == NEXT_STATE) {
+                    idle_work();
                 }
-                STATE = HEADER_STATE;
-                ACK = 0;
+                tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, WANTED_CHAR); 
+                NEXT_STATE = HEADER_STATE;
                 break;
             default:
                 break;
             }
-        }
+        // }
         // i += 1;
     }
 
@@ -174,6 +163,7 @@ static void idle_work(void){
 
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
     tud_cdc_n_write_char(itf, wanted_char);
+    tud_cdc_n_read_flush(CDC_CTRL_CHAN);
     gpio_put(25, !gpio_get_out_level(25));
-    ACK = 1;
+    STATE = NEXT_STATE;
 }
