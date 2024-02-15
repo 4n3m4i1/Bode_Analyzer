@@ -52,7 +52,7 @@ CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 
 // Global Settings Buffer, Mutual Exclusive Access via hardware semaphores
 //  to save on access stalls
-struct BANDIT_SETTINGS  Global_Bandit_Settings;
+struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
 
   //////////////////////////////////////////////////////////////////////
  ///////////////////   FUNCTION DEFINITIONS   /////////////////////////

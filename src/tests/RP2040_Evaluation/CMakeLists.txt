@@ -35,6 +35,7 @@ target_link_libraries(
                         hardware_pwm
                         hardware_dma
                         hardware_pio
+                        hardware_irq
                         )
 
 
