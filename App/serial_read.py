@@ -1,5 +1,9 @@
 import serial
-
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import signal, fft
+import struct
+from itertools import chain
 
 def serial_read(dataPortName, ctrlPortName):
     BYTES_PER_NUMBER = 2
@@ -41,7 +45,10 @@ def serial_read(dataPortName, ctrlPortName):
             case 2:
                 CTRLCHANNEL.write(b'a')
                 HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                print(HHat.hex(' '))
+
+                HHat = struct.iter_unpack('d', HHat)
+                HHat = list(chain.from_iterable(HHat))
+                print(HHat)
                 print('\n')
                 STATE = FFR
             case 3:
@@ -59,8 +66,16 @@ def serial_read(dataPortName, ctrlPortName):
             case 5:
                 CTRLCHANNEL.write(b'a')
                 IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
-                print(IDLE_data.hex(' '))
-                print('\n')
+                # print(IDLE_data.hex(' '))
+                # print('\n')
+                y_fft = fft.fft(HHat)
+
+                y_fft = np.abs(y_fft)
+                y_fft = fft.fftshift(y_fft)
+
+                plt.plot(y_fft)
+                plt.show()
+                break
                 STATE = H
 
 

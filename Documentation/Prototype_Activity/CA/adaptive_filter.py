@@ -14,7 +14,7 @@ D = signal.sosfilt(sos=LPF_sos, x=noise)
 
 
 
-num_taps = 64
+num_taps = 128
 mu = 1/1024
 
 h_hat = np.zeros(num_taps)
@@ -27,23 +27,23 @@ for i in range (num_taps, num_samples):
     y[i] = np.dot(h_hat, u)
     e[i] = D[i] - y[i]
     h_hat = h_hat + mu * u * e[i]
-
+print(h_hat)
 y_fft = fft.fft(h_hat)
 
 y_fft = np.abs(y_fft)
 y_fft = fft.fftshift(y_fft)
 
 
-plt.subplot(6, 1, 1)
-plt.plot(noise)
-plt.subplot(6, 1, 2)
-plt.plot(w, np.abs(h), 'b')
-plt.subplot(6, 1, 3)
-plt.plot(D)
-plt.subplot(6, 1, 4)
-plt.plot(y)
-plt.subplot(6, 1, 5)
-plt.plot(e)
-plt.subplot(6, 1, 6)
-plt.plot(y_fft)
-plt.show()
+# plt.subplot(6, 1, 1)
+# plt.plot(noise)
+# plt.subplot(6, 1, 2)
+# plt.plot(w, np.abs(h), 'b')
+# plt.subplot(6, 1, 3)
+# plt.plot(D)
+# plt.subplot(6, 1, 4)
+# plt.plot(y)
+# plt.subplot(6, 1, 5)
+# plt.plot(e)
+# plt.subplot(6, 1, 6)
+# plt.plot(y_fft)
+# plt.show()
