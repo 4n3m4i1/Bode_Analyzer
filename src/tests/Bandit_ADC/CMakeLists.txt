@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 
 include(pico_sdk_import.cmake)
 
-project(RP2040_ADAPTIVE_FILTER_EVAL C CXX ASM)
+project(BANDIT_ADC C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -43,7 +43,7 @@ add_library(FFT FFT/fft_half.c FFT/fft_half.h)
 add_library(circular_buffers circular_buffers/RP2040_Circ_Buffer.c circular_buffers/RP2040_Circ_Buffer.h)
 add_library(FIR FIR/FIR_Fast_Fixed.c FIR/FIR_Fast_Fixed.h)
 add_library(LMS LMS/LMS_Fixed.c LMS/LMS_Fixed.h)
-
+add_library(ADC ADS7253_RP2040/ADS7253_RP2040.c ADS7253_RP2040/ADS7253_RP2040.h)
 
 target_link_libraries(FFT
     pico_stdlib
@@ -64,11 +64,19 @@ target_link_libraries(LMS
     FIR
 )
 
-pico_enable_stdio_usb(RP2040_ADAPTIVE_FILTER_EVAL 1)
-pico_enable_stdio_uart(RP2040_ADAPTIVE_FILTER_EVAL 0)
+target_link_libraries(ADC
+    pico_stdlib
+    hardware_spi
+    hardware_irq
+    hardware_pwm
+    hardware_resets
+)
+
+pico_enable_stdio_usb(${PROJECT_NAME} 1)
+pico_enable_stdio_uart(${PROJECT_NAME} 0)
 
 # Create EXEC binaries like uf2
-pico_add_extra_outputs(RP2040_ADAPTIVE_FILTER_EVAL)
+pico_add_extra_outputs(${PROJECT_NAME})
 
 # Important Memory Management!!!!!!!!!!!!
 ## Okay the .. is a total hack but it works so... idk man I'm not fighting cmake this much

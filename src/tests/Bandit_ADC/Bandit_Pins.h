@@ -8,6 +8,8 @@
     Maps directly to GPIO register bit offsets (and thus GPIO number)
 )*/
 
+#define PINSH(a)    (1u << a)
+
 enum BODE_BANDIT_PINS {
     NC_0_PAD,
     ADC_CSN_PAD,
@@ -41,5 +43,14 @@ enum BODE_BANDIT_PINS {
     NC_15_PAD
 };
 
+#define PWMSLICE_RG 6
+#define PWMCHAN_R   0
+#define PWMCHAN_G   1
+
+#define PWMSLICE_BU 7
+#define PWMCHAN_B   0
+#define PWMCHAN_U   1
+
+#define PWMSLICE_ISR    1
 
 #endif

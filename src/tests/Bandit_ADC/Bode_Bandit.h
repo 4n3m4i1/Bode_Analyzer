@@ -9,6 +9,7 @@
 #include "FIR/FIR_Fast_Fixed.h"
 #include "LMS/LMS_Fixed.h"
 #include "AWGN_ROSC.h"
+#include "ADS7253_RP2040/ADS7253_RP2040.h"
 
 
 /*
