@@ -10,6 +10,7 @@
 #include "LMS/LMS_Fixed.h"
 #include "AWGN_ROSC.h"
 #include "ADS7253_RP2040/ADS7253_RP2040.h"
+#include "MCP6S92_RP2040/MCP6S92_RP2040.h"
 
 
 /*

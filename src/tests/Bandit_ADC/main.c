@@ -97,7 +97,7 @@ int main(){
 
     gpio_init(VDDA_EN_PAD);
     gpio_set_dir(VDDA_EN_PAD, GPIO_OUT);
-    gpio_put(VDDA_EN_PAD, false);
+    gpio_put(VDDA_EN_PAD, true);
     
     //start_randombit_dma_chain();
 
@@ -171,10 +171,27 @@ static void core_1_main(){
     LMS_FIR.data = LMS_FIR_BANK;
     LMS_FIR.taps = LMS_H_HATS;
 
+    sleep_ms(1);
 
     struct ADS7253_Inst_t ADC_Inst;
     setup_ADC(&ADC_Inst, sampling_ISR_func);
     Q15_Sampling_Bank_ptr = 0;
+
+    sleep_ms(1);
+
+    spi_inst_t *mcp_spi = spi1;
+    MCP6S92_Init(mcp_spi, PGA_CSN_PAD, PGA_SCK_PAD, PGA_SI_PAD);
+    //union MCP6S92_SPI_CMD pga_cmd;
+    //pga_cmd.cmd_bytes[MCP6S92_INSTRUCTION_BYTE] = MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER);
+    //pga_cmd.cmd_bytes[MCP6S92_DATA_BYTE] = MCP6S92_CHAN_0;
+    //MCP6S92_Send_Command(mcp_spi, &pga_cmd);
+//
+    //pga_cmd.cmd_bytes[MCP6S92_INSTRUCTION_BYTE] = MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER);
+    //pga_cmd.cmd_bytes[MCP6S92_DATA_BYTE] = MCP6S92_x1_GAIN;
+    //MCP6S92_Send_Command(mcp_spi, &pga_cmd);
+
+    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
+    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
 
     uint8_t r = 0;
     uint8_t g = 0;
@@ -187,6 +204,9 @@ static void core_1_main(){
         if(Q15_Sampling_Bank_ptr >= TOTAL_BUFF_LEN){
             set_RGB_levels(r++,g,b++);
             Q15_Sampling_Bank_ptr = 0;
+            for(int n = 0; n < TOTAL_BUFF_LEN; ++n){
+                printf("%d\t%d\n", D_N_0[n], X_N_0[n]);
+            }
             set_ADC_free_running();
         } else {
             tight_loop_contents();

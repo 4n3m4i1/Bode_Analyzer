@@ -44,6 +44,7 @@ add_library(circular_buffers circular_buffers/RP2040_Circ_Buffer.c circular_buff
 add_library(FIR FIR/FIR_Fast_Fixed.c FIR/FIR_Fast_Fixed.h)
 add_library(LMS LMS/LMS_Fixed.c LMS/LMS_Fixed.h)
 add_library(ADC ADS7253_RP2040/ADS7253_RP2040.c ADS7253_RP2040/ADS7253_RP2040.h)
+add_library(PGA MCP6S92_RP2040/MCP6S92_RP2040.h)
 
 target_link_libraries(FFT
     pico_stdlib
@@ -70,6 +71,11 @@ target_link_libraries(ADC
     hardware_irq
     hardware_pwm
     hardware_resets
+)
+
+target_link_libraries(PGA
+    pico_stdlib
+    hardware_spi
 )
 
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
