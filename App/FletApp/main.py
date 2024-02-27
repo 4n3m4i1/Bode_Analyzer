@@ -1,10 +1,28 @@
+from generic_include import *
 import serial
-import numpy as np
+
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
-from scipy import signal, fft
-import struct
+import numpy as np
 from itertools import chain
-from queue import Queue
+
+from scipy import fft
+import struct 
+
+import flet as ft
+from flet.matplotlib_chart import MatplotlibChart
+
+from multiprocessing import Process
+from queue import Queue, Empty
+dataPort = "/dev/tty.usbmodem1234561"
+ctrlPort = "/dev/tty.usbmodem1234563"
+
+NUM_VALUES = 128
+
+init_graph = [0 for i in range(NUM_VALUES)]
+
+FFT_real_queue = Queue()
 
 def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
     BYTES_PER_NUMBER = 2
@@ -33,58 +51,66 @@ def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
     # x = 0
 
     while True:
-
         # DATACHANNEL.reset_input_buffer()
         match STATE:
             case 1:
                 CTRLCHANNEL.write(b'a')
                 HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
-
-                # print(HEADER.hex(' '))
-                # print('\n')
                 STATE = HH
             case 2:
                 CTRLCHANNEL.write(b'a')
                 HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
 
-                HHat = struct.iter_unpack('d', HHat)
-                HHat = list(chain.from_iterable(HHat))
-                # print(HHat)
-                # print('\n')
                 STATE = FFR
             case 3:
                 CTRLCHANNEL.write(b'a')
                 FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
                 data_Queue.put(FFR_data)
-                print(FFR_data.hex(' '))
-                print('\n')
                 STATE = FFI
             case 4:
                 CTRLCHANNEL.write(b'a')
                 FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                # print(FFI_data.hex(' '))
-                # print('\n')
                 STATE = IDLE
             case 5:
                 CTRLCHANNEL.write(b'a')
                 IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
-                # print(IDLE_data.hex(' '))
-                # print('\n')
-                # y_fft = fft.fft(HHat)
-
-                # y_fft = np.abs(y_fft)
-                # y_fft = fft.fftshift(y_fft)
-
-                # plt.plot(y_fft)
-                # plt.show()
-                # break
                 STATE = H
 
 
+def update_graph(Graph_Object, line, data_Queue: Queue):
+    while True:
+        try:
+            graph_data_raw = data_Queue.get(block=False)
+            unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
+            listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
+            converted_graph_data = Q15_to_float_array(listed_graph_data, 128)
+            
+            y_fft = fft.fft(converted_graph_data)
+            y_fft = np.abs(y_fft)
+
+            print(y_fft)
+
+            line.clear()
+            line.plot(y_fft)
+            # Graph_Object.canvas.draw()
+            # Graph_Object.canvas.flush_events()
+        except Empty:
+            continue
+
+def main(page: ft.Page):
 
 
-if __name__ == "__main__":
-     
-    serial_read("/dev/tty.usbmodem1234561", "/dev/tty.usbmodem1234563")
+    figure = plt.figure()
+    ax = figure.add_subplot()
+    ax.plot(init_graph)
+    chart = MatplotlibChart(figure, isolated=True, expand=True)
+    page.add(chart)
+    
+    serial_reader = Process(target=serial_read, args=(dataPort, ctrlPort, FFT_real_queue))
+    graph_updater_thread = Process(target=update_graph, args=(figure, ax, FFT_real_queue))
 
-                
+    serial_reader.start()
+    graph_updater_thread.start()
+
+
+ft.app(target=main)
