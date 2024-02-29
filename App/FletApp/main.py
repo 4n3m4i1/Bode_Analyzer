@@ -2,7 +2,7 @@ from generic_include import *
 import serial
 
 import asyncio
-
+import random
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
@@ -15,9 +15,9 @@ import struct
 import flet as ft
 from flet.matplotlib_chart import MatplotlibChart
 
-from multiprocessing import Process
+from multiprocessing import Queue
 from threading import Thread
-from queue import Queue, Empty
+from queue import Empty
 dataPort = "/dev/tty.usbmodem1234561"
 ctrlPort = "/dev/tty.usbmodem1234563"
 
@@ -56,6 +56,7 @@ def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
 
     while True:
         # DATACHANNEL.reset_input_buffer()
+        test_val = bytes([random.randint(0, 255) for _ in range(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)])
         match STATE:
             case 1:
                 CTRLCHANNEL.write(b'a')
@@ -64,16 +65,22 @@ def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
             case 2:
                 CTRLCHANNEL.write(b'a')
                 HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-
+                # data_Queue.put(HHat, True)
+                # print('hhat')
                 STATE = FFR
             case 3:
                 CTRLCHANNEL.write(b'a')
                 FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                data_Queue.put(FFR_data)
+                # data_Queue.put(FFR_data, True)
+                data_Queue.put(test_val, True)
+                # print(list(data_Queue.queue))
+                # print('ffr')
                 STATE = FFI
             case 4:
                 CTRLCHANNEL.write(b'a')
                 FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
+                # data_Queue.put(FFI_data, True)
+                
                 STATE = IDLE
             case 5:
                 CTRLCHANNEL.write(b'a')
@@ -87,50 +94,57 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             graph_data_raw = data_in_Queue.get(block=False)
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
+
             converted_graph_data = Q15_to_float_array(listed_graph_data, 128)
-            
-            y_fft = fft.fft(converted_graph_data)
-            y_fft = np.abs(y_fft)
 
             # print(len(y_fft))
-
-            data_out_Queue.put(y_fft, block=False)
+            # print(y_fft)
+            data_out_Queue.put(converted_graph_data, block=False)
 
         except Empty:
             continue
 
+def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis):
+    while True:
+        try: 
+            data = data_Queue.get()
+            line.set_ydata(data)
+            axis.autoscale_view()
+            plt.ylim(0, max(data))
+            plt.draw()
+
+
+            chart.update()
+        except Empty:
+            continue
+
+
+        
 def main(page: ft.Page):
     page.title = "BODE GUI TESTING"
 
-    running = False
 
     figure = plt.figure()
+    # plt.ylim(0, 10)
     ax = figure.add_subplot()
     line, = ax.plot(init_graph)
     chart = MatplotlibChart(figure, isolated=True, expand=True)
-
+    serial_reader = Thread(target=serial_read, args=(dataPort, ctrlPort, FFT_real_queue))
+    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
+    update_graph_thread = Thread(target=update_graph, args=(FFT_converted_queue, chart, line, ax))
     def handle_start_button_clicked(e):
-        running = True
+        # running = True
         serial_reader.start()
         data_converter_process.start()
+        update_graph_thread.start()
 
-        while running:
-            try:
-                line.set_ydata(FFT_converted_queue.get())
-                plt.draw()
-                # plt.pause(0.1)
-                chart.update()
-            except Empty:
-                continue
         
     page.add(ft.OutlinedButton(
         width=150,
         on_click=handle_start_button_clicked
     ), 
     chart)
-    
-    serial_reader = Thread(target=serial_read, args=(dataPort, ctrlPort, FFT_real_queue))
-    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
+
 
 
     
