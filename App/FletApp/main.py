@@ -2,7 +2,6 @@ from generic_include import *
 import serial
 import time
 
-import asyncio
 import random
 import matplotlib
 matplotlib.use('agg')
@@ -16,7 +15,7 @@ import struct
 import flet as ft
 from flet.matplotlib_chart import MatplotlibChart
 
-from multiprocess import Process, Queue
+from multiprocess import Process, Queue, Event
 from threading import Thread
 from queue import Empty
 
@@ -29,6 +28,8 @@ init_graph = [0 for i in range(NUM_VALUES)]
 
 FFT_real_queue = Queue()
 FFT_converted_queue = Queue()
+
+GraphEvent = Event()
 
 def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
     BYTES_PER_NUMBER = 2
@@ -57,6 +58,7 @@ def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
     # x = 0
 
     while True:
+        is_set = GraphEvent.wait()
         # DATACHANNEL.reset_input_buffer()
         test_val = bytes([random.randint(0, 255) for _ in range(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)])
         match STATE:
@@ -89,9 +91,9 @@ def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
                 # IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
                 STATE = H
 
-
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
     while True:
+        is_set = GraphEvent.wait()
         try:
             graph_data_raw = data_in_Queue.get(block=False)
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
@@ -108,6 +110,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
 
 def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
     while True:
+        is_set = GraphEvent.wait()
         try: 
 
             data = data_Queue.get()
@@ -120,11 +123,11 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
             fig.canvas.blit(fig.bbox)
             fig.canvas.flush_events()
 
-            start = time.time()
+            # start = time.time()
             chart.update()
-            end = time.time()
+            # end = time.time()
 
-            print(end - start)
+            # print(end - start)
         except Empty:
             continue
 
@@ -133,27 +136,40 @@ def main(page: ft.Page):
     page.title = "BODE GUI TESTING"
 
 
+    
+
+    def handle_start_button_clicked(e):
+        # running = True
+        GraphEvent.set()
+
+    def handle_stop_button_clicked(e):
+        GraphEvent.clear()
+
     figure = plt.figure()
     # plt.ylim(0, 10)
     ax = figure.add_subplot()
     line, = ax.plot(init_graph, animated=True)
     chart = MatplotlibChart(figure, expand=True)
+
+    page.add(ft.Row([ft.OutlinedButton(
+        text='start',
+        width=150,
+        on_click = handle_start_button_clicked
+    ), ft.OutlinedButton(
+        text='stop',
+        width=150,
+        on_click = handle_stop_button_clicked
+        )]),
+    chart)
+    
     serial_reader = Thread(target=serial_read, args=(dataPort, ctrlPort, FFT_real_queue))
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
     update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, ax, figure))
-    
-    def handle_start_button_clicked(e):
-        # running = True
-        serial_reader.start()
-        data_converter_process.start()
-        update_graph_thread.start()
+    serial_reader.start()
+    data_converter_process.start()
+    update_graph_thread.start()
 
-        
-    page.add(ft.OutlinedButton(
-        width=150,
-        on_click = handle_start_button_clicked
-    ), 
-    chart)
+
 
 
 
