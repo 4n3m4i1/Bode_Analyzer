@@ -35,6 +35,8 @@ FFT_converted_queue = Queue()
 
 GraphEvent = Event()
 
+CONNECTED_FLAG = False
+
 def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
@@ -59,6 +61,7 @@ def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
         bytesize = serial.EIGHTBITS,
         timeout = 1,
     )
+
 
     while True:
         is_set = GraphEvent.wait()
@@ -227,8 +230,11 @@ def main(page: ft.Page):
     update_graph_thread.start()
 
 
-
-
+    def shutdown(e):
+        serial_reader.join()
+        data_converter_process.join()
+        update_graph_thread.join()
+        exit(0)
 
     
 if __name__ == '__main__':
