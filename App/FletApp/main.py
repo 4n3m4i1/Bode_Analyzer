@@ -20,13 +20,25 @@ from multiprocess import Process, Queue, Event
 from threading import Thread
 from queue import Empty
 
-dataPort = "/dev/tty.usbmodem1234561"
-ctrlPort = "/dev/tty.usbmodem1234563"
+# dataPort = "/dev/tty.usbmodem1234561"
+# ctrlPort = "/dev/tty.usbmodem1234563"
+
+dataPort = "/dev/tty.URT0"
+ctrlPort = "/dev/tty.URT0"
 
 NUM_VALUES = 128
 port_selections = []
 for port in list_ports_osx.comports():
     port_selections.append(ft.dropdown.Option(port))
+
+
+parametric_taps =[16,32,64,128,256]
+taps_list =[]
+size = len(parametric_taps)
+for index in range(size):
+    taps_list.append(ft.dropdown.Option(parametric_taps[index]))
+
+
 
 init_graph = [0 for i in range(NUM_VALUES)]
 
@@ -112,7 +124,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
     while True:
         is_set = GraphEvent.wait()
         try:
-            # print(f"data queue size: {data_in_Queue.qsize()}")
+            #print(f"data queue size: {data_in_Queue.qsize()}")
             graph_data_raw = data_in_Queue.get(block=False)
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
@@ -153,18 +165,15 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
 def main(page: ft.Page):
     page.title = "BODE GUI TESTING"
 
-    
-    
-
     def handle_start_button_clicked(e):
-        # running = True
+        #running = True 
         GraphEvent.set()
 
     def handle_stop_button_clicked(e):
         GraphEvent.clear()
 
     figure = plt.figure()
-    # plt.ylim(0, 10)
+    #plt.ylim(0, 10)
     ax = figure.add_subplot()
     line, = ax.plot(init_graph, animated=True)
     chart = MatplotlibChart(figure, expand=True)
@@ -176,11 +185,11 @@ def main(page: ft.Page):
         image_opacity=50
     )
     Controls = ft.Row([ft.OutlinedButton(
-        text='start',
+        text='Start',
         width=150,
         on_click = handle_start_button_clicked
     ), ft.OutlinedButton(
-        text='stop',
+        text='Stop',
         width=150,
         on_click = handle_stop_button_clicked
         )])
@@ -200,8 +209,15 @@ def main(page: ft.Page):
         ft.Dropdown(
             options=port_selections
         ),
+
+        ft.Text('Select number of Taps'),
+        ft.Dropdown(
+            options=taps_list
+        ),
+
         ]
     )
+
     SettingsSelection = ft.AlertDialog(
         modal=True,
         title=ft.Text('Configurations'),
@@ -225,9 +241,6 @@ def main(page: ft.Page):
     serial_reader.start()
     data_converter_process.start()
     update_graph_thread.start()
-
-
-
 
 
     
