@@ -1,7 +1,11 @@
 from generic_include import *
 import serial
 import serial.tools.list_ports_osx as list_ports_osx
+# import serial.tools.list_ports_windows as list_ports_windows
+# import serial.tools.list_ports_linux as list_ports_linux
+
 import time
+import platform
 
 import random
 import matplotlib
@@ -20,16 +24,30 @@ from multiprocess import Process, Queue, Event
 from threading import Thread
 from queue import Empty
 
+os = platform.system()
+
+# dataPort = None
+# ctrlPort = None
+MacOS = "Darwin"
+connected = Event()
+class Port():
+    def __init__(self, portString = None):
+        self.name = portString
+    def set(self, port):
+        self.name = port
+
+
 # dataPort = "/dev/tty.usbmodem1234561"
 # ctrlPort = "/dev/tty.usbmodem1234563"
 
-dataPort = "/dev/tty.URT0"
-ctrlPort = "/dev/tty.URT0"
+# dataPort = "/dev/tty.URT0"
+# ctrlPort = "/dev/tty.URT0"
 
 NUM_VALUES = 128
 port_selections = []
-for port in list_ports_osx.comports():
-    port_selections.append(ft.dropdown.Option(port))
+if os == MacOS: 
+    for port in list_ports_osx.comports():
+        port_selections.append(ft.dropdown.Option(str(port).split(".")[1].split("-")[0].strip()))
 
 
 parametric_taps =[16,32,64,128,256]
@@ -39,6 +57,8 @@ for index in range(size):
     taps_list.append(ft.dropdown.Option(parametric_taps[index]))
 
 
+data_port = Port()
+ctrl_port = Port()
 
 init_graph = [0 for i in range(NUM_VALUES)]
 
@@ -47,7 +67,7 @@ FFT_converted_queue = Queue()
 
 GraphEvent = Event()
 
-def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
+def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
     DATA_PACKET_LENGTH = 128
@@ -58,15 +78,18 @@ def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
     FFI = 4
     IDLE = 5   
     STATE = 5
+
+    is_conn = connected.wait()
+
     DATACHANNEL = serial.Serial(
-        port = dataPortName,
+        port = dataPort.name,
         baudrate = 9600,
         bytesize = serial.EIGHTBITS,
         timeout = 1,
 
     )
     CTRLCHANNEL = serial.Serial(
-        port= ctrlPortName,
+        port= ctrlPort.name,
         baudrate=9600,
         bytesize = serial.EIGHTBITS,
         timeout = 1,
@@ -166,8 +189,9 @@ def main(page: ft.Page):
     page.title = "BODE GUI TESTING"
 
     def handle_start_button_clicked(e):
-        #running = True 
+        connected.set()
         GraphEvent.set()
+        page.update()
 
     def handle_stop_button_clicked(e):
         GraphEvent.clear()
@@ -184,7 +208,8 @@ def main(page: ft.Page):
         image_src='/banditlogo.png',
         image_opacity=50
     )
-    Controls = ft.Row([ft.OutlinedButton(
+    Controls = ft.Row(
+        [ft.OutlinedButton(
         text='Start',
         width=150,
         on_click = handle_start_button_clicked
@@ -192,28 +217,49 @@ def main(page: ft.Page):
         text='Stop',
         width=150,
         on_click = handle_stop_button_clicked
-        )])
+        ),
+        ft.Icon(
+        name = ft.icons.SIGNAL_WIFI_4_BAR if connected.is_set() else ft.icons.SIGNAL_WIFI_OFF, 
+        color = ft.colors.GREEN_ACCENT if connected.is_set() else ft.colors.RED_ACCENT
+        ),
+        ])
     
 
-    def open_modal(e):
+    def open_modal(e): # handle settings modal opening
         page.dialog = SettingsSelection
         SettingsSelection.open = True
         page.update()
 
-    def close_modal(e):
+    def close_modal(e): #handle settings modal closing
         SettingsSelection.open = False
         page.update()
 
-    ConfigDisplay = ft.Column([
-        ft.Text('Select Port'),
-        ft.Dropdown(
-            options=port_selections
-        ),
+    def select_data_port(e): #handle data port selection
+        match os:
+            case "Darwin":
+                data_port.set(f"/dev/tty.{data_select.value}")
 
-        ft.Text('Select number of Taps'),
-        ft.Dropdown(
+    def select_ctrl_port(e): #handle ctrl port selection
+        ctrl_port.set(f"/dev/tty.{ctrl_select.value}")
+
+    data_select = ft.Dropdown(
+            label="Select Data Port",
+            options=port_selections,
+            on_change=select_data_port,
+        )
+    ctrl_select = ft.Dropdown(
+            label="Select Control Port",
+            options=port_selections,
+            on_change=select_ctrl_port
+        )
+    tap_select = ft.Dropdown(
+            label="Select Number of Taps",
             options=taps_list
-        ),
+        )
+    ConfigDisplay = ft.Column([
+        data_select,
+        ctrl_select,
+        tap_select,
 
         ]
     )
@@ -222,7 +268,7 @@ def main(page: ft.Page):
         modal=True,
         title=ft.Text('Configurations'),
         content=ConfigDisplay,
-        actions=[ft.TextButton('Cancel', on_click=close_modal), ft.TextButton('Submit')]
+        actions=[ft.TextButton('Close', on_click=close_modal)]
     )
     page.appbar = ft.AppBar(
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
@@ -230,12 +276,12 @@ def main(page: ft.Page):
         bgcolor=ft.colors.SURFACE_VARIANT,
         actions=[
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
-            ft.IconButton(icon=ft.icons.CLOSE)
+            ft.IconButton(icon=ft.icons.UNDO)
         ]
     )
     page.add(ft.Column([Controls,DataContainer]), chart)
 
-    serial_reader = Thread(target=serial_read, args=(dataPort, ctrlPort, FFT_real_queue))
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue))
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
     update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, ax, figure))
     serial_reader.start()
