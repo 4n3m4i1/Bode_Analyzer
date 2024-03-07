@@ -6,7 +6,6 @@ import serial.tools.list_ports_osx as list_ports_osx
 
 import time
 import platform
-
 import random
 import matplotlib
 matplotlib.use('agg')
@@ -69,7 +68,7 @@ FFT_converted_queue = Queue()
 
 GraphEvent = Event()
 
-def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue):
+def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
     DATA_PACKET_LENGTH = 128
@@ -80,70 +79,87 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue):
     FFI = 4
     IDLE = 5   
     STATE = 5
+    def close_banner(e):
+        page.banner.open = False
+        page.update()
+    
+    x = 0
+    while x < 1:
+        is_conn = connected.wait()
+        try:
+            DATACHANNEL = serial.Serial(
+                port = dataPort.name,
+                baudrate = 9600,
+                bytesize = serial.EIGHTBITS,
+                timeout = 1,
 
-    is_conn = connected.wait()
+            )
+            CTRLCHANNEL = serial.Serial(
+                port= ctrlPort.name,
+                baudrate=9600,
+                bytesize = serial.EIGHTBITS,
+                timeout = 1,
+            )
+            x = x + 1
+            while True:
+                is_set = GraphEvent.wait()
 
-    DATACHANNEL = serial.Serial(
-        port = dataPort.name,
-        baudrate = 9600,
-        bytesize = serial.EIGHTBITS,
-        timeout = 1,
+                # test_val = bytes([random.randint(0, 255) for _ in range(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)])
+                match STATE:
+                    case 1:
+                        CTRLCHANNEL.write(b'a')
+                        # start = time.time()
+                        HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
+                        # end = time.time()
+                        # print(f"header: {end - start}")
+                        STATE = HH
+                    case 2:
+                        CTRLCHANNEL.write(b'a')
+                        # start = time.time()
+                        # HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
+                        # data_Queue.put(HHat, True)
+                        # end = time.time()
+                        # print(f"hhat: {end - start}")
+                        # print('hhat')
+                        STATE = FFR
+                    case 3:
+                        CTRLCHANNEL.write(b'a')
+                        # start = time.time()
+                        FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
+                        data_Queue.put(FFR_data, True)
+                        # end = time.time()
+                        # print(f"ffr: {end - start}")
+                        # data_Queue.put(test_val, True)
+                        # print(list(data_Queue.queue))
+                        # print('ffr')
+                        STATE = FFI
+                    case 4:
+                        CTRLCHANNEL.write(b'a')
+                        # start = time.time()
+                        # FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
+                        # data_Queue.put(FFI_data, True)
+                        # end = time.time()
+                        # print(f"ffi: {end - start}")
+                        STATE = IDLE
+                    case 5:
+                        CTRLCHANNEL.write(b'a')
+                        # start = time.time()
+                        # IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
+                        # end = time.time()
+                        # print(f"idle: {end - start}")
+                        STATE = H
+        except serial.SerialException:
+            page.banner = ft.Banner(
+                bgcolor=ft.colors.AMBER_100,
+                leading=ft.Icon(ft.icons.WARNING_AMBER_ROUNDED, color=ft.colors.AMBER, size=40),
+                content=ft.Text("Invalid Port Selection", color=ft.colors.BLACK),
+                actions=[ft.TextButton("Close", on_click=close_banner),]
+                )
+            page.banner.open = True
+            connected.clear()
+            page.update()
+        
 
-    )
-    CTRLCHANNEL = serial.Serial(
-        port= ctrlPort.name,
-        baudrate=9600,
-        bytesize = serial.EIGHTBITS,
-        timeout = 1,
-    )
-
-    while True:
-        is_set = GraphEvent.wait()
-
-        # test_val = bytes([random.randint(0, 255) for _ in range(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)])
-        match STATE:
-            case 1:
-                CTRLCHANNEL.write(b'a')
-                # start = time.time()
-                HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
-                # end = time.time()
-                # print(f"header: {end - start}")
-                STATE = HH
-            case 2:
-                CTRLCHANNEL.write(b'a')
-                # start = time.time()
-                # HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                # data_Queue.put(HHat, True)
-                # end = time.time()
-                # print(f"hhat: {end - start}")
-                # print('hhat')
-                STATE = FFR
-            case 3:
-                CTRLCHANNEL.write(b'a')
-                # start = time.time()
-                FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                data_Queue.put(FFR_data, True)
-                # end = time.time()
-                # print(f"ffr: {end - start}")
-                # data_Queue.put(test_val, True)
-                # print(list(data_Queue.queue))
-                # print('ffr')
-                STATE = FFI
-            case 4:
-                CTRLCHANNEL.write(b'a')
-                # start = time.time()
-                # FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                # data_Queue.put(FFI_data, True)
-                # end = time.time()
-                # print(f"ffi: {end - start}")
-                STATE = IDLE
-            case 5:
-                CTRLCHANNEL.write(b'a')
-                # start = time.time()
-                # IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
-                # end = time.time()
-                # print(f"idle: {end - start}")
-                STATE = H
 
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
     while True:
@@ -191,9 +207,12 @@ def main(page: ft.Page):
     page.title = "BODE GUI TESTING"
 
     def handle_start_button_clicked(e):
-        connected.set()
-        GraphEvent.set()
-        page.update()
+        if is_connected():
+            connected.set()
+            GraphEvent.set()
+            page.update()
+        else:
+            handle_not_connected()
 
     def handle_stop_button_clicked(e):
         GraphEvent.clear()
@@ -203,8 +222,23 @@ def main(page: ft.Page):
     ax = figure.add_subplot()
     line, = ax.plot(init_graph, animated=True)
     chart = MatplotlibChart(figure, expand=True)
-
-
+    
+    
+    def is_connected():
+        return True if data_port.name is not None and ctrl_port.name is not None else False
+    
+    def close_banner(e):
+        page.banner.open = False
+        page.update()
+    def handle_not_connected():
+        page.banner.open = True
+        page.update()
+    page.banner = ft.Banner(
+            bgcolor=ft.colors.AMBER_100,
+            leading=ft.Icon(ft.icons.WARNING_AMBER_ROUNDED, color=ft.colors.AMBER, size=40),
+            content=ft.Text("Select Ports in Configurations", color=ft.colors.BLACK),
+            actions=[ft.TextButton("Close", on_click=close_banner),]
+            )
     DataContainer = ft.Container(
         content=ft.Text('test'),
         image_src='/banditlogo.png',
@@ -214,7 +248,7 @@ def main(page: ft.Page):
         [ft.OutlinedButton(
         text='Start',
         width=150,
-        on_click = handle_start_button_clicked
+        on_click = handle_start_button_clicked,
     ), ft.OutlinedButton(
         text='Stop',
         width=150,
@@ -285,7 +319,7 @@ def main(page: ft.Page):
     )
     page.add(ft.Column([Controls,DataContainer]), chart)
 
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue))
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
     update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, ax, figure))
     serial_reader.start()
