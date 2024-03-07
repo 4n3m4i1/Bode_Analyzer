@@ -1,4 +1,5 @@
 from generic_include import *
+from assets.ref import *
 import serial
 import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
@@ -28,7 +29,6 @@ os = platform.system()
 
 # dataPort = None
 # ctrlPort = None
-MacOS = "Darwin"
 connected = Event()
 
 class Port():
@@ -47,7 +47,7 @@ class Port():
 
 NUM_VALUES = 128
 port_selections = []
-if os == MacOS: 
+if os == MACOS_STR: 
     for port in list_ports_osx.comports():
         port_selections.append(ft.dropdown.Option(str(port).split(".")[1].split("-")[0].strip()))
 
@@ -110,35 +110,35 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
                 # test_val = bytes([random.randint(0, 255) for _ in range(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)])
                 match STATE:
                     case 1:
-                        CTRLCHANNEL.write(b'a')
+                        CTRLCHANNEL.write(SR_ACK)
                         HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
                         STATE = HH
                     case 2:
-                        CTRLCHANNEL.write(b'a')
+                        CTRLCHANNEL.write(SR_ACK)
                         # HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
                         # data_Queue.put(HHat, True)
                         STATE = FFR
                     case 3:
-                        CTRLCHANNEL.write(b'a')
+                        CTRLCHANNEL.write(SR_ACK)
                         FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
                         data_Queue.put(FFR_data, True)
                         # data_Queue.put(test_val, True)
                         STATE = FFI
                     case 4:
-                        CTRLCHANNEL.write(b'a')
+                        CTRLCHANNEL.write(SR_ACK)
                         # FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
                         # data_Queue.put(FFI_data, True)
                         STATE = IDLE
                     case 5:
-                        CTRLCHANNEL.write(b'a')
+                        CTRLCHANNEL.write(SR_ACK)
                         # IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
                         STATE = H
         except serial.SerialException:
             page.banner = ft.Banner(
                 bgcolor=ft.colors.AMBER_100,
                 leading=ft.Icon(ft.icons.WARNING_AMBER_ROUNDED, color=ft.colors.AMBER, size=40),
-                content=ft.Text("Invalid Port Selection", color=ft.colors.BLACK),
-                actions=[ft.TextButton("Close", on_click=close_banner),]
+                content=ft.Text(INVALID_PORTS_WARNING, color=ft.colors.BLACK),
+                actions=[ft.TextButton(CLOSE_STR, on_click=close_banner),]
                 )
             page.banner.open = True
             connected.clear()
@@ -185,7 +185,7 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
 
 
 def main(page: ft.Page):
-    page.title = "BODE GUI TESTING"
+    page.title = PAGE_TITLE
 
     def handle_start_button_clicked(e):
         if is_connected():
@@ -217,21 +217,21 @@ def main(page: ft.Page):
     page.banner = ft.Banner(
             bgcolor=ft.colors.AMBER_100,
             leading=ft.Icon(ft.icons.WARNING_AMBER_ROUNDED, color=ft.colors.AMBER, size=40),
-            content=ft.Text("Select Ports in Configurations", color=ft.colors.BLACK),
-            actions=[ft.TextButton("Close", on_click=close_banner),]
+            content=ft.Text(NONE_PORTS_WARNING, color=ft.colors.BLACK),
+            actions=[ft.TextButton(CLOSE_STR, on_click=close_banner),]
             )
     DataContainer = ft.Container(
         content=ft.Text('test'),
-        image_src='/banditlogo.png',
+        image_src=BANDIT_LOGO_SRC,
         image_opacity=50
     )
     Controls = ft.Row(
         [ft.OutlinedButton(
-        text='Start',
+        text=START_BUTTON_TEXT,
         width=150,
         on_click = handle_start_button_clicked,
     ), ft.OutlinedButton(
-        text='Stop',
+        text=STOP_BUTTON_TEXT,
         width=150,
         on_click = handle_stop_button_clicked
         ),
@@ -250,30 +250,30 @@ def main(page: ft.Page):
     def select_data_port(e): #handle data port selection
         match os:
             case "Darwin":
-                data_port.set(f"/dev/tty.{data_select.value}")
+                data_port.set(f"{MACOS_PORT_PREFIX}{data_select.value}")
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
         match os:
             case "Darwin":
-                ctrl_port.set(f"/dev/tty.{ctrl_select.value}")
+                ctrl_port.set(f"{MACOS_PORT_PREFIX}{ctrl_select.value}")
         page.update()
 
     data_select = ft.Dropdown(
-            label="Select Data Port",
+            label=SELECT_DP_STR,
             options=port_selections,
             on_change=select_data_port,
         )
     ctrl_select = ft.Dropdown(
-            label="Select Control Port",
+            label=SELECT_CP_STR,
             options=port_selections,
             on_change=select_ctrl_port
         )
     tap_select = ft.Dropdown(
-            label="Select Number of Taps",
+            label=SELECT_TAP_STR,
             options=taps_list
         )
     ConfigDisplay = ft.Column([
-        ft.Text("** For port selection, data port and control port will be sequential in numbering ** \n For example: data port: port1, control port: port2"),
+        ft.Text(CONFIG_INSTR),
         data_select,
         ctrl_select,
         tap_select,
@@ -283,13 +283,13 @@ def main(page: ft.Page):
 
     SettingsSelection = ft.AlertDialog(
         modal=True,
-        title=ft.Text('Configurations'),
+        title=ft.Text(CONFIG_STR),
         content=ConfigDisplay,
-        actions=[ft.TextButton('Close', on_click=close_modal)]
+        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)]
     )
     page.appbar = ft.AppBar(
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
-        title=ft.Text('BANDIT'),
+        title=ft.Text(APPBAR_TITLE),
         bgcolor=ft.colors.SURFACE_VARIANT,
         actions=[
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
