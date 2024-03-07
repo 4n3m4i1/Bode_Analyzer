@@ -3,6 +3,7 @@ import serial
 import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
 # import serial.tools.list_ports_linux as list_ports_linux
+import atexit
 
 import time
 import platform
@@ -298,12 +299,14 @@ def main(page: ft.Page):
     page.add(ft.Column([Controls,DataContainer]), chart)
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
+    serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
+    data_converter_process.daemon = True
     update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, ax, figure))
+    update_graph_thread.daemon = True
     serial_reader.start()
     data_converter_process.start()
     update_graph_thread.start()
-
 
     
 if __name__ == '__main__':
