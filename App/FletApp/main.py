@@ -87,6 +87,8 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
     while x < 1:
         is_conn = connected.wait()
         try:
+            if dataPort.name == ctrlPort.name:
+                raise serial.SerialException
             DATACHANNEL = serial.Serial(
                 port = dataPort.name,
                 baudrate = 9600,
