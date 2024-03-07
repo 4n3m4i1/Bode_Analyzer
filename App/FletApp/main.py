@@ -30,11 +30,13 @@ os = platform.system()
 # ctrlPort = None
 MacOS = "Darwin"
 connected = Event()
+
 class Port():
     def __init__(self, portString = None):
         self.name = portString
     def set(self, port):
         self.name = port
+
 
 
 # dataPort = "/dev/tty.usbmodem1234561"
@@ -218,10 +220,6 @@ def main(page: ft.Page):
         width=150,
         on_click = handle_stop_button_clicked
         ),
-        ft.Icon(
-        name = ft.icons.SIGNAL_WIFI_4_BAR if connected.is_set() else ft.icons.SIGNAL_WIFI_OFF, 
-        color = ft.colors.GREEN_ACCENT if connected.is_set() else ft.colors.RED_ACCENT
-        ),
         ])
     
 
@@ -238,9 +236,14 @@ def main(page: ft.Page):
         match os:
             case "Darwin":
                 data_port.set(f"/dev/tty.{data_select.value}")
-
+        # connected.set()
+        page.update()
     def select_ctrl_port(e): #handle ctrl port selection
-        ctrl_port.set(f"/dev/tty.{ctrl_select.value}")
+        match os:
+            case "Darwin":
+                ctrl_port.set(f"/dev/tty.{ctrl_select.value}")
+        # connected.set()
+        page.update()
 
     data_select = ft.Dropdown(
             label="Select Data Port",
@@ -257,6 +260,7 @@ def main(page: ft.Page):
             options=taps_list
         )
     ConfigDisplay = ft.Column([
+        ft.Text("** For port selection, data port and control port will be sequential in numbering ** \n For example: data port: port1, control port: port2"),
         data_select,
         ctrl_select,
         tap_select,
