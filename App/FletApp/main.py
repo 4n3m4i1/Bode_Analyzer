@@ -149,6 +149,8 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
     while True:
         is_set = GraphEvent.wait()
         try:
+            if data_in_Queue.empty():
+                raise Empty
             graph_data_raw = data_in_Queue.get(block=False)
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
@@ -164,7 +166,8 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
     while True:
         is_set = GraphEvent.wait()
         try: 
-
+            if data_Queue.empty():
+                raise Empty
             data = data_Queue.get()
             line.set_ydata(data)
             
