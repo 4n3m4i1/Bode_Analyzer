@@ -108,45 +108,27 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
                 match STATE:
                     case 1:
                         CTRLCHANNEL.write(b'a')
-                        # start = time.time()
                         HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
-                        # end = time.time()
-                        # print(f"header: {end - start}")
                         STATE = HH
                     case 2:
                         CTRLCHANNEL.write(b'a')
-                        # start = time.time()
                         # HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
                         # data_Queue.put(HHat, True)
-                        # end = time.time()
-                        # print(f"hhat: {end - start}")
-                        # print('hhat')
                         STATE = FFR
                     case 3:
                         CTRLCHANNEL.write(b'a')
-                        # start = time.time()
                         FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
                         data_Queue.put(FFR_data, True)
-                        # end = time.time()
-                        # print(f"ffr: {end - start}")
                         # data_Queue.put(test_val, True)
-                        # print(list(data_Queue.queue))
-                        # print('ffr')
                         STATE = FFI
                     case 4:
                         CTRLCHANNEL.write(b'a')
-                        # start = time.time()
                         # FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
                         # data_Queue.put(FFI_data, True)
-                        # end = time.time()
-                        # print(f"ffi: {end - start}")
                         STATE = IDLE
                     case 5:
                         CTRLCHANNEL.write(b'a')
-                        # start = time.time()
                         # IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
-                        # end = time.time()
-                        # print(f"idle: {end - start}")
                         STATE = H
         except serial.SerialException:
             page.banner = ft.Banner(
@@ -165,17 +147,14 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
     while True:
         is_set = GraphEvent.wait()
         try:
-            #print(f"data queue size: {data_in_Queue.qsize()}")
             graph_data_raw = data_in_Queue.get(block=False)
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
 
             converted_graph_data = Q15_to_float_array(listed_graph_data, 128)
 
-            # print(len(y_fft))
-            # print(y_fft)
             data_out_Queue.put(converted_graph_data, block=False)
-            # print(f"graph queue size: {data_out_Queue.qsize()}")
+
         except Empty:
             continue
 
@@ -186,7 +165,6 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
 
             data = data_Queue.get()
             line.set_ydata(data)
-            # axis.autoscale_view()
             
             plt.ylim(0, max(data))
 
@@ -194,11 +172,8 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
             fig.canvas.blit(fig.bbox)
             fig.canvas.flush_events()
 
-            # start = time.time()
             chart.update()
-            # end = time.time()
 
-            # print(end - start)
         except Empty:
             continue
 
@@ -215,10 +190,10 @@ def main(page: ft.Page):
             handle_not_connected()
 
     def handle_stop_button_clicked(e):
+        connected.clear()
         GraphEvent.clear()
 
     figure = plt.figure()
-    #plt.ylim(0, 10)
     ax = figure.add_subplot()
     line, = ax.plot(init_graph, animated=True)
     chart = MatplotlibChart(figure, expand=True)
@@ -270,13 +245,11 @@ def main(page: ft.Page):
         match os:
             case "Darwin":
                 data_port.set(f"/dev/tty.{data_select.value}")
-        # connected.set()
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
         match os:
             case "Darwin":
                 ctrl_port.set(f"/dev/tty.{ctrl_select.value}")
-        # connected.set()
         page.update()
 
     data_select = ft.Dropdown(
