@@ -1,38 +1,45 @@
-#ifndef AWGN_ROSC_h
-#define AWGN_ROSC_h
-
+#include <stdio.h>
+#include <inttypes.h>
+#include "pico/stdlib.h"
+#include "pico/multicore.h"
+#include "hardware/i2c.h"
+#include "hardware/timer.h"
+#include "hardware/pwm.h"
 #include "hardware/dma.h"
 #include "hardware/structs/rosc.h"
 #include "hardware/pio.h"
 #include "hardware/structs/pio.h"
-#include "Bandit_Pins.h"
 
 #include "pio_val_2_pin.pio.h"
 
 
 #define DMA_ROSC_CHANNEL    0
-
-#define DMA_ROSC_PIN        PDM_WGN_PAD
+#define DMA_ROSC_PIN        0
 
 int dma_awgn_data_chan, dma_awgn_ctrl_chan;
 
 const uint32_t awgn_txfer_ct = 0x0FFFFFFF;
 
-void setup_rosc_full_tilt(){
+
+void main(){
+    stdio_init_all();
+
+    busy_wait_ms(1000);
+
     rosc_hw->ctrl   = ROSC_CTRL_FREQ_RANGE_VALUE_HIGH;
     rosc_hw->freqa  = (ROSC_FREQA_PASSWD_VALUE_PASS << 16) | 0xFFFF;
     rosc_hw->freqb  = (ROSC_FREQB_PASSWD_VALUE_PASS << 16) | 0xFFFF;
-}
 
-void setup_PIO_for_switching(){
     PIO awgn_pio = pio0;
     int awgn_sm = 0;
     uint offset = pio_add_program(awgn_pio, &val2pin_program);
     awgn_pio->sm[awgn_sm].clkdiv = (uint32_t) ((15 << 16));
     val2pin_program_init(awgn_pio, awgn_sm, offset, DMA_ROSC_PIN);
-}
 
-void setup_chained_dma_channels(){
+
+    //dma_awgn_ctrl_chan = dma_claim_unused_channel(true);
+    //dma_awgn_data_chan = dma_claim_unused_channel(true);
+
     dma_awgn_ctrl_chan = 1;
     dma_awgn_data_chan = 0;
 
@@ -67,14 +74,16 @@ void setup_chained_dma_channels(){
         0,                      // Wait for ctrl channel to fill tx count
         false                   // Don't start yet
     );
+    
+    dma_start_channel_mask(1 << dma_awgn_ctrl_chan);
+
+    while(1){
+        //if(dma_hw->ch[dma_awgn_data_chan].al2_transfer_count == 0) {
+        //    printf("Refill! @ 0x%08X\n", &(dma_hw->ch[dma_awgn_data_chan].al2_transfer_count));
+        //    *((volatile uint32_t *)(0x50000000 + 0x01C)) = awgn_txfer_ct;
+           // dma_hw->ch[dma_awgn_data_chan].al2_transfer_count = awgn_txfer_ct;
+        //}
+        busy_wait_ms(10);
+        tight_loop_contents();
+    }
 }
-
-void start_randombit_dma_chain(int dma_channel){
-    dma_start_channel_mask(1 << dma_channel);
-}
-
-void stop_randombit_dma_chain(int dma_channel){
-
-}
-
-#endif
