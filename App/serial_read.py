@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from scipy import signal, fft
 import struct
 from itertools import chain
+from queue import Queue
 
-def serial_read(dataPortName, ctrlPortName):
+def serial_read(dataPortName, ctrlPortName, data_Queue: Queue):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
     DATA_PACKET_LENGTH = 128
@@ -15,7 +16,7 @@ def serial_read(dataPortName, ctrlPortName):
     FFR = 3
     FFI = 4
     IDLE = 5   
-    STATE = H
+    STATE = 5
     DATACHANNEL = serial.Serial(
         port = dataPortName,
         baudrate = 9600,
@@ -39,8 +40,8 @@ def serial_read(dataPortName, ctrlPortName):
                 CTRLCHANNEL.write(b'a')
                 HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
 
-                print(HEADER.hex(' '))
-                print('\n')
+                # print(HEADER.hex(' '))
+                # print('\n')
                 STATE = HH
             case 2:
                 CTRLCHANNEL.write(b'a')
@@ -48,34 +49,35 @@ def serial_read(dataPortName, ctrlPortName):
 
                 HHat = struct.iter_unpack('d', HHat)
                 HHat = list(chain.from_iterable(HHat))
-                print(HHat)
-                print('\n')
+                # print(HHat)
+                # print('\n')
                 STATE = FFR
             case 3:
                 CTRLCHANNEL.write(b'a')
                 FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
+                data_Queue.put(FFR_data)
                 print(FFR_data.hex(' '))
                 print('\n')
                 STATE = FFI
             case 4:
                 CTRLCHANNEL.write(b'a')
                 FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                print(FFI_data.hex(' '))
-                print('\n')
+                # print(FFI_data.hex(' '))
+                # print('\n')
                 STATE = IDLE
             case 5:
                 CTRLCHANNEL.write(b'a')
                 IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
                 # print(IDLE_data.hex(' '))
                 # print('\n')
-                y_fft = fft.fft(HHat)
+                # y_fft = fft.fft(HHat)
 
-                y_fft = np.abs(y_fft)
-                y_fft = fft.fftshift(y_fft)
+                # y_fft = np.abs(y_fft)
+                # y_fft = fft.fftshift(y_fft)
 
-                plt.plot(y_fft)
-                plt.show()
-                break
+                # plt.plot(y_fft)
+                # plt.show()
+                # break
                 STATE = H
 
 
