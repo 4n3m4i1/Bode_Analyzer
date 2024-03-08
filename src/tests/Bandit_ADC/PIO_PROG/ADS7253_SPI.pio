@@ -1,0 +1,98 @@
+;   ADS7253 "SPI" Interface
+;   Shift Data Out on RISING
+;   Shift Data IN on RISING
+;
+;   No action taken on falling edges
+;       however ensure 50% duty sck
+;
+;   03/07/2024 Joseph A. De Vico
+
+;   Intended Pin Layout (for sideset):
+;   LSB
+;       CS      (side bit 0)
+;       SCK     (side bit 1)
+;       DOUT
+;       DIN_A
+;       DIN_B
+;   MSB
+
+.program ADS7253_SPI_CTRL
+; CS and SCK Sideset
+.side_set 2
+.wrap_target
+bitshiftloop:
+    ; Shift Data Out on DOUT
+    out pins,   1           side 0x2 [1]
+    ; Repeat Loop N - 2 more times
+    jmp x-- bitshiftloop    side 0x0 [1]
+    ; Fallthrough when x == 0: Terminate Loop
+    ; Shift out last bit
+    out pins,   1           side 0x2 [1]
+    ; Refill Shift Counter
+    mov x,      y           side 0x0
+    ; If more data in TX buffer, shift it out
+    jmp !osre bitshiftloop  side 0x0
+    ; Fallthrough if no more TX data
+public entry_point:
+    ; Stall with CSN high until data present to shift out
+    pull    ifempty block   side 0x1 [1]
+    ; CSN initial delay, keep to one cycle
+    nop                     side 0x0 [1]
+.wrap
+
+% c-sdk {
+#include "hardware/gpio.h"
+static inline void ads7253_pio_ctrl_setup(PIO pio, uint sm, uint prog_offs, uint num_bits,
+                    uint clkdiv_i, uint clkdiv_f, uint pin_cs, uint pin_copi){
+
+    /*
+    pio_sm_config c = ADS7253_SPI_CTRL_program_get_default_config(prog_offs);
+
+    // OUT Instruction Base Pin
+    sm_config_set_out_pins(&c, pin_copi, 1);
+    // Sideset Base Pins
+    sm_config_set_sideset_pins(&c, pin_cs);
+    // Auto Pull threshold
+    sm_config_set_out_shift(&c, false, true, num_bits);
+    sm_config_set_clkdiv_int_frac(&c, clkdiv_i, clkdiv_f);
+
+    pio_sm_set_pins_with_mask(pio, sm, (1u << pin_cs), (3u << pin_cs) | (1 << pin_copi));
+    pio_sm_set_pindirs_with_mask(pio, sm, (3u << pin_cs) | (1u << pin_copi), (3u << pin_cs) | (1u << pin_copi));
+    
+    pio_gpio_init(pio, pin_cs);
+    pio_gpio_init(pio, pin_cs + 1);
+    pio_gpio_init(pio, pin_copi);
+
+    // Invert SCK at IO block for CPOL = 1 with GPIO_OVERRIDE_INVERT
+    //gpio_set_outover((pin_cs + 1), GPIO_OVERRIDE_NORMAL);
+
+    uint entry_point = prog_offs + ADS7253_SPI_CTRL_offset_entry_point;
+
+    pio_sm_init(pio, sm, entry_point, &c);
+    // Preload counters, fill Y (constant var) w bitlen
+    pio_sm_exec(pio, sm, pio_encode_set(pio_x, num_bits - 2));
+    pio_sm_exec(pio, sm, pio_encode_set(pio_y, num_bits - 2));
+
+    pio_sm_set_enabled(pio, sm, true);
+    */
+
+    pio_sm_config c = ADS7253_SPI_CTRL_program_get_default_config(prog_offs);
+    sm_config_set_out_pins(&c, pin_copi, 1);
+    sm_config_set_sideset_pins(&c, pin_cs);
+    sm_config_set_out_shift(&c, false, true, num_bits);
+    sm_config_set_clkdiv_int_frac(&c, clkdiv_i, clkdiv_f);
+
+    pio_sm_set_pins_with_mask(pio, sm, (2u << pin_cs), (3u << pin_cs) | (1u << pin_copi));
+    pio_sm_set_pindirs_with_mask(pio, sm, (3u << pin_cs) | (1u << pin_copi), (3u << pin_cs) | (1u << pin_copi));
+    pio_gpio_init(pio, pin_copi);
+    pio_gpio_init(pio, pin_cs);
+    pio_gpio_init(pio, pin_cs + 1);
+    //gpio_set_outover(pin_cs, cpol ? GPIO_OVERRIDE_INVERT : GPIO_OVERRIDE_NORMAL);
+
+    uint entry_point = prog_offs + ADS7253_SPI_CTRL_offset_entry_point;
+    pio_sm_init(pio, sm, entry_point, &c);
+    pio_sm_exec(pio, sm, pio_encode_set(pio_x, num_bits - 2));
+    pio_sm_exec(pio, sm, pio_encode_set(pio_y, num_bits - 2));
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}

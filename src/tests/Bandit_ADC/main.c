@@ -10,6 +10,7 @@
 
 #include "Bode_Bandit.h"
 
+
   //////////////////////////////////////////////////////////////////////
  //////////////////   GLOBAL PREALLOC BUFFERS   ///////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -60,9 +61,6 @@ struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
  ///////////////////   FUNCTION DEFINITIONS   /////////////////////////
 //////////////////////////////////////////////////////////////////////
 // Generic Function Definitions
-static void init_LED_pins();
-static void set_RGB_levels(uint8_t R_, uint8_t G_, uint8_t B_);
-static void set_ULED_level(uint8_t _L);
 
 // Core 0 Function Definitions
 static void core_0_main();
@@ -76,10 +74,12 @@ static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 //
 
 // Core 1 Function Definitions
+CORE_1_MEM struct ADS7253_Inst_t ADC_Inst;
 static void     core_1_main();
 static void     setup_ADC(struct ADS7253_Inst_t *ADC, irq_handler_t adc_read_handler);
 static void     set_ADC_free_running();
 static void     stop_ADC_free_running();
+static void     set_ADC_dac(struct ADS7253_Inst_t *adc, uint16_t refA, uint16_t refB);
 //void    setup_sampling_ISR();
 void            sampling_ISR_func();
 //int     run_adaptive_taps();
@@ -118,20 +118,20 @@ int main(){
 static void core_0_main(){
     // Do tiny USB and control stuff here,
     
-    Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS;
+    Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS | BS_WGN_ON;
     Global_Bandit_Settings.manual_tap_len_setting = 0;
     Global_Bandit_Settings.manual_error_limit = 0;
     Global_Bandit_Settings.manual_freq_range = 0;
 
 
     // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
-    setup_rosc_full_tilt();
-    setup_PIO_for_switching();
-    setup_chained_dma_channels();
+    //setup_rosc_full_tilt();
+    //setup_PIO_for_switching();
+    //setup_chained_dma_channels();
 
-    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
-        start_randombit_dma_chain(dma_awgn_ctrl_chan);
-    }
+    //if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
+    //    start_randombit_dma_chain(dma_awgn_ctrl_chan);
+    //}
 
     // Setup Structs and Default Parameters for FFT
     struct FFT_PARAMS cool_fft;
@@ -173,23 +173,25 @@ static void core_1_main(){
 
     sleep_ms(1);
 
-    struct ADS7253_Inst_t ADC_Inst;
-    setup_ADC(&ADC_Inst, sampling_ISR_func);
-    Q15_Sampling_Bank_ptr = 0;
+    PIO ADC_PIO = pio1;
 
+/*
+ads7253_pio_ctrl_setup(PIO pio, uint sm, uint prog_offs, uint num_bits,
+                    uint clkdiv_i, uint clkdiv_f, uint pin_cs, uint pin_copi){
+*/
+    uint pioprogramoffset = pio_add_program(ADC_PIO, &ADS7253_SPI_CTRL_program);
+    ads7253_pio_ctrl_setup(ADC_PIO, ADS_PIO_MAIN_SM, pioprogramoffset, 16, 16, 0, ADC_CSN_PAD, ADC_SDI_PAD);
+
+    Q15_Sampling_Bank_ptr = 0;
     sleep_ms(1);
 
+    /*
+        Initiate frontend PGA/MUX
+            Set channel 0 (D_N), 1x gain
+    */
     spi_inst_t *mcp_spi = spi1;
     MCP6S92_Init(mcp_spi, PGA_CSN_PAD, PGA_SCK_PAD, PGA_SI_PAD);
-    //union MCP6S92_SPI_CMD pga_cmd;
-    //pga_cmd.cmd_bytes[MCP6S92_INSTRUCTION_BYTE] = MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER);
-    //pga_cmd.cmd_bytes[MCP6S92_DATA_BYTE] = MCP6S92_CHAN_0;
-    //MCP6S92_Send_Command(mcp_spi, &pga_cmd);
-//
-    //pga_cmd.cmd_bytes[MCP6S92_INSTRUCTION_BYTE] = MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER);
-    //pga_cmd.cmd_bytes[MCP6S92_DATA_BYTE] = MCP6S92_x1_GAIN;
-    //MCP6S92_Send_Command(mcp_spi, &pga_cmd);
-
+    // Internal loopback for testing!
     MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
     MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
 
@@ -198,21 +200,245 @@ static void core_1_main(){
     uint8_t b = 0;
     uint8_t l = 0;
     
-    set_ADC_free_running();
+    //set_ADC_free_running();
+    pwm_hw->slice[PWMSLICE_ISR].csr |= PWM_CH1_CSR_EN_BITS;
+
+    uint8_t a = 0;
+
+    uint16_t refval = 0x108;
 
     while(1){
-        if(Q15_Sampling_Bank_ptr >= TOTAL_BUFF_LEN){
-            set_RGB_levels(r++,g,b++);
-            Q15_Sampling_Bank_ptr = 0;
-            for(int n = 0; n < TOTAL_BUFF_LEN; ++n){
-                printf("%d\t%d\n", D_N_0[n], X_N_0[n]);
-            }
-            set_ADC_free_running();
-        } else {
-            tight_loop_contents();
-            sleep_us(1);
-        }
+        //if(Q15_Sampling_Bank_ptr >= TOTAL_BUFF_LEN){
+        //    set_RGB_levels((uint8_t)(D_N_0[0] & 0xFF) >> 8,g, (uint8_t)(D_N_0[0] & 0xFF));
+        //    Q15_Sampling_Bank_ptr = 0;
+        //    //for(int n = 0; n < TOTAL_BUFF_LEN; ++n){
+        //    //    printf("%d\t%d\n", D_N_0[n], X_N_0[n]);
+        //    //}
+        //    //printf("%3u %d\n", a, D_N_0[0]);
+        //    //set_ADC_free_running();
+        //} else {
+        //    //tight_loop_contents();
+        //    //sleep_us(1);
+        //}
         //tight_loop_contents();
+        char b = getchar_timeout_us(0);
+        switch(b){
+            case 'c':{   // configure
+                printf("Configuring!\n");
+                uint16_t sendemcmd[3];
+                sendemcmd[0] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (0 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                sendemcmd[1] = 0x0000;
+                sendemcmd[2] = 0x0000;
+                gpio_put(ADC_CSN_PAD, false);
+                spi_write16_blocking(ADC_Inst.ads_spi, sendemcmd, 1);
+                gpio_put(ADC_CSN_PAD, true);
+
+                sleep_us(1);
+
+                gpio_put(ADC_CSN_PAD, false);
+
+                gpio_put(ADC_CSN_PAD, true);
+            }
+            break;
+
+            case 'r':{   // read
+                uint16_t sendem[3];
+                sendem[0] = ADS7253_CMD(ADS7253_CFR_READ, 0);
+                sendem[1] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (1 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                sendem[2] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (1 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                gpio_put(ADC_CSN_PAD, false);
+                spi_write16_blocking(ADC_Inst.ads_spi, sendem, 3);
+                gpio_put(ADC_CSN_PAD, true);
+                busy_wait_us(1);
+                gpio_put(ADC_CSN_PAD, false);
+                spi_read16_blocking(ADC_Inst.ads_spi, 0x0000, sendem, 3);
+                gpio_put(ADC_CSN_PAD, true);
+
+                printf("CFR: 0x%4X\n", sendem[0]);
+            }
+            break;
+
+            case 'd':{   // read
+                uint16_t sendem[3];
+                sendem[0] = ADS7253_CMD(ADS7253_REFDAC_A_READ, 0);
+                sendem[1] = ADS7253_CMD(ADS7253_REFDAC_A_WRITE, refval << 4);
+                //sendem[2] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (1 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                
+                //sendem[1] = 0; 
+                sendem[2] = 0;
+
+                printf("Sending: 0x%04X 0x%04X 0x%04X\n", sendem[0], sendem[1], sendem[2]);
+
+                gpio_put(ADC_CSN_PAD, false);
+                spi_write16_blocking(ADC_Inst.ads_spi, sendem, 3);
+                gpio_put(ADC_CSN_PAD, true);
+                busy_wait_us(1);
+                gpio_put(ADC_CSN_PAD, false);
+                // 
+            //spi_write16_read16_blocking 
+                uint16_t rval[3];
+                spi_write16_read16_blocking(ADC_Inst.ads_spi, sendem, rval, 3);
+                //spi_read16_blocking(ADC_Inst.ads_spi, 0x0000, sendem, 3);
+                gpio_put(ADC_CSN_PAD, true);
+
+                printf("DAC: 0x%04X 0x%04X 0x%04X\n", rval[0], rval[1], rval[2]);
+            }
+            break;
+
+            case '+':
+                refval += 16;
+                set_ADC_dac(&ADC_Inst, refval, refval);
+                printf("Plus\t0x%04X\n", refval);
+            break;
+
+            case '-':
+                refval -= 16;
+                set_ADC_dac(&ADC_Inst, refval, refval);
+                printf("Minus\t0x%04X\n", refval);
+            break;
+
+            case 'v':{
+                uint16_t dst[2];
+                spi_read16_blocking(ADC_Inst.ads_spi, 0x0000, dst, 2);
+
+                printf("Read: 0x%04X 0x%04X\n", dst[0], dst[1]);
+
+            }
+            break;
+
+            case 'e':{
+                printf("Sending COMMAND\n");
+                uint16_t command = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (0 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                pio_ADS7253_Write_CMD(ADC_PIO, command);
+                busy_wait_us(1);
+                command = ADS7253_CMD(ADS7253_REFDAC_A_WRITE, 0x108 << 3);
+                pio_ADS7253_Write_CMD(ADC_PIO, command);
+                busy_wait_us(1);
+                command = ADS7253_CMD(ADS7253_REFDAC_B_WRITE, 0x108 << 3);
+                pio_ADS7253_Write_CMD(ADC_PIO, command);
+            }
+            break;
+
+            case 'p':{
+                printf("PIO Instructions:\n");
+                uint16_t rval = ADC_PIO->sm[ADS_PIO_MAIN_SM].addr;
+                uint16_t rval2 = ADC_PIO->sm[ADS_PIO_SDOA_SM].addr;
+                uint16_t rval3 = ADC_PIO->sm[ADS_PIO_SDOB_SM].addr;
+                //for(int n = 0; n < 32; ++n){
+                //    printf("%2d\t0x%08X\n", n, ADC_PIO->instr_mem[n]);
+                //}
+
+                printf("INSTR SM: 0\t%2d -> 0x%08X\n", rval, ADC_PIO->sm[ADS_PIO_MAIN_SM].instr);
+                printf("INSTR SM: 1\t%2d -> 0x%08X\n", rval2, ADC_PIO->sm[ADS_PIO_SDOA_SM].instr);
+                printf("INSTR SM: 2\t%2d -> 0x%08X\n", rval3, ADC_PIO->sm[ADS_PIO_SDOB_SM].instr);
+
+                printf("\nDone!\n");
+            }
+            break;
+
+            case 't': {
+                printf("Write n Count\n");
+                static uint16_t ctr[3][128];
+                static uint32_t cc[128];
+                static uint32_t fifo[128];
+                ctr[0][0] = ADC_PIO->sm[ADS_PIO_MAIN_SM].instr;
+                ctr[1][0] = ADC_PIO->sm[ADS_PIO_SDOA_SM].instr;
+                ctr[2][0] = ADC_PIO->sm[ADS_PIO_SDOB_SM].instr;
+                cc[0] = ADC_PIO->dbg_padout;
+                uint16_t command = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (0 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = command;
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
+                //pio_ADS7253_Write_CMD(ADC_PIO, command);
+                io_rw_16 *txfifo = (io_rw_16 *) &ADC_PIO->txf[ADS_PIO_MAIN_SM];
+                *txfifo = command;
+                *txfifo = 0xFFFF;
+                *txfifo = 0xAAAA;
+
+                fifo[0] = ADC_PIO->flevel;
+
+                for(int n = 1; n < count_of(ctr[0]); ++n){
+                    ctr[0][n] = ADC_PIO->sm[ADS_PIO_MAIN_SM].instr;
+                    //ctr[1][n] = ADC_PIO->sm[ADS_PIO_SDOA_SM].instr;
+                    //ctr[2][n] = ADC_PIO->sm[ADS_PIO_SDOB_SM].instr;
+                    cc[n] = ADC_PIO->dbg_padout;
+                    fifo[n] = ADC_PIO->flevel;
+                }
+
+                printf("State Machine:\n0\t1\t2\n");
+                printf("Pins: CSN: %X\tSCK: %X\tMOSI: %X\n", 1u << ADC_CSN_PAD, 1u << ADC_SCK_PAD, 1u << ADC_SDI_PAD);
+                for(int n = 0; n < count_of(ctr[0]); ++n){
+                    printf("%2d -> 0x%4X\t0x%4X\t0x%4X -> 0x%02X\tFLEVEL: 0x%08X\n", n, ctr[0][n], ctr[1][n], ctr[2][n], (uint8_t)cc[n], fifo[n]);
+                }
+                printf("\nDirs: 0x%08X\n", ADC_PIO->dbg_padoe);
+
+                printf("State Machine Registers:\n");
+                printf("Shift Control: 0x%08X\n", ADC_PIO->sm[ADS_PIO_MAIN_SM].shiftctrl);
+                printf("Exec  Control: 0x%08X\n", ADC_PIO->sm[ADS_PIO_MAIN_SM].execctrl);
+                uint pinz = ADC_PIO->sm[ADS_PIO_MAIN_SM].pinctrl;
+                printf("Pin   Control: 0x%08X\n", ADC_PIO->sm[ADS_PIO_MAIN_SM].pinctrl);
+            
+                uint sideset_ct = pinz >> 29;
+                uint set_count = (pinz >> 26) & 0b111;
+                uint out_count = (pinz >> 20) & 0b11111;
+                uint in_base = (pinz >> 15) & 0b11111;
+                uint side_base = (pinz >> 10) & 0b11111;
+                uint set_base = (pinz >> 5) & 0b11111;
+                uint out_base = pinz & 0b11111;
+
+                printf("Side Count\t%d\n", sideset_ct);
+                printf("Side Base\t%d\n", side_base);
+
+                printf("Set Count\t%d\n", set_count);
+                printf("Set Base\t%d\n", set_base);
+
+                printf("Out Count\t%d\n", out_count);
+                printf("Out Base\t%d\n", out_base);
+                printf("In Base\t%d\n", in_base);
+                
+
+                printf("FLEVEL: 0x%08X\tRead: 0x%08X 0x%08X\n", ADC_PIO->flevel, ADC_PIO->rxf[ADS_PIO_SDOA_SM], ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
+                printf("FLEVEL: 0x%08X\tRead: 0x%08X 0x%08X\n", ADC_PIO->flevel, ADC_PIO->rxf[ADS_PIO_SDOA_SM], ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
+                printf("FLEVEL: 0x%08X\tRead: 0x%08X 0x%08X\n", ADC_PIO->flevel, ADC_PIO->rxf[ADS_PIO_SDOA_SM], ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
+                printf("FLEVEL: 0x%08X\tRead: 0x%08X 0x%08X\n", ADC_PIO->flevel, ADC_PIO->rxf[ADS_PIO_SDOA_SM], ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
+            }
+            break;
+
+            case 'g':{
+                uint16_t rval[3];
+                rval[0] = 0xDEAD;
+                rval[1] = 0xBEEF;
+                rval[2] = 0xA349;
+                //pio_ADS7253_Read_Reg(ADC_PIO, ADS7253_CFR_READ, rval);
+                io_rw_16 *txfifo = (io_rw_16 *) &ADC_PIO->txf[ADS_PIO_MAIN_SM];
+                io_rw_16 *rxfifo = (io_rw_16 *) &ADC_PIO->rxf[ADS_PIO_MAIN_SM];
+                uint len = 1;
+                size_t tx_remain = len, rx_remain = len;
+                uint16_t *src;
+                src = rval;
+                while (tx_remain || rx_remain) {
+                    if (tx_remain && !pio_sm_is_tx_fifo_full(ADC_PIO, ADS_PIO_MAIN_SM)) {
+                        *txfifo = *src++;
+                        --tx_remain;
+                    }
+                    if (rx_remain && !pio_sm_is_rx_fifo_empty(ADC_PIO, ADS_PIO_MAIN_SM)) {
+                        (void) *rxfifo;
+                        --rx_remain;
+                    }
+                }
+
+                printf("CFR: 0x%04X 0x%04X 0x%04X\n", rval[0], rval[1], rval[2]);
+            }
+            break;
+        }
+
+        //if(pwm_hw->slice[PWMSLICE_ISR].ctr == 0){
+        //if(pwm_hw->intr & (1u << PWMSLICE_ISR)){
+        //    pwm_clear_irq(PWMSLICE_ISR);
+        //    set_ULED_level(a++);
+        //    sampling_ISR_func();
+        //}
 
         //set_ULED_level((uint8_t)pwm_hw->slice[PWMSLICE_ISR].ctr);
         //sleep_ms(15);
@@ -270,7 +496,18 @@ void sampling_ISR_func(){
     //  Should equal output from downsampling but here we are...
     D_N_0[Q15_Sampling_Bank_ptr]    = (Q15)(((int32_t)rdsamp[0]) - 2048);
     X_N_0[Q15_Sampling_Bank_ptr++]  = (Q15)(((int32_t)rdsamp[1]) - 2048);
-    if(Q15_Sampling_Bank_ptr >= TOTAL_BUFF_LEN) stop_ADC_free_running();
+    
+    //gpio_put(ADC_CSN_PAD, 0);
+//
+    //uint32_t rv = ADS7253_RW_CMD(&ADC_Inst, ADS7253_CMD(
+    //                                            ADS7253_CFR_READ, 0
+    //                                                ));
+    //
+    //gpio_put(ADC_CSN_PAD, 1);
+    //D_N_0[Q15_Sampling_Bank_ptr] = *(((Q15 *)&rv) + 1u);
+    //X_N_0[Q15_Sampling_Bank_ptr++] = *(((Q15 *)&rv));
+
+    //if(Q15_Sampling_Bank_ptr >= TOTAL_BUFF_LEN) stop_ADC_free_running();
 };
 
 // Setup ADC and PGA
@@ -292,6 +529,7 @@ static void setup_ADC(struct ADS7253_Inst_t *ADC, irq_handler_t adc_read_handler
 
     
     ADC->ads_spi = spi0;
+    ADC->csn_pin = ADC_CSN_PAD;
 
     ADS7253_Setup(ADC, 500 * 1000, ADS7253_16_CLK_MODE, ADS7253_SINGLE_SDO);
 
@@ -305,13 +543,43 @@ static void setup_ADC(struct ADS7253_Inst_t *ADC, irq_handler_t adc_read_handler
     pwm_hw->slice[PWMSLICE_ISR].div =   1u << PWM_CH1_DIV_INT_LSB;
     pwm_hw->slice[PWMSLICE_ISR].ctr =   0u;
     //pwm_hw->slice[1].csr =  PWM_CH1_CSR_EN_BITS;
-    pwm_clear_irq(PWMSLICE_ISR);
+    //pwm_clear_irq(PWMSLICE_ISR);
     //pwm_hw->inte |=         (1 << 1);   // Enable PWM block IRQ output from slice 1
-    pwm_set_irq_enabled(PWMSLICE_ISR, true);
+    
+    //pwm_set_irq_enabled(PWMSLICE_ISR, true);
 
     //irq_set_exclusive_handler(PWM_IRQ_WRAP, adc_read_handler);
-    irq_set_exclusive_handler(PWM_IRQ_WRAP, sampling_ISR_func);
-    irq_set_enabled(PWM_IRQ_WRAP, true);
+    //irq_set_exclusive_handler(PWM_IRQ_WRAP, sampling_ISR_func);
+    //irq_set_enabled(PWM_IRQ_WRAP, true);
+
+    uint16_t cmd = ADS7253_CMD(ADS7253_CFR_WRITE,
+                                            ADS7253_SET_SINGLE_SDO  |
+                                            ADS7253_SET_16_CLK_MODE |
+                                            ADS7253_USE_INTERNAL_REFERENCE |
+                                            ADS7253_2X_REFDAC
+                                            );
+
+    ADS7253_Write_Command(ADC, cmd);
+
+    busy_wait_us(1);
+    // Reference at 2.195 V
+   // ADS7253_Write_Command(ADC, ADS7253_CMD(ADS7253_REFDAC_A_WRITE, 0x109 << 3));
+   // busy_wait_us(1);
+   // ADS7253_Write_Command(ADC, ADS7253_CMD(ADS7253_REFDAC_B_WRITE, 0x109 << 3));
+//
+   // // Reference at A = 2.400 V, B = 2.00 V
+   // ADS7253_Write_Command(ADC, ADS7253_CMD(ADS7253_REFDAC_A_WRITE, 0x1AE << 3));
+   // //busy_wait_us(2);
+   // ADS7253_Write_Command(ADC, ADS7253_CMD(ADS7253_REFDAC_B_WRITE, 0x069 << 3));
+
+    set_ADC_dac(&ADC_Inst, 0x108, 0x108);
+}
+
+static void set_ADC_dac(struct ADS7253_Inst_t *adc, uint16_t refA, uint16_t refB){
+    ADS7253_Write_Command(adc, ADS7253_CMD(ADS7253_REFDAC_A_WRITE, refA << 3));
+//    busy_wait_us(1);
+    ADS7253_Write_Command(adc, ADS7253_CMD(ADS7253_REFDAC_B_WRITE, refB << 3));
+//    busy_wait_us(1);
 }
 
 static void set_ADC_free_running(){
@@ -325,61 +593,6 @@ static void stop_ADC_free_running(){
   /////////////////////////////////////////////////////////
  ////////////////////// Generic Functions :) /////////////
 /////////////////////////////////////////////////////////
-static void init_LED_pins(){
-    // Cleanup for direct register access, minimal slice readdress
-    //  since they are shared to a high degree
-    gpio_init_mask(                         // Enable GPIO for LEDs
-                PINSH(RGB_R_PAD) | 
-                PINSH(RGB_G_PAD) | 
-                PINSH(RGB_B_PAD) | 
-                PINSH(USER_LED_PAD)
-                );
 
-    // Set GPIO Muxes to PWM sources
-    gpio_set_function(RGB_R_PAD, GPIO_FUNC_PWM);
-    gpio_set_function(RGB_G_PAD, GPIO_FUNC_PWM);
-    gpio_set_function(RGB_B_PAD, GPIO_FUNC_PWM);
-    gpio_set_function(USER_LED_PAD, GPIO_FUNC_PWM);
-
-    // Zero out all PWM levels just in case
-    set_RGB_levels(0,0,0);  
-    set_ULED_level(0);  
-
-    /*
-        Set PWM top, set PWM slice clk div, 
-        invert both channel outputs, enable pwm slice
-
-        125MHz / 256 (divider) == 488281 Hz counter clock
-            488281 / 256 max -> 1.907kHz output f, good enough!
-    */
-
-    // RED and GREEN RGB Channels
-    pwm_hw->slice[PWMSLICE_RG].top =    0xFF;
-    pwm_hw->slice[PWMSLICE_RG].div =    (0xFF << PWM_CH6_DIV_INT_LSB);
-    pwm_hw->slice[PWMSLICE_RG].csr =    PWM_CH6_CSR_A_INV_BITS |
-                                        PWM_CH6_CSR_B_INV_BITS |
-                                        PWM_CH6_CSR_EN_BITS;
-
-    // BLUE RGB Channel, USER LED
-    pwm_hw->slice[PWMSLICE_BU].top =    0xFF;
-    pwm_hw->slice[PWMSLICE_BU].div =    (0xFF << PWM_CH7_DIV_INT_LSB);
-    pwm_hw->slice[PWMSLICE_BU].csr =    PWM_CH7_CSR_A_INV_BITS |
-                                        PWM_CH7_CSR_B_INV_BITS |
-                                        PWM_CH7_CSR_EN_BITS;
-
-}
-static void set_RGB_levels(uint8_t R_, uint8_t G_, uint8_t B_){
-    // Channel B is upper 16 bits, Channel A is lower 16 bits
-    //  Red     -> Channel A, slice 6
-    //  Green   -> Channel B, slice 6
-    //  Blue    -> Channel A, slice 7
-    pwm_hw->slice[PWMSLICE_RG].cc = (((uint16_t)G_ << 16) | (uint16_t)R_);
-    pwm_hw->slice[PWMSLICE_BU].cc = (pwm_hw->slice[PWMSLICE_BU].cc & 0xFFFF0000 | (uint16_t)B_); 
-}
-static void set_ULED_level(uint8_t _L){
-    // Channel B is upper 16 bits, CHannel A is lower 16 bits
-    //  UserLed -> Channel B, slice 7
-    pwm_hw->slice[PWMSLICE_BU].cc = ((uint16_t)_L << 16) | (pwm_hw->slice[PWMSLICE_BU].cc & 0x0000FFFF); 
-}
 
 

@@ -1,4 +1,4 @@
-; OUT pin 0 as output
+; OUT pin as output
 
 .program val2pin
 

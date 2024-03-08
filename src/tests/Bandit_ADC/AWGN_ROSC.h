@@ -5,12 +5,14 @@
 #include "hardware/structs/rosc.h"
 #include "hardware/pio.h"
 #include "hardware/structs/pio.h"
+#include "Bandit_Pins.h"
 
 #include "pio_val_2_pin.pio.h"
 
 
 #define DMA_ROSC_CHANNEL    0
-#define DMA_ROSC_PIN        0
+
+#define DMA_ROSC_PIN        PDM_WGN_PAD
 
 int dma_awgn_data_chan, dma_awgn_ctrl_chan;
 

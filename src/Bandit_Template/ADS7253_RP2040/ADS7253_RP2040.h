@@ -6,8 +6,6 @@
 #include "hardware/spi.h"
 #include "hardware/irq.h"
 #include "hardware/pwm.h"       // Going to use PWM Wrap IRQ to set sampling ISR interval
-#include "hardware/regs/resets.h"
-#include "hardware/resets.h"
 
 enum ADS7253_REGISTER_ADDRESSES {
     ADS7253_NOP,
@@ -84,7 +82,7 @@ enum ADS7253_SPI_MODES {
 #define ADS7253_MIN_DUAL_SDO_32_CLKS    32
 
 struct ADS7253_Inst_t {
-    spi_inst_t      *ads_spi;
+    spi_inst_t      ads_spi;
     uint16_t        CFR_A;
     uint16_t        CFR_B;
     uint16_t        REFDAC_A;
@@ -99,10 +97,8 @@ struct ADS7253_Inst_t {
     Initializes ADS7253 struct and SPI link
 */
 void ADS7253_Setup(struct ADS7253_Inst_t *ads, uint32_t sampling_fm, uint32_t clk_mode, uint16_t sdo_mode){
-    hw_set_bits(&resets_hw->reset, (ads->ads_spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS));
-    hw_clear_bits(&resets_hw->reset, (ads->ads_spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS));
-    while (~resets_hw->reset_done & (ads->ads_spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS))
-        tight_loop_contents();
+    spi_reset(ads->ads_spi);
+    spi_unreset(ads->ads_spi);
 
     uint32_t clk_per_txfr = 0;
     switch((clk_mode << 1) | sdo_mode){
@@ -115,13 +111,11 @@ void ADS7253_Setup(struct ADS7253_Inst_t *ads, uint32_t sampling_fm, uint32_t cl
         case ADS7253_DUAL_16_MODE_:
             clk_per_txfr = ADS7253_MIN_DUAL_SDO_16_CLKS;
         break;
-        case ADS7253_SINGLE_16_MODE_:
+        case ADS7253_SINGLE_32_MODE_:
         default:
             clk_per_txfr = ADS7253_MIN_SINGLE_SDO_16_CLKS;
         break;
     }
-
-    
 
     // Total single transfer time target ~1us, may need faster
     //      to run at full 1MSPS
@@ -134,7 +128,7 @@ void ADS7253_Setup(struct ADS7253_Inst_t *ads, uint32_t sampling_fm, uint32_t cl
     //  Set TI Synchronous Serial Format
     //hw_set_bits(&spi_get_hw(ads->ads_spi)->SSPCR0, 1u << 4);
 
-    // Enable SPI and enable DREQ output
+
     hw_set_bits(&spi_get_hw(ads->ads_spi)->dmacr, SPI_SSPDMACR_TXDMAE_BITS | SPI_SSPDMACR_RXDMAE_BITS);
     hw_set_bits(&spi_get_hw(ads->ads_spi)->cr1, SPI_SSPCR1_SSE_BITS);
 }
