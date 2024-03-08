@@ -125,9 +125,9 @@ static void core_0_main(){
 
 
     // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
-    setup_rosc_full_tilt();
-    setup_PIO_for_switching();
-    setup_chained_dma_channels();
+    //setup_rosc_full_tilt();
+    //setup_PIO_for_switching();
+    //setup_chained_dma_channels();
 
     //if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
     //    start_randombit_dma_chain(dma_awgn_ctrl_chan);
@@ -173,14 +173,14 @@ static void core_1_main(){
 
     sleep_ms(1);
 
-    //setup_ADC(&ADC_Inst, sampling_ISR_func);
     PIO ADC_PIO = pio1;
-    //gpio_init(ADC_CSN_PAD);
-    //gpio_init(ADC_SCK_PAD);
-    //gpio_init(ADC_SDI_PAD);
-    //gpio_init(ADC_SDO_A_PAD);
-    //gpio_init(ADC_SDO_B_PAD);
-    //ADS7253_PIO_Setup(ADC_PIO, 1, ADC_CSN_PAD, ADC_SCK_PAD, ADC_SDI_PAD, ADC_SDO_A_PAD, ADC_SDO_B_PAD);
+
+/*
+ads7253_pio_ctrl_setup(PIO pio, uint sm, uint prog_offs, uint num_bits,
+                    uint clkdiv_i, uint clkdiv_f, uint pin_cs, uint pin_copi){
+*/
+    uint pioprogramoffset = pio_add_program(ADC_PIO, &ADS7253_SPI_CTRL_program);
+    ads7253_pio_ctrl_setup(ADC_PIO, ADS_PIO_MAIN_SM, pioprogramoffset, 16, 16, 0, ADC_CSN_PAD, ADC_SDI_PAD);
 
     Q15_Sampling_Bank_ptr = 0;
     sleep_ms(1);
@@ -346,12 +346,16 @@ static void core_1_main(){
                 ctr[2][0] = ADC_PIO->sm[ADS_PIO_SDOB_SM].instr;
                 cc[0] = ADC_PIO->dbg_padout;
                 uint16_t command = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (0 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
-                ADC_PIO->txf[ADS_PIO_MAIN_SM] = command;
-                ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
-                ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
-                ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = command;
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
+                //ADC_PIO->txf[ADS_PIO_MAIN_SM] = 0x0000;
                 //pio_ADS7253_Write_CMD(ADC_PIO, command);
-                
+                io_rw_16 *txfifo = (io_rw_16 *) &ADC_PIO->txf[ADS_PIO_MAIN_SM];
+                *txfifo = command;
+                *txfifo = 0xFFFF;
+                *txfifo = 0xAAAA;
+
                 fifo[0] = ADC_PIO->flevel;
 
                 for(int n = 1; n < count_of(ctr[0]); ++n){
@@ -372,8 +376,28 @@ static void core_1_main(){
                 printf("State Machine Registers:\n");
                 printf("Shift Control: 0x%08X\n", ADC_PIO->sm[ADS_PIO_MAIN_SM].shiftctrl);
                 printf("Exec  Control: 0x%08X\n", ADC_PIO->sm[ADS_PIO_MAIN_SM].execctrl);
+                uint pinz = ADC_PIO->sm[ADS_PIO_MAIN_SM].pinctrl;
                 printf("Pin   Control: 0x%08X\n", ADC_PIO->sm[ADS_PIO_MAIN_SM].pinctrl);
             
+                uint sideset_ct = pinz >> 29;
+                uint set_count = (pinz >> 26) & 0b111;
+                uint out_count = (pinz >> 20) & 0b11111;
+                uint in_base = (pinz >> 15) & 0b11111;
+                uint side_base = (pinz >> 10) & 0b11111;
+                uint set_base = (pinz >> 5) & 0b11111;
+                uint out_base = pinz & 0b11111;
+
+                printf("Side Count\t%d\n", sideset_ct);
+                printf("Side Base\t%d\n", side_base);
+
+                printf("Set Count\t%d\n", set_count);
+                printf("Set Base\t%d\n", set_base);
+
+                printf("Out Count\t%d\n", out_count);
+                printf("Out Base\t%d\n", out_base);
+                printf("In Base\t%d\n", in_base);
+                
+
                 printf("FLEVEL: 0x%08X\tRead: 0x%08X 0x%08X\n", ADC_PIO->flevel, ADC_PIO->rxf[ADS_PIO_SDOA_SM], ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
                 printf("FLEVEL: 0x%08X\tRead: 0x%08X 0x%08X\n", ADC_PIO->flevel, ADC_PIO->rxf[ADS_PIO_SDOA_SM], ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
                 printf("FLEVEL: 0x%08X\tRead: 0x%08X 0x%08X\n", ADC_PIO->flevel, ADC_PIO->rxf[ADS_PIO_SDOA_SM], ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
@@ -386,7 +410,23 @@ static void core_1_main(){
                 rval[0] = 0xDEAD;
                 rval[1] = 0xBEEF;
                 rval[2] = 0xA349;
-                pio_ADS7253_Read_Reg(ADC_PIO, ADS7253_CFR_READ, rval);
+                //pio_ADS7253_Read_Reg(ADC_PIO, ADS7253_CFR_READ, rval);
+                io_rw_16 *txfifo = (io_rw_16 *) &ADC_PIO->txf[ADS_PIO_MAIN_SM];
+                io_rw_16 *rxfifo = (io_rw_16 *) &ADC_PIO->rxf[ADS_PIO_MAIN_SM];
+                uint len = 1;
+                size_t tx_remain = len, rx_remain = len;
+                uint16_t *src;
+                src = rval;
+                while (tx_remain || rx_remain) {
+                    if (tx_remain && !pio_sm_is_tx_fifo_full(ADC_PIO, ADS_PIO_MAIN_SM)) {
+                        *txfifo = *src++;
+                        --tx_remain;
+                    }
+                    if (rx_remain && !pio_sm_is_rx_fifo_empty(ADC_PIO, ADS_PIO_MAIN_SM)) {
+                        (void) *rxfifo;
+                        --rx_remain;
+                    }
+                }
 
                 printf("CFR: 0x%04X 0x%04X 0x%04X\n", rval[0], rval[1], rval[2]);
             }

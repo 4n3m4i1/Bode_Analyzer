@@ -11,6 +11,7 @@
 #include "hardware/pio.h"
 
 #include "ads7253_Data_Interface.pio.h"
+#include "ADS7253_SPI.pio.h"
 /*
     ADS7253 Data Transfer Protocol
 
