@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.12)
 
 include(pico_sdk_import.cmake)
 
-project(BANDIT_ADC C CXX ASM)
+project(BANDIT_TEMPLATE C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -15,19 +15,14 @@ add_executable(
                 ${PROJECT_NAME}
                 main.c
 
-#                ADS7253_RP2040/ADS7253_RP2040.c
-                ADS7253_RP2040.c
                 FFT/fft_half.c
                 circular_buffers/RP2040_Circ_Buffer.c
                 FIR/FIR_Fast_Fixed.c
                 LMS/LMS_Fixed.c
-                Bandit_LED/Bandit_LED.c
                 )
 
 #pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_val_2_pin.pio)
 pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/PIO_PROG/pio_val_2_pin.pio)
-pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/PIO_PROG/ads7253_Data_Interface.pio)
-pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/PIO_PROG/ADS7253_SPI.pio)
 
 # Link Libraries
 target_link_libraries(
@@ -48,10 +43,7 @@ add_library(FFT FFT/fft_half.c FFT/fft_half.h)
 add_library(circular_buffers circular_buffers/RP2040_Circ_Buffer.c circular_buffers/RP2040_Circ_Buffer.h)
 add_library(FIR FIR/FIR_Fast_Fixed.c FIR/FIR_Fast_Fixed.h)
 add_library(LMS LMS/LMS_Fixed.c LMS/LMS_Fixed.h)
-#add_library(ADC ADS7253_RP2040/ADS7253_RP2040.c ADS7253_RP2040/ADS7253_RP2040.h)
-add_library(ADC ADS7253_RP2040.c ADS7253_RP2040.h)
-add_library(PGA MCP6S92_RP2040/MCP6S92_RP2040.h)
-add_library(LED Bandit_LED/Bandit_LED.c Bandit_LED/Bandit_LED.h)
+
 
 target_link_libraries(FFT
     pico_stdlib
@@ -70,25 +62,6 @@ target_link_libraries(FIR
 target_link_libraries(LMS
     pico_stdlib
     FIR
-)
-
-target_link_libraries(ADC
-    pico_stdlib
-    hardware_spi
-    hardware_irq
-    hardware_pwm
-    hardware_resets
-    hardware_pio
-)
-
-target_link_libraries(PGA
-    pico_stdlib
-    hardware_spi
-)
-
-target_link_libraries(LED
-    pico_stdlib
-    hardware_pwm
 )
 
 pico_enable_stdio_usb(${PROJECT_NAME} 1)

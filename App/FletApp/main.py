@@ -49,7 +49,7 @@ NUM_VALUES = 128
 port_selections = []
 if os == MACOS_STR: 
     for port in list_ports_osx.comports():
-        port_selections.append(ft.dropdown.Option(str(port).split(".")[1].split("-")[0].strip()))
+        port_selections.append(ft.dropdown.Option(str(port).split(".")[1]))
 
 
 parametric_taps =[16,32,64,128,256]
@@ -256,12 +256,14 @@ def main(page: ft.Page):
     def select_data_port(e): #handle data port selection
         match os:
             case "Darwin":
-                data_port.set(f"{MACOS_PORT_PREFIX}{data_select.value}")
+                portName = data_select.value.split("-")[0].strip()
+                data_port.set(f"{MACOS_PORT_PREFIX}{portName}")
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
         match os:
             case "Darwin":
-                ctrl_port.set(f"{MACOS_PORT_PREFIX}{ctrl_select.value}")
+                portName = ctrl_select.value.split("-")[0].strip()
+                ctrl_port.set(f"{MACOS_PORT_PREFIX}{portName}")
         page.update()
 
     data_select = ft.Dropdown(

@@ -2,7 +2,6 @@
 #define BODE_BANDIT_h
 
 #include "Bandit_Pins.h"
-#include "Bandit_LED/Bandit_LED.h"
 #include "generic_include.h"
 #include "Memory_Management.h"
 #include "FFT/fft_half.h"
@@ -10,9 +9,6 @@
 #include "FIR/FIR_Fast_Fixed.h"
 #include "LMS/LMS_Fixed.h"
 #include "AWGN_ROSC.h"
-//#include "ADS7253_RP2040/ADS7253_RP2040.h"
-#include "ADS7253_RP2040.h"
-#include "MCP6S92_RP2040/MCP6S92_RP2040.h"
 
 
 /*
