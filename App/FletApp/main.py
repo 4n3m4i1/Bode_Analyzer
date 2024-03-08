@@ -58,6 +58,13 @@ size = len(parametric_taps)
 for index in range(size):
     taps_list.append(ft.dropdown.Option(parametric_taps[index]))
 
+frequency_ranges = ["High: 20Hz to 125kHz","Mid: 20Hz to 50kHz ","Low: 20Hz to 25kHz"]
+range_list = []
+size1 = len(frequency_ranges)
+for index1 in range(size1):
+    range_list.append(ft.dropdown.Option(frequency_ranges[index1]))
+
+
 
 data_port = Port()
 ctrl_port = Port()
@@ -155,7 +162,6 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             graph_data_raw = data_in_Queue.get(block=False)
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
-
             converted_graph_data = Q15_to_float_array(listed_graph_data, 128)
 
             data_out_Queue.put(converted_graph_data, block=False)
@@ -272,11 +278,17 @@ def main(page: ft.Page):
             label=SELECT_TAP_STR,
             options=taps_list
         )
+    freq_range_select = ft.Dropdown(
+            label= SELECT_RANGE_STR,
+            options=range_list
+        )
+    
     ConfigDisplay = ft.Column([
         ft.Text(CONFIG_INSTR),
         data_select,
         ctrl_select,
         tap_select,
+        freq_range_select
 
         ]
     )

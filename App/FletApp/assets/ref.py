@@ -10,6 +10,7 @@ MACOS_PORT_PREFIX = "/dev/tty."
 SELECT_DP_STR = "Select Data Port"
 SELECT_CP_STR = "Select Control Port"
 SELECT_TAP_STR = "Select Number of Taps"
+SELECT_RANGE_STR = "Select Frequency Range"
 
 CONFIG_INSTR = "** For port selection, data port and control port will be sequential in numbering ** \n For example: data port: port1, control port: port2"
 
