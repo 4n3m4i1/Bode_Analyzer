@@ -4,9 +4,8 @@
 ; Write data to pins, handle CS and SCK
 .program ads7253_write_data_pio
 .side_set 2
-
+; Working Program
 .wrap_target
-
 beepboop:
     out pins, 1         side 0x2 [1]    ; Data shift out, SCK high
     nop                 side 0x0        ; Stall 1, SCK low
@@ -21,11 +20,29 @@ public entry_point:
     ;irq  set 7          side 0x0 [1]    ; Set irq7 flag to start DIN, stall 1
 .wrap
 
+; Working on this one
+;.wrap_target
+;beepboop:
+;    out pins, 1         side 0x2 [1]    ; Data shift out, SCK high
+;    nop                 side 0x0        ; Stall 1, SCK low
+;    jmp x-- beepboop    side 0x0
+;
+;    out pins, 1         side 0x2[1]
+;    mov x, y            side 0x0
+;    jmp !osre beepboop  side 0x0
+;
+;public entry_point:
+;    pull ifempty        side 0x1    ; Wait for data, cs high clk low
+;    irq  set 7          side 0x1 [1]    ; Set irq7 flag to start DIN, stall 1
+;.wrap
+
+
 ; Read data from pins, synchronize with other SM with delays
 
 .program ads7253_read_data_pio
 
 ;.wrap_target
+;public entry_point:
 ;    wait 1 irq 7 [1]     ; Wait for CS front porch to end, set sample half way thru SCK hi
 ;bitloop:
 ;    in  pins, 1 [2]     ; Input data (1 cycle), delay to sync with main pace
@@ -34,12 +51,24 @@ public entry_point:
 ;    irq clear 7
 ;.wrap
 
+;.wrap_target
+;topmiso:
+;public entry_point:
+;    wait    1 gpio 2    ; Wait for sck rising
+;    in      pins, 1     ; read data in
+;    wait    0 gpio 2    ; Wait for sck falling
+;    jmp     topmiso
+;.wrap
+
 .wrap_target
-topmiso:
-    wait    1 gpio 2    ; Wait for sck rising
-    in      pins, 1     ; read data in
-    wait    0 gpio 2    ; Wait for sck falling
-    jmp     topmiso
+topdin:
+    wait 1 gpio 2   
+    in pins, 1      [1]
+    ;wait 0 gpio 2
+    ;jmp x-- topdin
+public entry_point:
+    ;mov x, y
+    ;wait 1 gpio 2
 .wrap
 
 
@@ -134,10 +163,10 @@ static inline void ADS7253_PIO_Setup(PIO pio, bool DUALSDO, uint CSPIN, uint SCK
     sm_config_set_in_shift(&datasm_A, false, true, transfer_size);
     sm_config_set_in_shift(&datasm_B, false, true, transfer_size);
     
-    pio_sm_exec(pio, DIN_A_SM, pio_encode_set(pio_x, transfer_size - 2));
-    pio_sm_exec(pio, DIN_A_SM, pio_encode_set(pio_y, transfer_size - 2));
-    pio_sm_exec(pio, DIN_B_SM, pio_encode_set(pio_x, transfer_size - 2));
-    pio_sm_exec(pio, DIN_B_SM, pio_encode_set(pio_y, transfer_size - 2));
+    pio_sm_exec(pio, DIN_A_SM, pio_encode_set(pio_x, transfer_size));
+    pio_sm_exec(pio, DIN_A_SM, pio_encode_set(pio_y, transfer_size));
+    pio_sm_exec(pio, DIN_B_SM, pio_encode_set(pio_x, transfer_size));
+    pio_sm_exec(pio, DIN_B_SM, pio_encode_set(pio_y, transfer_size));
 
     pio_gpio_init(pio, CSPIN);
     pio_gpio_init(pio, SCKPIN);
@@ -145,12 +174,14 @@ static inline void ADS7253_PIO_Setup(PIO pio, bool DUALSDO, uint CSPIN, uint SCK
     pio_gpio_init(pio, SDIPIN_A);
 
     if(DUALSDO) pio_gpio_init(pio, SDIPIN_B);
-    pio_sm_set_clkdiv_int_frac(pio, MAINSPI_SM, 16, 0);
+    pio_sm_set_clkdiv_int_frac(pio, MAINSPI_SM, 1, 0);
     pio_sm_set_clkdiv_int_frac(pio, DIN_A_SM, 1, 0);
     pio_sm_set_clkdiv_int_frac(pio, DIN_B_SM, 1, 0);
     
     pio_sm_init(pio, MAINSPI_SM, ads7253_write_data_pio_offset_entry_point, &mainsm);
+    //pio_sm_init(pio, DIN_A_SM, ads7253_read_data_pio_offset_entry_point + datasmoffset, &datasm_A);
     pio_sm_init(pio, DIN_A_SM, datasmoffset, &datasm_A);
+    //pio_sm_init(pio, DIN_B_SM, ads7253_read_data_pio_offset_entry_point + datasmoffset, &datasm_B);
     pio_sm_init(pio, DIN_B_SM, datasmoffset, &datasm_B);
     
     pio_add_program_at_offset(pio, &ads7253_write_data_pio_program, mainsmoffset);
@@ -163,6 +194,8 @@ static inline void ADS7253_PIO_Setup(PIO pio, bool DUALSDO, uint CSPIN, uint SCK
     pio_sm_set_enabled(pio, MAINSPI_SM, true);
     pio_sm_set_enabled(pio, DIN_A_SM, true);
     if(DUALSDO) pio_sm_set_enabled(pio, DIN_B_SM, true);
+
+    pio_clkdiv_restart_sm_mask(pio, 0xF);
 }
 %}
 
