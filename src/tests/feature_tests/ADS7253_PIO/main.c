@@ -16,6 +16,7 @@
     This is terrible and just for testing, too lazy to break out a real debugger :)
 */
 
+
 enum PINZ {
     NC,
     CS_PAD,
@@ -45,20 +46,21 @@ void __time_critical_func(pio_spi_write16_read16_blocking)(PIO pio, uint16_t *sr
         if (tx_remain && !pio_sm_is_tx_fifo_full(pio, 0)) {
         //if(tx_remain){
             *txfifo = *src++;
-            //pio->txf[0] = *src++;
-            //pio->txf[0] = *src++;
-            printf("TEE EXX\n");
+            //pio->txf[0] = *(src++);
+            //pio->txf[0] = src[tx_remain - len];
+            //pio->txf[0] = 0xF81F;
+            //printf("TEE EXX\n");
             --tx_remain;
         }
-        printf("AA\n");
+        //printf("AA\n");
         if (rx_remain && !pio_sm_is_rx_fifo_empty(pio, 1)) {
-            printf("ZZ\n");
+        //    printf("ZZ\n");
             //*dst_A++ = *rxfifo_A;
             *dst_A++ = pio->rxf[1];
-            printf("YY\n");
+        //    printf("YY\n");
             //*dst_B++ = *rxfifo_B;
             *dst_B++ = pio->rxf[2];
-            printf("ARR EXX\n");
+            //printf("ARR EXX\n");
             --rx_remain;
         }
 
@@ -67,7 +69,7 @@ void __time_critical_func(pio_spi_write16_read16_blocking)(PIO pio, uint16_t *sr
             printf("Broke on Stuck!\n");
             break;
         }
-        printf("WOOP\n");
+        //printf("WOOP\n");
     }
 }
 
@@ -110,15 +112,20 @@ void main(){
         data_B[n] = 0x4AEF;
     }
 
+    io_rw_16 *SPI_TXDR = (io_rw_16 *)pio1->txf[0];
+    io_rw_16 *SPI_RX_A = (io_rw_16 *)pio1->rxf[1];
+    io_rw_16 *SPI_RX_B = (io_rw_16 *)pio1->rxf[2];
+
+
     cmd[0] = (1 << 15); // CFR write
     cmd[0] |= (1 << 11);    // 16 clk mode
     cmd[0] |= (1 << 9);     // in = 2x vref
     cmd[0] |= (1 << 6);     // use internal reference
 
    // pio_spi_write16_read16_blocking(pio1, cmd, data_A, data_B, 3);
-    pio_sm_put(pio1, 0, cmd[0]);
-    pio_sm_put(pio1, 0, cmd[1]);
-    pio_sm_put(pio1, 0, cmd[2]);
+    //pio_sm_put(pio1, 0, cmd[0]);
+    //pio_sm_put(pio1, 0, cmd[1]);
+    //pio_sm_put(pio1, 0, cmd[2]);
 
     while(1){
         //if(pio1->sm[0].instr != pioinstr){
@@ -130,7 +137,12 @@ void main(){
         char a = getchar_timeout_us(0);
         switch(a){
             case 'a':{
-                pio_sm_put(pio1, 0, 0xAF81);
+                //*SPI_TXDR = 0xABCD;
+                //*SPI_TXDR = 0x1234;
+                //*SPI_TXDR = 0xFFFE;
+                //pio_sm_put(pio1, 0, 0xAF81);
+                pio1->txf[0] = 0xAF81;
+                pio1->txf[0] = 0xABCD;
                 break;
             }
             break;
@@ -151,7 +163,7 @@ void main(){
                                                         ((pio1->flevel >> 16) & 0xF),
                                                         ((pio1->flevel >> 24) & 0xF));
                 printf("PadDir: \t"); printbin(32, &pio1->dbg_padoe, true); printf("\r\n");
-                printf("PadSet:\t"); printbin(32, &pio1->dbg_padout, true); printf("\r\n");
+                printf("PadSet: \t"); printbin(32, &pio1->dbg_padout, true); printf("\r\n");
                 printf("FiFo Dbgg:\t0x%8X\r\n", pio1->fdebug);
                 printf("SM0 Exec Ctrl:\t"); printbin(32, &pio1->sm[0].execctrl, 1); printf("\r\n");
                 printf("SM1 Exec Ctrl:\t"); printbin(32, &pio1->sm[1].execctrl, 1); printf("\r\n");
@@ -164,7 +176,7 @@ void main(){
                 printf("SM2 Shif Ctrl:\t"); printbin(32, &pio1->sm[2].shiftctrl, 1); printf("\r\n");
                 printf("SM3 Shif Ctrl:\t"); printbin(32, &pio1->sm[3].shiftctrl, 1); printf("\r\n");
 
-                printf("PC VAL:\t%d\t%d\t%d\t%d\r\n", pio1->sm[0].addr, pio1->sm[1].addr, pio1->sm[2].addr, pio1->sm[3].addr);
+                printf("PC VAL:\t\t%d\t%d\t%d\t%d\r\n", pio1->sm[0].addr, pio1->sm[1].addr, pio1->sm[2].addr, pio1->sm[3].addr);
                 printf("Instr:\t\t0x%04X\t0x%04X\t0x%04X\t0x%04X\r\n", pio1->sm[0].instr, pio1->sm[1].instr, pio1->sm[2].instr, pio1->sm[3].instr);
 
                 pinctrl_reg_decode(pio1->sm[0].pinctrl, 0);
@@ -177,9 +189,9 @@ void main(){
 
             case 'r':{
                 printf("Sending\r\n");
-                cmd[0] = 0;
-                cmd[1] = 0;
-                cmd[2] = 0;
+                cmd[0] = 0xAAAA;
+                cmd[1] = 0xFF81;
+                cmd[2] = 0x1235;
 
                 pio_spi_write16_read16_blocking(pio1, cmd, data_A, data_B, 3);
 
