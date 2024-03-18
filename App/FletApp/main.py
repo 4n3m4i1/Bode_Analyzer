@@ -20,6 +20,7 @@ import struct
 
 import flet as ft
 from flet.matplotlib_chart import MatplotlibChart
+from flet import RouteChangeEvent, ViewPopEvent
 
 from multiprocess import Process, Queue, Event
 from threading import Thread
@@ -189,9 +190,39 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
         except Empty:
             continue
 
-
 def main(page: ft.Page):
     page.title = PAGE_TITLE
+    page.route = "/"
+    page.theme = ft.Theme(
+    color_scheme=ft.ColorScheme(
+        primary=ft.colors.BLACK,
+    )
+) 
+    
+    def route_change(e: RouteChangeEvent) -> None:
+        if page.route == "/about":
+            page.views.append(
+                ft.View(
+                    route = "/about",
+                    controls = [
+                        ft.AppBar(title=ft.Text("About Us"), bgcolor=ft.colors.SURFACE_VARIANT), 
+                        logo, about_header, mission_statement, meet_team
+                    ],   
+                )
+            )
+
+
+        page.update()
+
+
+    def view_pop(view):
+        page.views.pop()
+        top_view = page.views[-1]
+        page.go(top_view.route)
+
+    page.on_route_change = route_change
+    page.on_view_pop = view_pop
+    page.go(page.route)
 
     def handle_start_button_clicked(e):
         if is_connected():
@@ -220,6 +251,7 @@ def main(page: ft.Page):
     def handle_not_connected():
         page.banner.open = True
         page.update()
+
     page.banner = ft.Banner(
             bgcolor=ft.colors.AMBER_100,
             leading=ft.Icon(ft.icons.WARNING_AMBER_ROUNDED, color=ft.colors.AMBER, size=40),
@@ -231,6 +263,32 @@ def main(page: ft.Page):
         image_src=BANDIT_LOGO_SRC,
         image_opacity=50
     )
+
+    ## Content for the about us page
+    logo = ft.Container(
+        ft.Image(
+            src= BANDIT_LOGO_SRC,
+            width=150,
+            height=150,
+            fit=ft.ImageFit.CONTAIN,
+        ),
+
+        alignment = ft.alignment.center
+    )
+    
+    about_header = ft.Container(
+        ft.Text("The Bode Bandits", theme_style=ft.TextThemeStyle.DISPLAY_LARGE),
+        )
+    
+    mission_statement = ft.Container(
+        ft.Text("Bode Analysis N’ Display of Instrument Testing") #TBD
+        )
+    
+    meet_team =  ft.Container(
+        ft.Text("Meet the Team", theme_style=ft.TextThemeStyle.DISPLAY_MEDIUM),
+        )
+
+
     Controls = ft.Row(
         [ft.OutlinedButton(
         text=START_BUTTON_TEXT,
@@ -303,9 +361,11 @@ def main(page: ft.Page):
     )
     page.appbar = ft.AppBar(
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
+
         title=ft.Text(APPBAR_TITLE),
         bgcolor=ft.colors.SURFACE_VARIANT,
         actions=[
+            ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
             ft.IconButton(icon=ft.icons.UNDO)
         ]
