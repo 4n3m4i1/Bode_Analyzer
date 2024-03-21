@@ -167,6 +167,10 @@ int main(){
                 pio_spi_write16_blocking(&SPIPIO, sendem, 2);
 
                 printf("Configured: 0x%04X\n", A);
+
+                while(!pio_sm_is_rx_fifo_empty(pio1, 1)){
+                    printf("CFG: 0x%4X\t0x%4X\n", pio1->rxf[1], pio1->rxf[2]);
+                }
             };
             break;
 

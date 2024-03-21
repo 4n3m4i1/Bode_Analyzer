@@ -54,6 +54,11 @@ CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 //  to save on access stalls
 struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
 
+// Core 1 Defines
+#define ADCRES_BITS     12u
+#define ADC_RES_CODES   (1u << ADCRES_BITS)
+#define ADC_VREF_CODE   0x108                   // ~2.15 V from ADS7253 DAC
+
   //////////////////////////////////////////////////////////////////////
  ///////////////////   FUNCTION DEFINITIONS   /////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -90,6 +95,10 @@ static void    core_1_main();
 int main(){
     stdio_init_all();
     init_LED_pins();
+
+    gpio_init(VDDA_EN_PAD);
+    gpio_set_dir(VDDA_EN_PAD, GPIO_OUT);
+    gpio_put(VDDA_EN_PAD, true);
     
     //start_randombit_dma_chain();
 
@@ -172,6 +181,20 @@ static void core_1_main(){
     LMS_FIR.data = LMS_FIR_BANK;
     LMS_FIR.taps = LMS_H_HATS;
 
+    /*
+        Initiate frontend PGA/MUX
+            Set channel 0 (D_N), 1x gain
+    */
+    spi_inst_t *mcp_spi = spi1;
+    MCP6S92_Init(mcp_spi, PGA_CSN_PAD, PGA_SCK_PAD, PGA_SI_PAD);
+    // Internal loopback for testing!
+    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
+    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+
+    /*
+        Initialize ADC SPI w/ pio1
+    */
+
 
 
     while(1){
@@ -227,59 +250,3 @@ static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft){
   /////////////////////////////////////////////////////////
  ////////////////////// Generic Functions :) /////////////
 /////////////////////////////////////////////////////////
-static void init_LED_pins(){
-    // Cleanup for direct register access, minimal slice readdress
-    //  since they are shared to a high degree
-    gpio_init_mask(                         // Enable GPIO for LEDs
-                PINSH(RGB_R_PAD) | 
-                PINSH(RGB_G_PAD) | 
-                PINSH(RGB_B_PAD) | 
-                PINSH(USER_LED_PAD)
-                );
-
-    // Set GPIO Muxes to PWM sources
-    gpio_set_function(RGB_R_PAD, GPIO_FUNC_PWM);
-    gpio_set_function(RGB_G_PAD, GPIO_FUNC_PWM);
-    gpio_set_function(RGB_B_PAD, GPIO_FUNC_PWM);
-    gpio_set_function(USER_LED_PAD, GPIO_FUNC_PWM);
-
-    // Zero out all PWM levels just in case
-    set_RGB_levels(0,0,0);  
-    set_ULED_level(0);  
-
-    /*
-        Set PWM top, set PWM slice clk div, 
-        invert both channel outputs, enable pwm slice
-
-        125MHz / 256 (divider) == 488281 Hz counter clock
-            488281 / 256 max -> 1.907kHz output f, good enough!
-    */
-
-    // RED and GREEN RGB Channels
-    pwm_hw->slice[PWMSLICE_RG].top =    0xFF;
-    pwm_hw->slice[PWMSLICE_RG].div =    (0xFF << PWM_CH6_DIV_INT_LSB);
-    pwm_hw->slice[PWMSLICE_RG].csr =    PWM_CH6_CSR_A_INV_BITS |
-                                        PWM_CH6_CSR_B_INV_BITS |
-                                        PWM_CH6_CSR_EN_BITS;
-
-    // BLUE RGB Channel, USER LED
-    pwm_hw->slice[PWMSLICE_BU].top =    0xFF;
-    pwm_hw->slice[PWMSLICE_BU].div =    (0xFF << PWM_CH7_DIV_INT_LSB);
-    pwm_hw->slice[PWMSLICE_BU].csr =    PWM_CH7_CSR_A_INV_BITS |
-                                        PWM_CH7_CSR_B_INV_BITS |
-                                        PWM_CH7_CSR_EN_BITS;
-
-}
-static void set_RGB_levels(uint8_t R_, uint8_t G_, uint8_t B_){
-    // Channel B is upper 16 bits, Channel A is lower 16 bits
-    //  Red     -> Channel A, slice 6
-    //  Green   -> Channel B, slice 6
-    //  Blue    -> Channel A, slice 7
-    pwm_hw->slice[PWMSLICE_RG].cc = (((uint16_t)G_ << 16) | (uint16_t)R_);
-    pwm_hw->slice[PWMSLICE_BU].cc = (pwm_hw->slice[PWMSLICE_BU].cc & 0xFFFF0000 | (uint16_t)B_); 
-}
-static void set_ULED_level(uint8_t _L){
-    // Channel B is upper 16 bits, CHannel A is lower 16 bits
-    //  UserLed -> Channel B, slice 7
-    pwm_hw->slice[PWMSLICE_BU].cc = ((uint16_t)_L << 16) | (pwm_hw->slice[PWMSLICE_BU].cc & 0x0000FFFF); 
-}

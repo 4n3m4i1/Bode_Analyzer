@@ -2,14 +2,16 @@
 #define BODE_BANDIT_h
 
 #include "Bandit_Pins.h"
-#include "generic_include.h"
+#include "fixedpt_include.h"
 #include "Memory_Management.h"
+
 #include "FFT/fft_half.h"
 #include "circular_buffers/RP2040_Circ_Buffer.h"
 #include "FIR/FIR_Fast_Fixed.h"
 #include "LMS/LMS_Fixed.h"
 #include "AWGN_ROSC.h"
-
+#include "MCP6S92_RP2040/MCP6S92_RP2040.h"
+#include "Bandit_LED/Bandit_LED.h"
 
 /*
     Remember:

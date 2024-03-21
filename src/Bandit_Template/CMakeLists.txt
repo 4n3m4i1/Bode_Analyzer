@@ -19,6 +19,7 @@ add_executable(
                 circular_buffers/RP2040_Circ_Buffer.c
                 FIR/FIR_Fast_Fixed.c
                 LMS/LMS_Fixed.c
+                Bandit_LED/Bandit_LED.c
                 )
 
 #pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_val_2_pin.pio)
@@ -43,6 +44,8 @@ add_library(FFT FFT/fft_half.c FFT/fft_half.h)
 add_library(circular_buffers circular_buffers/RP2040_Circ_Buffer.c circular_buffers/RP2040_Circ_Buffer.h)
 add_library(FIR FIR/FIR_Fast_Fixed.c FIR/FIR_Fast_Fixed.h)
 add_library(LMS LMS/LMS_Fixed.c LMS/LMS_Fixed.h)
+add_library(PGA MCP6S92_RP2040/MCP6S92_RP2040.h)
+add_library(LED Bandit_LED/Bandit_LED.c Bandit_LED/Bandit_LED.h)
 
 
 target_link_libraries(FFT
@@ -62,6 +65,16 @@ target_link_libraries(FIR
 target_link_libraries(LMS
     pico_stdlib
     FIR
+)
+
+target_link_libraries(PGA
+    pico_stdlib
+    hardware_spi
+)
+
+target_link_libraries(LED
+    pico_stdlib
+    hardware_pwm
 )
 
 pico_enable_stdio_usb(${PROJECT_NAME} 1)

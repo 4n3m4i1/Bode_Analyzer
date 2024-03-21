@@ -2,7 +2,7 @@
 #define FFT_h
 
 #include <pico/stdlib.h>
-#include "generic_include.h"
+#include "fixedpt_include.h"
 #include "Q15_sin_table.h"
 #include "Q15_cos_table.h"
 
@@ -29,7 +29,7 @@ struct FFT_PARAMS {
 // Simple log2() function
 uint16_t get_log_2(uint16_t num_samples);
 
-// Shift amount for FFT bit reversal
+// Shift amount for FFT index bit reversal
 uint16_t get_shift_amt(uint16_t log2ns);
 
 // Scale fixed trig table addressing to any 2^n <= 1024 (10)
