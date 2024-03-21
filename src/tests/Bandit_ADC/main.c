@@ -76,7 +76,7 @@ static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 // Core 1 Function Definitions
 CORE_1_MEM struct ADS7253_Inst_t ADC_Inst;
 static void     core_1_main();
-static void     setup_ADC(struct ADS7253_Inst_t *ADC, irq_handler_t adc_read_handler);
+static void     setup_ADC(struct ADS7253_Inst_t *ADC);
 static void     set_ADC_free_running();
 static void     stop_ADC_free_running();
 static void     set_ADC_dac(struct ADS7253_Inst_t *adc, uint16_t refA, uint16_t refB);
@@ -175,12 +175,14 @@ static void core_1_main(){
 
     PIO ADC_PIO = pio1;
 
+    
+
 /*
 ads7253_pio_ctrl_setup(PIO pio, uint sm, uint prog_offs, uint num_bits,
                     uint clkdiv_i, uint clkdiv_f, uint pin_cs, uint pin_copi){
 */
     uint pioprogramoffset = pio_add_program(ADC_PIO, &ADS7253_SPI_CTRL_program);
-    ads7253_pio_ctrl_setup(ADC_PIO, ADS_PIO_MAIN_SM, pioprogramoffset, 16, 16, 0, ADC_CSN_PAD, ADC_SDI_PAD);
+    //ads7253_pio_ctrl_setup(ADC_PIO, ADS_PIO_MAIN_SM, pioprogramoffset, 16, 16, 0, ADC_CSN_PAD, ADC_SDI_PAD);
 
     Q15_Sampling_Bank_ptr = 0;
     sleep_ms(1);
@@ -229,15 +231,17 @@ ads7253_pio_ctrl_setup(PIO pio, uint sm, uint prog_offs, uint num_bits,
                 sendemcmd[0] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (0 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
                 sendemcmd[1] = 0x0000;
                 sendemcmd[2] = 0x0000;
-                gpio_put(ADC_CSN_PAD, false);
-                spi_write16_blocking(ADC_Inst.ads_spi, sendemcmd, 1);
-                gpio_put(ADC_CSN_PAD, true);
+                //gpio_put(ADC_CSN_PAD, false);
+                //spi_write16_blocking(ADC_Inst.ads_spi, sendemcmd, 1);
+                setup_ADC(&ADC_Inst);
+                
+                //gpio_put(ADC_CSN_PAD, true);
 
                 sleep_us(1);
 
-                gpio_put(ADC_CSN_PAD, false);
-
-                gpio_put(ADC_CSN_PAD, true);
+                //gpio_put(ADC_CSN_PAD, false);
+//
+                //gpio_put(ADC_CSN_PAD, true);
             }
             break;
 
@@ -511,7 +515,7 @@ void sampling_ISR_func(){
 };
 
 // Setup ADC and PGA
-static void setup_ADC(struct ADS7253_Inst_t *ADC, irq_handler_t adc_read_handler){
+static void setup_ADC(struct ADS7253_Inst_t *ADC){
     gpio_init_mask(
                 PINSH(ADC_CSN_PAD) |
                 PINSH(ADC_SCK_PAD) |

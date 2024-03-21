@@ -31,10 +31,11 @@ bitloop:
     mov x, y           side 0x0
 ;    in pins, 1         side 0x0
     jmp !osre bitloop  side 0x0
+    nop                 side 0x0 [7]
 
 public entry_point:                 ; Must set X,Y to n-2 before starting!
     pull ifempty       side 0x1 [1] ; Block with CSn high (minimum 2 cycles)
-    nop                side 0x0 [1]; CSn front porch
+    nop                side 0x0 [4]; CSn front porch MAKE 1 IF BAD
 .wrap
 
 .program ADS7253_SPI_INGEST
@@ -49,7 +50,7 @@ public entry_point:
 % c-sdk {
 #include "hardware/gpio.h"
 static inline void pio_ads7253_spi_init(PIO pio, uint num_bits, uint clkdiv_i, uint clkdiv_f,
-        uint pin_cs, uint pin_copi, uint pin_dinA) {
+        uint pin_cs, uint pin_copi, uint pin_dinA, uint8_t invclk) {
     
     const uint sm = 0;
 
@@ -70,6 +71,8 @@ static inline void pio_ads7253_spi_init(PIO pio, uint num_bits, uint clkdiv_i, u
     pio_gpio_init(pio, pin_copi);
     pio_gpio_init(pio, pin_cs);
     pio_gpio_init(pio, pin_cs + 1);
+
+    gpio_set_outover(pin_cs + 1, invclk ? GPIO_OVERRIDE_INVERT : GPIO_OVERRIDE_NORMAL);
 
     uint entry_point = prog_offs + ADS7253_SPI_CTRL_offset_entry_point;
     pio_sm_init(pio, sm, entry_point, &c);
