@@ -3,7 +3,7 @@ from assets.ref import *
 import serial
 import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
-# import serial.tools.list_ports_linux as list_ports_linux
+import serial.tools.list_ports_linux as list_ports_linux
 import atexit
 
 import time
@@ -51,6 +51,13 @@ port_selections = []
 if os == MACOS_STR: 
     for port in list_ports_osx.comports():
         port_selections.append(ft.dropdown.Option(str(port).split(".")[1]))
+elif os == LINUX_STR:
+    for port in list_ports_linux.comports():
+        port_selections.append(ft.dropdown.Option(str(port)))
+# elif os == WINDOWS_STR:
+#     for port in list_ports_windows.comports():
+#         port_selections.append(ft.dropdown.Option(str(port)))
+else: pass
 
 
 parametric_taps =[16,32,64,128,256]
@@ -119,7 +126,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
                 match STATE:
                     case 1:
                         CTRLCHANNEL.write(SR_ACK)
-                        HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
+                        HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH * BYTES_PER_NUMBER)
                         STATE = HH
                     case 2:
                         CTRLCHANNEL.write(SR_ACK)
