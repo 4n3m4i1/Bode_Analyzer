@@ -3,7 +3,7 @@ from assets.ref import *
 import serial
 import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
-# import serial.tools.list_ports_linux as list_ports_linux
+import serial.tools.list_ports_linux as list_ports_linux
 import atexit
 
 import time
@@ -51,6 +51,13 @@ port_selections = []
 if os == MACOS_STR: 
     for port in list_ports_osx.comports():
         port_selections.append(ft.dropdown.Option(str(port).split(".")[1]))
+elif os == LINUX_STR:
+    for port in list_ports_linux.comports():
+        port_selections.append(ft.dropdown.Option(str(port)))
+# elif os == WINDOWS_STR:
+#     for port in list_ports_windows.comports():
+#         port_selections.append(ft.dropdown.Option(str(port)))
+else: pass
 
 
 parametric_taps =[16,32,64,128,256]
@@ -77,6 +84,7 @@ FFT_converted_queue = Queue()
 
 GraphEvent = Event()
 
+##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
@@ -119,7 +127,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
                 match STATE:
                     case 1:
                         CTRLCHANNEL.write(SR_ACK)
-                        HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH)
+                        HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH * BYTES_PER_NUMBER)
                         STATE = HH
                     case 2:
                         CTRLCHANNEL.write(SR_ACK)
@@ -151,9 +159,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
             page.banner.open = True
             connected.clear()
             page.update()
-        
-
-
+##########################################################################################DATACONVERTER
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
     while True:
         is_set = GraphEvent.wait()
@@ -169,7 +175,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
 
         except Empty:
             continue
-
+##########################################################################################UPDATEGRAPH
 def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
     while True:
         is_set = GraphEvent.wait()
@@ -189,7 +195,7 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
 
         except Empty:
             continue
-
+##########################################################################################MAIN
 def main(page: ft.Page):
     page.title = PAGE_TITLE
     page.route = "/"
@@ -316,12 +322,18 @@ def main(page: ft.Page):
             case "Darwin":
                 portName = data_select.value.split("-")[0].strip()
                 data_port.set(f"{MACOS_PORT_PREFIX}{portName}")
+            case "Linux":
+                portName = data_select.value
+                data_port.set(portName)
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
         match os:
             case "Darwin":
                 portName = ctrl_select.value.split("-")[0].strip()
                 ctrl_port.set(f"{MACOS_PORT_PREFIX}{portName}")
+            case "Linux":
+                portName = ctrl_select.value
+                ctrl_port.set(portName)
         page.update()
 
     data_select = ft.Dropdown(

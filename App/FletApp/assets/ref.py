@@ -6,7 +6,11 @@ BANDIT_LOGO_SRC = "/banditlogo.png"
 START_BUTTON_TEXT = "Start"
 STOP_BUTTON_TEXT = "Stop"
 ABOUT_US_TEXT = "About Us"
+
 MACOS_STR = "Darwin"
+LINUX_STR = "Linux"
+WINDOWS_STR = "Windows"
+
 MACOS_PORT_PREFIX = "/dev/tty."
 SELECT_DP_STR = "Select Data Port"
 SELECT_CP_STR = "Select Control Port"
