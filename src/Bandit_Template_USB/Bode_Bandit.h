@@ -147,12 +147,12 @@ struct BANDIT_SETTINGS {
 #define CDC_CTRL_CHAN 1
 #define CDC_PACKET_LEN 64
 //core0 state machine init
-#define STATE
-#define NEXT_STATE
-#define INIT 0
-#define FFT_DATA_COLLECT 1
-#define SEND_TUSB 2
-#define RECIEVE_CONFIG 3
-#define UPDATE_CONFIG 4
+//#define STATE             // variables?
+//#define NEXT_STATE                
+#define USB_INIT 0
+#define USB_FFT_DATA_COLLECT 1
+#define USB_SEND_TUSB 2
+#define USB_RECIEVE_CONFIG 3
+#define USB_UPDATE_CONFIG 4
 
 #endif

@@ -6,7 +6,10 @@
 #include "hardware/timer.h"
 #include "hardware/pwm.h"
 #include "hardware/dma.h"
+
 #include "tusb.h"
+#include "tusb_config.h"
+
 #include "Bode_Bandit.h"
 
   //////////////////////////////////////////////////////////////////////
@@ -49,10 +52,15 @@ CORE_0_MEM Q15 FI_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
 // Reserve Buffer for Stored Results
 CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 
+// Core 0 FFT Buffers
+struct CORE_0_MEM FFT_PARAMS cool_fft;
+
 
 // Global Settings Buffer, Mutual Exclusive Access via hardware semaphores
 //  to save on access stalls
 struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
+CORE_0_MEM uint16_t USB_STATE;
+CORE_0_MEM uint16_t USB_NEXT_STATE;
 
 // Core 1 Defines
 #define ADCRES_BITS     12u
@@ -63,9 +71,6 @@ struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
  ///////////////////   FUNCTION DEFINITIONS   /////////////////////////
 //////////////////////////////////////////////////////////////////////
 // Generic Function Definitions
-static void init_LED_pins();
-static void set_RGB_levels(uint8_t R_, uint8_t G_, uint8_t B_);
-static void set_ULED_level(uint8_t _L);
 
 // Core 0 Function Definitions
 static void core_0_main();
@@ -141,15 +146,15 @@ static void core_0_main(){
     }
 
     // Setup Structs and Default Parameters for FFT
-    struct FFT_PARAMS cool_fft;
     fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
 
     // Initialize tinyUSB with board and start listening for start char from GUI
     tud_init(BOARD_TUD_RHPORT);
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
 
-    // USB State Machine, Settings Application, FFT
-    NEXT_STATE = INIT;
+    // USB USB_STATE Machine, Settings Application, FFT
+    USB_NEXT_STATE = USB_INIT;
+
     uint8_t r = 0;
     uint8_t g = 0;
     uint8_t b = 0;
@@ -158,21 +163,21 @@ static void core_0_main(){
     while(1){
         
         tud_task();
-        STATE = NEXT_STATE;
-        switch(STATE) {
-            case INIT:
+        USB_STATE = USB_NEXT_STATE;
+        switch(USB_STATE) {
+            case USB_INIT:
                 //need idle work until GUI is ready
                 break;
-            case FFT_DATA_COLLECT:
+            case USB_FFT_DATA_COLLECT:
                 FFT_Handler(); //fft data from shared memory & run fft calc
-                NEXT_STATE = SEND_TUSB;
+                USB_NEXT_STATE = USB_SEND_TUSB;
                 break;
-            case SEND_TUSB:
-                USB_Handler(); //send data to GUI through tusb
-                NEXT_STATE = FFT_DATA_COLLECT;
+            case USB_SEND_TUSB:
+                USB_Handler(&cool_fft); //send data to GUI through tusb
+                USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
                 break;
             default:
-                break; //need debug for state error
+                break; //need debug for USB_STATE error
 
         }
 
@@ -296,18 +301,19 @@ static void update_bandit_config(){
 }
 
 //triggered when wanted_char is recieved thru ctrl channel
-static void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) { 
+void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) { 
     switch (wanted_char) {
         case START_CHAR:
             // signal core 1 to begin processing
-            NEXT_STATE = FFT_DATA_COLLECT;
+            USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             tud_cdc_n_read_flush(itf);
             tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, SETTINGS_CHAR);
             break;
         case SETTINGS_CHAR:
-            update_fft_config();
+            //update_fft_config();      // idk bandit config?
+            update_bandit_config();
             tud_cdc_n_read_flush(itf); 
-            NEXT_STATE = FFT_DATA_COLLECT; 
+            USB_NEXT_STATE = USB_FFT_DATA_COLLECT; 
             break;
         default:
             tud_cdc_n_read_flush(itf);
