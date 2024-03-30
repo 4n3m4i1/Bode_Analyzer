@@ -4,6 +4,7 @@
 #include <pico/stdlib.h>
 #include <inttypes.h>
 #include "hardware/spi.h"
+#include "hardware/resets.h"
 
 enum MCP6S92_INSTRUCTIONS {
     MCP6S92_NOP,

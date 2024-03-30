@@ -63,9 +63,9 @@ struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
  ///////////////////   FUNCTION DEFINITIONS   /////////////////////////
 //////////////////////////////////////////////////////////////////////
 // Generic Function Definitions
-static void init_LED_pins();
-static void set_RGB_levels(uint8_t R_, uint8_t G_, uint8_t B_);
-static void set_ULED_level(uint8_t _L);
+
+
+
 
 // Core 0 Function Definitions
 static void core_0_main();

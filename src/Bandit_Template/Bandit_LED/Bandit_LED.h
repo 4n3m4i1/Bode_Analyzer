@@ -1,7 +1,7 @@
 #ifndef BANDIT_LED_h
 #define BANDIT_LED_h
 
-#include "../Bandit_Pins.h"
+#include "Bandit_Pins.h"
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 

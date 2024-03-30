@@ -37,6 +37,7 @@ target_link_libraries(
                         hardware_dma
                         hardware_pio
                         hardware_irq
+                        hardware_resets
                         )
 
 
@@ -70,6 +71,7 @@ target_link_libraries(LMS
 target_link_libraries(PGA
     pico_stdlib
     hardware_spi
+    hardware_resets
 )
 
 target_link_libraries(LED
