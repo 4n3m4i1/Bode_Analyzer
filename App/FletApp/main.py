@@ -244,8 +244,10 @@ def main(page: ft.Page):
 
     figure = plt.figure()
     ax = figure.add_subplot()
-    line, = ax.plot(init_graph, animated=True)
-    chart = MatplotlibChart(figure, expand=True)
+    line, = ax.plot(init_graph, animated=True,)
+    line.set_color('#F55BB0')
+
+    chart = MatplotlibChart(figure, expand=True,)
     
     
     def is_connected():
@@ -264,12 +266,7 @@ def main(page: ft.Page):
             content=ft.Text(NONE_PORTS_WARNING, color=ft.colors.BLACK),
             actions=[ft.TextButton(CLOSE_STR, on_click=close_banner),]
             )
-    DataContainer = ft.Container(
-        content=ft.Text('test'),
-        image_src=BANDIT_LOGO_SRC,
-        image_opacity=50
-    )
-
+    
     ## Content for the about us page
     logo = ft.Container(
         ft.Image(
@@ -293,18 +290,33 @@ def main(page: ft.Page):
     meet_team =  ft.Container(
         ft.Text("Meet the Team", theme_style=ft.TextThemeStyle.DISPLAY_MEDIUM),
         )
+    
+    start_container = ft.Container (
 
-
-    Controls = ft.Row(
-        [ft.OutlinedButton(
+        content= ft.OutlinedButton(
         text=START_BUTTON_TEXT,
         width=150,
         on_click = handle_start_button_clicked,
-    ), ft.OutlinedButton(
+    ),
+        bgcolor='#ecd4df',
+        border_radius=20,
+    )
+
+    stop_container = ft.Container (
+
+        content= ft.OutlinedButton(
         text=STOP_BUTTON_TEXT,
         width=150,
-        on_click = handle_stop_button_clicked
-        ),
+        on_click = handle_stop_button_clicked,
+    ),
+        bgcolor='#e895c0',
+        border_radius=20,
+    )
+
+
+    Controls = ft.Row(
+        [ start_container
+        ,stop_container
         ])
     
 
@@ -382,7 +394,7 @@ def main(page: ft.Page):
             ft.IconButton(icon=ft.icons.UNDO)
         ]
     )
-    page.add(ft.Column([Controls,DataContainer]), chart)
+    page.add(ft.Column([Controls]), chart)
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
     serial_reader.daemon = True

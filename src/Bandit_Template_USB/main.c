@@ -6,7 +6,7 @@
 #include "hardware/timer.h"
 #include "hardware/pwm.h"
 #include "hardware/dma.h"
-
+#include "tusb.h"
 #include "Bode_Bandit.h"
 
   //////////////////////////////////////////////////////////////////////
@@ -69,7 +69,10 @@ static void set_ULED_level(uint8_t _L);
 
 // Core 0 Function Definitions
 static void core_0_main();
-static void USB_Handler();
+static void USB_Handler(struct FFT_PARAMS *fft);
+static void FFT_Handler();
+static void update_bandit_config();
+
 static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len);
 static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 //void setup_tiny_usb();
@@ -77,6 +80,9 @@ static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 //void post_process_fft_data(struct FFT_PARAMS *fft);
 //void transmit_final_results(struct FFT_PARAMS *fft);
 //
+
+static void send_header_packet(Q15 *h_data);
+static void send_f_packets(Q15 *data, uint16_t num_samples);
 
 // Core 1 Function Definitions
 static void    core_1_main();
@@ -138,9 +144,12 @@ static void core_0_main(){
     struct FFT_PARAMS cool_fft;
     fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
 
-
+    // Initialize tinyUSB with board and start listening for start char from GUI
+    tud_init(BOARD_TUD_RHPORT);
+    tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
 
     // USB State Machine, Settings Application, FFT
+    NEXT_STATE = INIT;
     uint8_t r = 0;
     uint8_t g = 0;
     uint8_t b = 0;
@@ -148,11 +157,30 @@ static void core_0_main(){
     
     while(1){
         
+        tud_task();
+        STATE = NEXT_STATE;
+        switch(STATE) {
+            case INIT:
+                //need idle work until GUI is ready
+                break;
+            case FFT_DATA_COLLECT:
+                FFT_Handler(); //fft data from shared memory & run fft calc
+                NEXT_STATE = SEND_TUSB;
+                break;
+            case SEND_TUSB:
+                USB_Handler(); //send data to GUI through tusb
+                NEXT_STATE = FFT_DATA_COLLECT;
+                break;
+            default:
+                break; //need debug for state error
 
-        set_RGB_levels(r-- - g,g--,b++);
-        set_ULED_level(l--);
+        }
 
-        sleep_ms(15);
+
+        // set_RGB_levels(r-- - g,g--,b++);
+        // set_ULED_level(l--);
+
+        // sleep_ms(15);
         tight_loop_contents();
     }
 }
@@ -214,11 +242,77 @@ static void core_1_main(){
   /////////////////////////////////////////////////////////
  ////////////////////// CORE 0: FFT, USB, CTRL /////////////
 /////////////////////////////////////////////////////////
-static void USB_Handler(){
+static void USB_Handler(struct FFT_PARAMS *fft){
     // tusb here!
     // No stall states, this should whizz thru and be fine with the
     //  potential to not be handled for some time.
     //  Either use ISRs or hardware buffers
+
+    uint16_t num_samples = fft->num_samples;
+    Q15 header_data[CDC_PACKET_LEN];
+
+    //setup header data
+    header_data[0] = 0x4242;
+    header_data[1] = fft->num_samples;
+    header_data[2] = fft->log2_num_samples;
+    header_data[3] = fft->shift_amount;
+    header_data[CDC_PACKET_LEN - 1] = 0x40;
+
+    send_header_packet(header_data);
+    while (tud_cdc_n_read_char(CDC_CTRL_CHAN) != 'a') {
+        tud_task(); // wait for ACK from GUI
+    }
+    tud_cdc_n_read_flush(CDC_CTRL_CHAN);
+    send_f_packets(fft->fr, num_samples);
+}
+
+//sends header data through data chan to GUI interface
+static void send_header_packet(Q15 *h_data){
+    tud_cdc_n_write(CDC_DATA_CHAN, (uint8_t *)h_data, CDC_PACKET_LEN);
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
+}
+
+//sends fft data through data chan to GUI interface
+static void send_f_packets(Q15 *data, uint16_t num_samples){
+    uint16_t NUM_PACKET_PER_BUF = num_samples / CDC_PACKET_LEN;
+
+    for(uint16_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
+        while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
+            tud_task(); // tinyusb device task
+        }
+        tud_cdc_n_write(CDC_DATA_CHAN, ((uint8_t *)data + (n * CDC_PACKET_LEN)), CDC_PACKET_LEN);
+    }
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
+}
+
+// just for pseudo code utility
+static void FFT_Handler(){
+
+}
+
+// recieve config data from GUI and update BANDIT_SETTINGS accordingly
+static void update_bandit_config(){
+
+}
+
+//triggered when wanted_char is recieved thru ctrl channel
+static void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) { 
+    switch (wanted_char) {
+        case START_CHAR:
+            // signal core 1 to begin processing
+            NEXT_STATE = FFT_DATA_COLLECT;
+            tud_cdc_n_read_flush(itf);
+            tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, SETTINGS_CHAR);
+            break;
+        case SETTINGS_CHAR:
+            update_fft_config();
+            tud_cdc_n_read_flush(itf); 
+            NEXT_STATE = FFT_DATA_COLLECT; 
+            break;
+        default:
+            tud_cdc_n_read_flush(itf);
+            break;
+    }
 }
 
 static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len){

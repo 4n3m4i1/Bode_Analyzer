@@ -11,3 +11,4 @@ build/
 *.s
 *.zip
 oi4v/
+*.pyc
