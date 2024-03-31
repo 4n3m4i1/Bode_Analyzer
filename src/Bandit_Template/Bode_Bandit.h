@@ -152,5 +152,22 @@ enum BANDIT_CORE_1_DSP_STATES {
     CORE_1_SHIP_RESULTS
 };
 
+//tinyUsb definitions
+#define START_CHAR              '~'
+#define SETTINGS_CHAR           '('
+#define CONFIG_CHAR
+
+#define CDC_DATA_CHAN           0
+#define CDC_CTRL_CHAN           1
+#define CDC_PACKET_LEN          64
+//core0 state machine init
+//#define STATE             // variables?
+//#define NEXT_STATE                
+#define USB_INIT                0
+#define USB_FFT_DATA_COLLECT    1
+#define USB_SEND_TUSB           2
+#define USB_RECIEVE_CONFIG      3
+#define USB_UPDATE_CONFIG       4
+
 
 #endif
