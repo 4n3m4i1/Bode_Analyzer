@@ -72,7 +72,7 @@ void start_randombit_dma_chain(int dma_channel){
 }
 
 void stop_randombit_dma_chain(int dma_channel){
-
+    
 }
 
 #endif
