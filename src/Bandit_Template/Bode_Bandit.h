@@ -12,6 +12,7 @@
 #include "AWGN_ROSC.h"
 #include "MCP6S92_RP2040/MCP6S92_RP2040.h"
 #include "Bandit_LED/Bandit_LED.h"
+#include "PIO_ADS7253/PIO_ADS7253.h"
 
 /*
     Remember:
@@ -137,5 +138,18 @@ struct BANDIT_SETTINGS {
 
 #define BANDIT_DFL_SETTINGS     (1 << BS_ENABLE) | \
                                 (1 << BS_AUTO_SEND)
+
+
+
+enum BANDIT_CORE_1_DSP_STATES {
+    CORE_1_IDLE,
+    CORE_1_APPLY_SETTINGS,
+    CORE_1_SAMPLE,
+    CORE_1_DOWNSAMPLE,
+    CORE_1_LMS,
+    CORE_1_POST_PROC,
+    CORE_1_SHIP_RESULTS
+};
+
 
 #endif

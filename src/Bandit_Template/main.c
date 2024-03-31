@@ -59,6 +59,19 @@ struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
 #define ADC_RES_CODES   (1u << ADCRES_BITS)
 #define ADC_VREF_CODE   0x108                   // ~2.15 V from ADS7253 DAC
 
+#define ADC_PIO         pio1
+CORE_1_MEM uint16_t tmp_arr[ADS_READ_REG_COUNT] = {0,0,0};
+CORE_1_MEM uint8_t  CORE_1_STATE = CORE_1_IDLE;
+
+struct BANDIT_LED_COLORS {
+    uint8_t R;
+    uint8_t G;
+    uint8_t B;
+    uint8_t U;
+};
+
+struct BANDIT_LED_COLORS Bandit_RGBU;
+
   //////////////////////////////////////////////////////////////////////
  ///////////////////   FUNCTION DEFINITIONS   /////////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -99,6 +112,13 @@ int main(){
     gpio_init(VDDA_EN_PAD);
     gpio_set_dir(VDDA_EN_PAD, GPIO_OUT);
     gpio_put(VDDA_EN_PAD, true);
+
+    Bandit_RGBU.R = 0;
+    Bandit_RGBU.G = 0;
+    Bandit_RGBU.B = 120;
+    Bandit_RGBU.U = 0;
+    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
+    set_ULED_level(Bandit_RGBU.U);
     
     //start_randombit_dma_chain();
 
@@ -141,18 +161,9 @@ static void core_0_main(){
 
 
     // USB State Machine, Settings Application, FFT
-    uint8_t r = 0;
-    uint8_t g = 0;
-    uint8_t b = 0;
-    uint8_t l = 0;
-    
     while(1){
-        
-
-        set_RGB_levels(r-- - g,g--,b++);
-        set_ULED_level(l--);
-
-        sleep_ms(15);
+        static volatile uint16_t a = 0;
+        ++a;
         tight_loop_contents();
     }
 }
@@ -194,14 +205,111 @@ static void core_1_main(){
     /*
         Initialize ADC SPI w/ pio1
     */
+    pio_ads7253_spi_init(pio1, 16, 1, 0, ADC_CSN_PAD, ADC_SDI_PAD, ADC_SDO_A_PAD, 0);
+
+    Bandit_RGBU.B = 0;
+start_adc_setup:
+
+    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B++);
+    ADS7253_TI_Approved_Configuration(ADC_PIO,
+                                ADS7253_SET_DUAL_SDO |
+                                ADS7253_SET_16_CLK_MODE |
+                                ADS7253_USE_INTERNAL_REFERENCE |
+                                ADS7253_2X_REFDAC
+                                );
 
 
+    while(!pio_sm_is_rx_fifo_empty(ADC_PIO, ADS_PIO_SDOA_SM) || 
+            !pio_sm_is_rx_fifo_empty(ADC_PIO, ADS_PIO_SDOB_SM)){
+            
+            ADS7253_Read_Dual_Data(ADC_PIO, &tmp_arr[0], &tmp_arr[1]);
+    }
 
+    busy_wait_us_32(10);
+    
+    // Read the CFR and ensure it's lookin good before proceeding
+    tmp_arr[0] = ADS7253_CMD(ADS7253_CFR_READ, 0);
+    tmp_arr[1] = 0;
+    tmp_arr[2] = 0;
+    
+    // Ask for CFR readback twice just to be sure the data is latched
+    //  and CFR is updated.
+    ADS7253_write16_blocking(ADC_PIO, tmp_arr, ADS_READ_REG_COUNT);
+    busy_wait_us_32(50);
+    ADS7253_write16_blocking(ADC_PIO, tmp_arr, ADS_READ_REG_COUNT);
+    busy_wait_us_32(50);
+    
+    while(!pio_sm_is_rx_fifo_empty(ADC_PIO, ADS_PIO_SDOA_SM)){
+        tmp_arr[0] = ADC_PIO->rxf[ADS_PIO_SDOA_SM];
+        tmp_arr[1] = ADC_PIO->rxf[ADS_PIO_SDOB_SM];
+        
+        // okay like 2624 is hacky, but it is the expected CFR value
+        //  EVEN THOUGH IT SHOULDNT BE THAT
+        //  Through all testing that's been the correct return.
+        //  This DOES NOT match the datasheet, but through testing is
+        //  legit... so idk dude, sendit - Joseph 03/31/2024
+        if(tmp_arr[0] == 2624){
+            Bandit_RGBU.G = 127;
+            set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
+            break;
+        }
+    }
+
+
+    if(Bandit_RGBU.G != 127){
+        set_RGB_levels(Bandit_RGBU.R++, Bandit_RGBU.G, Bandit_RGBU.B);
+        busy_wait_us_32(50);
+        goto start_adc_setup;
+    }
+    
+
+     
+
+    // Main Loop for Core 1
+    //  All peripherals should be configured by now :)
     while(1){
-        tight_loop_contents();
-        for(int n = 0; n < TOTAL_BUFF_LEN; ++n){    // for testing 
-            X_N_0[n] = 2;
-            D_N_0[n] = 3;
+        switch(CORE_1_STATE){
+            case CORE_1_IDLE: {
+                set_ULED_level(Bandit_RGBU.U++);
+                busy_wait_ms(20);
+                
+                CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+            }
+            break;
+            case CORE_1_APPLY_SETTINGS: {
+                
+                CORE_1_STATE = CORE_1_SAMPLE;
+            }
+            break;
+            case CORE_1_SAMPLE: {
+
+                CORE_1_STATE = CORE_1_DOWNSAMPLE;
+            }
+            break;
+            case CORE_1_DOWNSAMPLE: {
+
+                CORE_1_STATE = CORE_1_LMS;
+            }
+            break;
+            case CORE_1_LMS: {
+
+                CORE_1_STATE = CORE_1_POST_PROC;
+            }
+            break;
+            case CORE_1_POST_PROC: {
+
+                CORE_1_STATE = CORE_1_SHIP_RESULTS;
+            }
+            break;
+            case CORE_1_SHIP_RESULTS: {
+
+                CORE_1_STATE = CORE_1_IDLE;
+            }
+            break;
+            default:
+                // Idk should have some out of bounds safety, but whatever
+                CORE_1_STATE = CORE_1_IDLE;
+            break;
         }
     }
 }
