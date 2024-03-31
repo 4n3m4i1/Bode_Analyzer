@@ -92,6 +92,9 @@ void ADS7253_write16_blocking_clr_RX(const PIO pio, const uint16_t *src, size_t 
 void ADS7253_read16_blocking(const PIO pio, uint16_t *dst, size_t len);
 
 void ADS7253_write16_read16_blocking(const PIO pio, uint16_t *src, uint16_t *dst, size_t len);
+void ADS7253_write16_read16_blocking_dual(const PIO pio, uint16_t *src, uint16_t *dstA, uint16_t *dstB, size_t len);
+
+void ADS7253_Dual_Sampling(const PIO pio, uint16_t *src, uint16_t *dstA, uint16_t *dstB, size_t len);
 
 // No checks, raw pointer assigns via io_rw_16 accesses
 void ADS7253_Read_Dual_Data(const PIO pio, uint16_t *dst_A, uint16_t *dst_B);

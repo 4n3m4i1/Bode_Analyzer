@@ -37,7 +37,7 @@ int main(){
 
     //PIO pio1 = pio1;
 
-    pio_ads7253_spi_init(pio1, 16, 4, 0, SPICSN, SPIMOSI, SPIMISO, 0);
+    pio_ads7253_spi_init(pio1, 16, 1, 0, SPICSN, SPIMOSI, SPIMISO, 0);
 
     uint8_t auto_mode = 0;
 
@@ -63,9 +63,11 @@ int main(){
 
             case AUTO_COLLECT_BLOCK:{
                 uint16_t sendem[1] = {0};
-                ADS7253_write16_blocking(pio1, sendem, count_of(sendem));
-                busy_wait_us(1);
-                ADS7253_Read_Dual_Data(pio1, &block_a[block_wr_ptr], &block_b[block_wr_ptr++]);
+                //ADS7253_write16_blocking(pio1, sendem, count_of(sendem));
+                //busy_wait_us(1);
+                //ADS7253_Read_Dual_Data(pio1, &block_a[block_wr_ptr], &block_b[block_wr_ptr++]);
+                ADS7253_Dual_Sampling(pio1, sendem, &block_a[block_wr_ptr], &block_b[block_wr_ptr++], 1);
+                
                 if(block_wr_ptr == BLOCK_SIZE) auto_mode = AUTO_PRINT_BLOCK;
             }
             break;

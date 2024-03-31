@@ -65,6 +65,44 @@ void __time_critical_func(ADS7253_write16_read16_blocking)(const PIO pio, uint16
     }
 }
 
+void __time_critical_func(ADS7253_write16_read16_blocking_dual)(const PIO pio, uint16_t *src, uint16_t *dstA, uint16_t *dstB,
+                                                         size_t len) {
+    size_t tx_remain = len, rx_remain = len;
+    io_rw_16 *txfifo = (io_rw_16 *) &pio->txf[ADS_PIO_MAIN_SM];
+    io_rw_16 *rxfifo_A = (io_rw_16 *) &pio->rxf[ADS_PIO_SDOA_SM];
+    io_rw_16 *rxfifo_B = (io_rw_16 *) &pio->rxf[ADS_PIO_SDOB_SM];
+    while (tx_remain || rx_remain) {
+        if (tx_remain && !pio_sm_is_tx_fifo_full(pio, ADS_PIO_MAIN_SM)) {
+            *txfifo = *src++;
+            --tx_remain;
+        }
+        if (rx_remain && !pio_sm_is_rx_fifo_empty(pio, ADS_PIO_SDOA_SM)) {
+            *dstA++ = *rxfifo_A;
+            *dstB++ = *rxfifo_B;
+            --rx_remain;
+        }
+    }
+}
+
+void __time_critical_func(ADS7253_Dual_Sampling)(const PIO pio, uint16_t *src, uint16_t *dstA, uint16_t *dstB,
+                                                         size_t len) {
+    size_t tx_remain = len, rx_remain = len;
+    io_rw_16 *txfifo = (io_rw_16 *) &pio->txf[ADS_PIO_MAIN_SM];
+    io_rw_16 *rxfifo_A = (io_rw_16 *) &pio->rxf[ADS_PIO_SDOA_SM];
+    io_rw_16 *rxfifo_B = (io_rw_16 *) &pio->rxf[ADS_PIO_SDOB_SM];
+    while (tx_remain || rx_remain) {
+        if (tx_remain && !pio_sm_is_tx_fifo_full(pio, ADS_PIO_MAIN_SM)) {
+            *txfifo = *src++;
+            --tx_remain;
+        }
+        if (rx_remain && !pio_sm_is_rx_fifo_empty(pio, ADS_PIO_SDOA_SM)) {
+            *dstA++ = (*rxfifo_A) >> 2;
+            *dstB++ = (*rxfifo_B) >> 2;
+            --rx_remain;
+        }
+    }
+}
+
 void __time_critical_func(ADS7253_Read_Dual_Data)(const PIO pio, uint16_t *dst_A, uint16_t *dst_B){
     *dst_A = *((io_rw_16 *)&pio->rxf[ADS_PIO_SDOA_SM]) >> 2;
     *dst_B = *((io_rw_16 *)&pio->rxf[ADS_PIO_SDOB_SM]) >> 2;
