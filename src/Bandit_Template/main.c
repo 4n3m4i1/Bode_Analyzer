@@ -263,7 +263,8 @@ start_adc_setup:
     }
     
 
-     
+    // Setup Sampling Pace Flags
+    Sampling_Setup(500000);
 
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
@@ -282,12 +283,25 @@ start_adc_setup:
             }
             break;
             case CORE_1_SAMPLE: {
+                tmp_arr[0] = 0;
+                Start_Sampling();   // You have 500 clocks between each flag, careful!
+                
+                for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                    while(!Sample_Now());
+                    //Sample_Flag_Clear();
+                    hw_clear_bits(&pwm_hw->intr, PWM_INTR_CH3_BITS);
+                    ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, &D_N_0[n], &X_N_0[n], 1);
+                }
+
+                Stop_Sampling();
 
                 CORE_1_STATE = CORE_1_DOWNSAMPLE;
             }
             break;
             case CORE_1_DOWNSAMPLE: {
-
+                for(int n = 0; n < STD_MAX_SAMPLES; ++n){
+                    printf("%u\t%u\n", D_N_0[n], X_N_0[n]);
+                }
                 CORE_1_STATE = CORE_1_LMS;
             }
             break;
