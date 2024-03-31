@@ -191,6 +191,7 @@ static void core_0_main(){
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
                 break;
             default:
+                USB_STATE = USB_INIT;
                 break; //need debug for USB_STATE error
 
         }
