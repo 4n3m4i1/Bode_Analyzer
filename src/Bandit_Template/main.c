@@ -41,6 +41,8 @@ CORE_1_MEM Q15 D_N_0[TOTAL_BUFF_LEN];
 CORE_1_MEM Q15 LMS_FIR_BANK[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_1_MEM Q15 LMS_H_HATS[TOTAL_ADAPTIVE_FIR_LEN];
 
+CORE_1_MEM Q15 LMS_H_HATS_CORRECTION[TOTAL_ADAPTIVE_FIR_LEN];
+
 // Downsampling FIR and Tap Sets
 CORE_1_MEM Q15 DDSAMP_FIR_BANK[DDSAMP_FIR_LEN];
 CORE_1_MEM Q15 DDSAMP_TAP_BANK[DDSAMP_FIR_LEN][DDSAMP_TAP_OPTIONS];
@@ -267,6 +269,9 @@ static void core_0_main(){
  /////////////////    Core 1 Main Loop    /////////////////////////////
 //////////////////////////////////////////////////////////////////////
 static void core_1_main(){
+    uint8_t Bandit_Calibration_State = BANDIT_UNCALIBRATED;
+    Q15 Bandit_DC_Offset_Cal = 0;
+    
     // Setup LMS controller and buffering
     struct LMS_Fixed_Inst LMS_Inst;
     LMS_Struct_Init(&LMS_Inst, 
@@ -293,9 +298,9 @@ static void core_1_main(){
     */
     spi_inst_t *mcp_spi = spi1;
     MCP6S92_Init(mcp_spi, PGA_CSN_PAD, PGA_SCK_PAD, PGA_SI_PAD);
-    // Internal loopback for testing!
-    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
-    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+    // Don't init frontend PGA until calibration
+    //MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
+    //MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
 
     /*
         Initialize ADC SPI w/ pio1
@@ -361,6 +366,9 @@ start_adc_setup:
     // Setup Sampling Pace Flags
     Sampling_Setup(500000);
 
+    uint16_t error_attempts;
+
+
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
     while(1){
@@ -370,13 +378,17 @@ start_adc_setup:
                 busy_wait_ms(20);
                 
                 // If starting conditions are met start the whole DSP cycle
-                if(1){
+                if(Bandit_Calibration_State == BANDIT_UNCALIBRATED){
+                    CORE_1_STATE = CORE_1_SAMPLE;
+                } else {
+                    error_attempts = 0;
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 }
             }
             break;
             case CORE_1_APPLY_SETTINGS: {
-                
+                // if settings changed:
+                //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
                 CORE_1_STATE = CORE_1_SAMPLE;
             }
             break;
@@ -389,11 +401,32 @@ start_adc_setup:
                     //Sample_Flag_Clear();
                     hw_clear_bits(&pwm_hw->intr, PWM_INTR_CH3_BITS);
                     ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, &D_N_0[n], &X_N_0[n], 1);
+                    X_N_0[n] -= Bandit_DC_Offset_Cal;
                 }
 
                 Stop_Sampling();
+                if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_IN_PROG){
+                    CORE_1_STATE = CORE_1_DOWNSAMPLE;
+                } else {
+                    CORE_1_STATE = CORE_1_APPLY_DC_CORRECTION;
+                }
+                
+            }
+            break;
+            case CORE_1_APPLY_DC_CORRECTION: {
+                int32_t dcavg_zone = 0;
+                for(uint16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                    dcavg_zone += (int32_t)(D_N_0[n] - X_N_0[n]);
+                } 
+                dcavg_zone >>= LOG2_STD_MAX_SAMPLES;
+                Bandit_DC_Offset_Cal = (Q15)dcavg_zone;
+                Bandit_Calibration_State = BANDIT_CAL_DC_BIAS_COMPLETE;
 
-                CORE_1_STATE = CORE_1_DOWNSAMPLE;
+                // Enable frontend PGA
+                MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
+                MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+
+                CORE_1_STATE = CORE_1_IDLE;
             }
             break;
             case CORE_1_DOWNSAMPLE: {
@@ -402,13 +435,39 @@ start_adc_setup:
             }
             break;
             case CORE_1_LMS: {
+                Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
 
-                CORE_1_STATE = CORE_1_POST_PROC;
+                if(LMS_Error == LMS_FAIL_DFL){
+                    // Handle the error
+                    //  Sample again and try again
+                    error_attempts++;
+                    CORE_1_STATE = CORE_1_SAMPLE;
+                } else {
+                    CORE_1_STATE = CORE_1_POST_PROC;
+                }
+                
+                if(Bandit_Calibration_State != BANDIT_FULLY_CALIBRATED);
             }
             break;
             case CORE_1_POST_PROC: {
+                if(Bandit_Calibration_State != BANDIT_FULLY_CALIBRATED){
+                    // Apply transfer function correction
+                    // Apply correction in time domain, it's linear idk man should be right
+                    
+                    for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                        LMS_H_HATS_CORRECTION[n] = LMS_FIR.data[n];
+                    }
 
-                CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                    Bandit_Calibration_State = BANDIT_FULLY_CALIBRATED;
+                    
+                    CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+                } else {
+                    // Move on with a normal run
+                    for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                        LMS_FIR.data[n] -= LMS_H_HATS_CORRECTION[n];
+                    }
+                    CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                }
             }
             break;
             case CORE_1_SHIP_RESULTS: {
@@ -423,11 +482,11 @@ start_adc_setup:
                 if(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A)){
                     spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_B);
                     used_lock = FFTMEMLOCK_B;
-                    transfer_results_to_safe_mem(LMS_H_HATS, &ICTXFR_B, LMS_Inst.tap_len);
+                    transfer_results_to_safe_mem(LMS_FIR.data, &ICTXFR_B, LMS_Inst.tap_len);
                 } else {
                     spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
                     used_lock = FFTMEMLOCK_A;
-                    transfer_results_to_safe_mem(LMS_H_HATS, &ICTXFR_A, LMS_Inst.tap_len);
+                    transfer_results_to_safe_mem(LMS_FIR.data, &ICTXFR_A, LMS_Inst.tap_len);
                 }
 
                 spin_unlock(used_lock, spinlock_irq_status);

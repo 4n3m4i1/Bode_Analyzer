@@ -11,8 +11,8 @@ void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable
 }
 
 
-int LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR){
-    int retval = LMS_FAIL_DFL;
+Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR){
+    Q15 retval = LMS_FAIL_DFL;
     Q15 *desired = LMS->d_n + LMS->fixed_offset;
     Q15 *white_noise = LMS->x_n + LMS->fixed_offset;
     if(LMS->d_n_offset){
@@ -27,12 +27,18 @@ int LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR)
     flush_FIR_buffer_and_taps(WGN_FIR);
 
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
-    for(uint16_t n = 0; n < LMS->iteration_ct; ++n){
-        Q15 err = *(desired++) - run_2n_FIR_cycle(WGN_FIR, *(white_noise++));
-        LMS_Update_Taps(LMS, WGN_FIR, err);
+    uint16_t n;
+    for(n = 0; n < LMS->iteration_ct; ++n){
+        retval = *(desired++) - run_2n_FIR_cycle(WGN_FIR, *(white_noise++));
+        LMS_Update_Taps(LMS, WGN_FIR, retval);
 
         // Error processing Stuff goes here!!!!!!!!!!!
         //  break if avg < min err
+        if(retval < LMS->target_error) break;
+    }
+
+    if(n >= LMS->iteration_ct){
+        if(retval > LMS->max_error_allowed) retval = LMS_FAIL_DFL;
     }
 
     // Error should be acceptable by now, or we've failed and everything sucks..
