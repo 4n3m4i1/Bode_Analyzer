@@ -8,13 +8,16 @@ void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable
     LMS->max_error_allowed = max_acceptable_error;
     LMS->iteration_ct = max_runtime;
     LMS->fixed_offset = start_offset;
+    LMS->samples_processed = 0;
 }
 
 
-Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR){
+Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool flush_FIR){
     Q15 retval = LMS_FAIL_DFL;
     Q15 *desired = LMS->d_n + LMS->fixed_offset;
     Q15 *white_noise = LMS->x_n + LMS->fixed_offset;
+    uint32_t *sp_ct = &LMS->samples_processed;
+
     if(LMS->d_n_offset){
         if(LMS->d_n_offset > 0){
             desired += LMS->d_n_offset;
@@ -23,14 +26,16 @@ Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR)
         }
     }
 
-    //setup_Q15_FIR(WGN_FIR, LMS->tap_len);     // Should be setup by now..
-    flush_FIR_buffer_and_taps(WGN_FIR);
+    // If new run, flush the FIR buffer
+    if(flush_FIR) flush_FIR_buffer_and_taps(WGN_FIR);
 
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
     uint16_t n;
     for(n = 0; n < LMS->iteration_ct; ++n){
         retval = *(desired++) - run_2n_FIR_cycle(WGN_FIR, *(white_noise++));
         LMS_Update_Taps(LMS, WGN_FIR, retval);
+
+        *sp_ct++;        
 
         // Error processing Stuff goes here!!!!!!!!!!!
         //  break if avg < min err

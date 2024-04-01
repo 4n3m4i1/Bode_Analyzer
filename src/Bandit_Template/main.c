@@ -417,7 +417,6 @@ start_adc_setup:
 
     uint16_t error_attempts;
 
-
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
     while(1){
@@ -432,6 +431,9 @@ start_adc_setup:
                     CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     error_attempts = 0;
+                    
+                    LMS_Inst.samples_processed = 0;
+
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 }
             }
@@ -461,13 +463,9 @@ start_adc_setup:
                     // PGA Settling Time
                     busy_wait_us_32(1);
                 } else {
+                    // if auto run or run signal -> CORE_1_STATE = CORE_1_SAMPLE;
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
                 }
-                
-                
-                
-                
-                CORE_1_STATE = CORE_1_SAMPLE;
             }
             break;
             case CORE_1_SAMPLE: {
@@ -491,7 +489,7 @@ start_adc_setup:
                 
             }
             break;
-            case CORE_1_APPLY_DC_CORRECTION: {
+            case CORE_1_APPLY_DC_CORRECTION: {  // One time startup calibration routine
                 int32_t dcavg_zone = 0;
                 for(uint16_t n = 0; n < STD_MAX_SAMPLES; ++n){
                     dcavg_zone += ((int32_t)D_N_0[n] - (int32_t)X_N_0[n]);
@@ -509,7 +507,9 @@ start_adc_setup:
             }
             break;
             case CORE_1_LMS: {
-                Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
+                // If first run: error_attempts = 0, thus we flush FIR buffer
+                //  else we should maintain results for more iterations
+                Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR, !error_attempts);
 
                 if(LMS_Error == LMS_FAIL_DFL){
                     // Handle the error
