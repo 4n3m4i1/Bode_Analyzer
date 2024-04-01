@@ -311,7 +311,7 @@ static void core_1_main(){
     pio_ads7253_spi_init(pio1, 16, 1, 0, ADC_CSN_PAD, ADC_SDI_PAD, ADC_SDO_A_PAD, 0);
 
     Bandit_RGBU.B = 0;
-    
+
 start_adc_setup:
 
     set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B++);
@@ -383,6 +383,7 @@ start_adc_setup:
                 
                 // If starting conditions are met start the whole DSP cycle
                 if(Bandit_Calibration_State == BANDIT_UNCALIBRATED){
+                    Bandit_Calibration_State = BANDIT_CAL_DC_BIAS_IN_PROG;
                     CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     error_attempts = 0;
@@ -394,21 +395,31 @@ start_adc_setup:
                 uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
 
                 if(Global_Bandit_Settings.updated){
-                    Global_Bandit_Settings.updated = false;
+                    if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_IN_PROG){
+                        Global_Bandit_Settings.updated = false;
 
-                    // if settings changed:
-                    //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
-                    // Switch frontend PGA to White Noise Loopback
-                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
-                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
-                
-                    Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
+                        // if settings changed:
+                        //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
+                        // Switch frontend PGA to White Noise Loopback
+                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
+                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
 
+                        // Need to recalibrate transfer function if a settings update occurs
+                        Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
+                    } else {
+                        // Need to do DC Cal
+                        // Keep PGA uninitialized
+                    }
+                    
+
+                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
                     // PGA Settling Time
                     busy_wait_us_32(1);
+                } else {
+                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
                 }
                 
-                spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+                
                 
                 
                 CORE_1_STATE = CORE_1_SAMPLE;
@@ -427,7 +438,7 @@ start_adc_setup:
                 }
 
                 Stop_Sampling();
-                if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_IN_PROG){
+                if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_COMPLETE){
                     CORE_1_STATE = CORE_1_DOWNSAMPLE;
                 } else {
                     CORE_1_STATE = CORE_1_APPLY_DC_CORRECTION;
@@ -438,7 +449,7 @@ start_adc_setup:
             case CORE_1_APPLY_DC_CORRECTION: {
                 int32_t dcavg_zone = 0;
                 for(uint16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                    dcavg_zone += (int32_t)(D_N_0[n] - X_N_0[n]);
+                    dcavg_zone += ((int32_t)D_N_0[n] - (int32_t)X_N_0[n]);
                 } 
                 dcavg_zone >>= LOG2_STD_MAX_SAMPLES;
                 Bandit_DC_Offset_Cal = (Q15)dcavg_zone;
