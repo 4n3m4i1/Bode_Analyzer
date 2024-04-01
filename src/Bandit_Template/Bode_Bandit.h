@@ -5,6 +5,7 @@
 #include "fixedpt_include.h"
 #include "Memory_Management.h"
 #include "Bandit_Sampling.h"
+#include "hardware/structs/bus_ctrl.h"
 
 #include "FFT/fft_half.h"
 #include "circular_buffers/RP2040_Circ_Buffer.h"

@@ -142,19 +142,53 @@ int main(){
     SETTINGS_LOCK = spin_lock_init(INTERCORE_SETTINGS_LOCK);
     SETTINGS_UPDATED_LOCK = spin_lock_init(INTERCORE_SETTINGS_CHANGED_LOCK);
 
+    // Claim lock on settings until Core 0 can deal with initialization
+    //  prevents Core 1 from starting any processing without settings
+    //  in place.
     spin_lock_claim(INTERCORE_SETTINGS_LOCK);
 
+    // Init h_hat core transfer register lengths to any known value.
     ICTXFR_A.len = 0;
     ICTXFR_B.len = 0;
+    
+    /*
+        The AHB Lite cross bar is a 2:3 priority MUX that connects:
+            - PIO0, PIO1, USB
+        with the main AHB bus.
 
+        USB falls in the lowest real time priority thus accesses to it
+            (only Core 0) are regarded as lower priority.
+        The access paths indicate wait-free access can be ensured for
+            both white noise generation (DMA -> PIO0) and sampling
+            (Core 1 <-> PIO1) if they have higher bus priority.
+        
+        Access allowance is done by gated high priority access, such that
+            low priority access can occur. Sampling is not continuous,
+            WGN generation is not continuous. But during their runtimes
+            BOTH need 0 collisions.
+    */
+
+    // Allow Core 1 to have priority access to AHB Lite Bus
+    //  This ensures the timing of sampling is deterministic
+    hw_set_bits(&bus_ctrl_hw->priority, BUSCTRL_BUS_PRIORITY_PROC1_BITS);
+
+    // Tenative allowance for High Priority DMA R/W access to AHB and APB
+    //  buses for uninterrupted white noise generation.
+    hw_set_bits(&bus_ctrl_hw->priority, BUSCTRL_BUS_PRIORITY_DMA_W_BITS);
+    hw_set_bits(&bus_ctrl_hw->priority, BUSCTRL_BUS_PRIORITY_DMA_R_BITS);
+
+    // Wait for bus priority changes to be applied.
+    //  "In normal circumstances this occurs almost immediately"
+    while(!bus_ctrl_hw->priority_ack);
+
+    // Initialize Status LEDs,
+    //  If blue is seen bus priorities have been applied.
     Bandit_RGBU.R = 0;
     Bandit_RGBU.G = 0;
     Bandit_RGBU.B = 120;
     Bandit_RGBU.U = 0;
     set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
     set_ULED_level(Bandit_RGBU.U);
-    
-    //start_randombit_dma_chain();
 
     // Setup for peripherals done on core 0
     multicore_launch_core1(core_1_main);
