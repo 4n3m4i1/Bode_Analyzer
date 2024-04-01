@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define FIX_2_FLOAT
-#include "../generic_include.h"
+#include "../fixedpt_include.h"
 
 
 
