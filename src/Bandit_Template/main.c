@@ -45,6 +45,15 @@ CORE_1_MEM Q15 LMS_H_HATS[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_1_MEM Q15 DDSAMP_FIR_BANK[DDSAMP_FIR_LEN];
 CORE_1_MEM Q15 DDSAMP_TAP_BANK[DDSAMP_FIR_LEN][DDSAMP_TAP_OPTIONS];
 
+// Core 1 -> 0 transfer buffers
+struct Transfer_Data {
+    uint16_t    len;
+    Q15         data[TOTAL_ADAPTIVE_FIR_LEN];
+};
+
+struct Transfer_Data ICTXFR_A;
+struct Transfer_Data ICTXFR_B;
+
 // FFT Tap Buffers
 CORE_0_MEM Q15 FR_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_0_MEM Q15 FI_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
@@ -89,7 +98,6 @@ struct BANDIT_LED_COLORS Bandit_RGBU;
 static void core_0_main();
 
 static void USB_Handler(struct FFT_PARAMS *fft);
-static void FFT_Handler();
 static void update_bandit_config();
 
 static void send_header_packet(Q15 *h_data);
@@ -100,12 +108,16 @@ static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 
 // Core 1 Function Definitions
 static void    core_1_main();
+static void    transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, uint16_t len);
 //void    setup_ADC();
 //void    setup_sampling_ISR();
 //void    sampling_ISR_func();
 //int     run_adaptive_taps();
 //void    handle_intercore_h_hat_transfer();  // DMA tap data to other core, or error on overrun, start fft core 0
 
+spin_lock_t *FFTMEMLOCK_A;
+spin_lock_t *FFTMEMLOCK_B;
+spin_lock_t *SETTINGS_LOCK;
 
   //////////////////////////////////////////////////////////////////////
  ////////////////////////////    Code!    /////////////////////////////
@@ -119,6 +131,15 @@ int main(){
     gpio_init(VDDA_EN_PAD);
     gpio_set_dir(VDDA_EN_PAD, GPIO_OUT);
     gpio_put(VDDA_EN_PAD, true);
+
+    Setup_Semaphores();
+
+    FFTMEMLOCK_A = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
+    FFTMEMLOCK_B = spin_lock_init(INTERCORE_FFTMEM_LOCK_B);
+    SETTINGS_LOCK = spin_lock_init(INTERCORE_SETTINGS_LOCK);
+
+    ICTXFR_A.len = 0;
+    ICTXFR_B.len = 0;
 
     Bandit_RGBU.R = 0;
     Bandit_RGBU.G = 0;
@@ -144,6 +165,8 @@ int main(){
  /////////////////    Core 0 Main Loop    /////////////////////////////
 //////////////////////////////////////////////////////////////////////
 static void core_0_main(){
+    
+
     // Do tiny USB and control stuff here,
     
     Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS;
@@ -182,10 +205,50 @@ static void core_0_main(){
             case USB_INIT:
                 //need idle work until GUI is ready
                 break;
-            case USB_FFT_DATA_COLLECT:
-                FFT_Handler(); //fft data from shared memory & run fft calc
-                USB_NEXT_STATE = USB_SEND_TUSB;
+            case USB_APPLY_SETTINGS: {
+                uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+
+                spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+            }
+            break;
+            case USB_FFT_DATA_COLLECT: {
+                // Acquire safe access to FFT mem, can use 2 locks for ping pong access
+                uint32_t spinlock_irq_status;
+                spin_lock_t *used_lock;
+                struct Transfer_Data *data_src;
+
+                if(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A)){
+                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_B);
+                    used_lock = FFTMEMLOCK_B;
+                    data_src = &ICTXFR_B;
+                } else {
+                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
+                    used_lock = FFTMEMLOCK_A;
+                    data_src = &ICTXFR_A;
+                }
+
+                // Apply windowing here if needed!!!
+                for(uint16_t n = 0; n < data_src->len; ++n){
+                    cool_fft.fr[n] = data_src->data[n];
+                    cool_fft.fi[n] = 0;
+                }
+
+                fft_setup(&cool_fft, data_src->len);
+                
+                // Free memory constraints
+                spin_unlock(used_lock, spinlock_irq_status);
+
+                USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
+                
+                }
                 break;
+            
+            case USB_RUN_DMC_JK_RUN_FFT: {
+                FFT_fixdpt(&cool_fft);
+                USB_NEXT_STATE = USB_SEND_TUSB;
+            }
+            break;
+
             case USB_SEND_TUSB:
                 USB_Handler(&cool_fft); //send data to GUI through tusb
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
@@ -306,7 +369,10 @@ start_adc_setup:
                 set_ULED_level(Bandit_RGBU.U++);
                 busy_wait_ms(20);
                 
-                CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+                // If starting conditions are met start the whole DSP cycle
+                if(1){
+                    CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+                }
             }
             break;
             case CORE_1_APPLY_SETTINGS: {
@@ -331,9 +397,7 @@ start_adc_setup:
             }
             break;
             case CORE_1_DOWNSAMPLE: {
-                for(int n = 0; n < STD_MAX_SAMPLES; ++n){
-                    printf("%u\t%u\n", D_N_0[n], X_N_0[n]);
-                }
+                
                 CORE_1_STATE = CORE_1_LMS;
             }
             break;
@@ -348,6 +412,25 @@ start_adc_setup:
             }
             break;
             case CORE_1_SHIP_RESULTS: {
+                // Transfer results from LMS to memory accessible by both cores
+                //  only like this to improve speed someday with DMA...
+                //      but not today :)
+                // If this didn't need to be serialized DMA would be sick here
+                //  but really no benefit due to overall processing structure
+                //  1000% could be better tho
+                uint32_t spinlock_irq_status;
+                spin_lock_t *used_lock;
+                if(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A)){
+                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_B);
+                    used_lock = FFTMEMLOCK_B;
+                    transfer_results_to_safe_mem(LMS_H_HATS, &ICTXFR_B, LMS_Inst.tap_len);
+                } else {
+                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
+                    used_lock = FFTMEMLOCK_A;
+                    transfer_results_to_safe_mem(LMS_H_HATS, &ICTXFR_A, LMS_Inst.tap_len);
+                }
+
+                spin_unlock(used_lock, spinlock_irq_status);
 
                 CORE_1_STATE = CORE_1_IDLE;
             }
@@ -432,10 +515,6 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
     }
 }
 
-// just for pseudo code utility
-static void FFT_Handler(){
-
-}
 
 // recieve config data from GUI and update BANDIT_SETTINGS accordingly
 static void update_bandit_config(){
@@ -465,7 +544,12 @@ static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft){
   /////////////////////////////////////////////////////////
  ////////////////////// CORE 1: ADC, LMS, Downsampling ///
 /////////////////////////////////////////////////////////
-
+static void transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, uint16_t len){
+    dst->len = len;
+    for(uint16_t n = 0; n < len; ++n){
+        dst->data[n] = *src++;
+    }
+}
 
 
   /////////////////////////////////////////////////////////

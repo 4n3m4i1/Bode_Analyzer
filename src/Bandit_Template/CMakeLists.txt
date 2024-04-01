@@ -21,6 +21,7 @@ add_executable(
                 LMS/LMS_Fixed.c
                 Bandit_LED/Bandit_LED.c
                 PIO_ADS7253/PIO_ADS7253.c
+                Bandit_InterCore/Bandit_Inter_Core.c
                 )
 
 #pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_val_2_pin.pio)
@@ -49,7 +50,7 @@ add_library(LMS LMS/LMS_Fixed.c LMS/LMS_Fixed.h)
 add_library(PGA MCP6S92_RP2040/MCP6S92_RP2040.h)
 add_library(LED Bandit_LED/Bandit_LED.c Bandit_LED/Bandit_LED.h)
 add_library(PIOSPI PIO_ADS7253/PIO_ADS7253.c PIO_ADS7253/PIO_ADS7253.h)
-
+add_library(CORESYNC Bandit_InterCore/Bandit_Inter_Core.c Bandit_InterCore/Bandit_Inter_Core.h)
 
 target_link_libraries(FFT
     pico_stdlib
@@ -84,6 +85,10 @@ target_link_libraries(LED
 target_link_libraries(PIOSPI
     pico_stdlib
     hardware_pio
+)
+
+target_link_libraries(CORESYNC
+    hardware_sync
 )
 
 pico_enable_stdio_usb(${PROJECT_NAME} 1)

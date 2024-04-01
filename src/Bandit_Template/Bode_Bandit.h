@@ -14,6 +14,7 @@
 #include "MCP6S92_RP2040/MCP6S92_RP2040.h"
 #include "Bandit_LED/Bandit_LED.h"
 #include "PIO_ADS7253/PIO_ADS7253.h"
+#include "Bandit_InterCore/Bandit_Inter_Core.h"
 
 /*
     Remember:
@@ -162,12 +163,17 @@ enum BANDIT_CORE_1_DSP_STATES {
 #define CDC_PACKET_LEN          64
 //core0 state machine init
 //#define STATE             // variables?
-//#define NEXT_STATE                
-#define USB_INIT                0
-#define USB_FFT_DATA_COLLECT    1
-#define USB_SEND_TUSB           2
-#define USB_RECIEVE_CONFIG      3
-#define USB_UPDATE_CONFIG       4
+//#define NEXT_STATE         
+enum USB_STATE_MACHINEEEEE {
+    USB_INIT,
+    USB_APPLY_SETTINGS,
+    USB_FFT_DATA_COLLECT,
+    USB_RUN_DMC_JK_RUN_FFT,
+    USB_SEND_TUSB,
+    USB_RECIEVE_CONFIG,
+    USB_UPDATE_CONFIG
+};    
+
 
 
 #endif
