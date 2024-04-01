@@ -7,7 +7,6 @@
 
 #define SHAMT           15  // initially 15
 typedef int16_t Q15;
-//#define multfix14_16(a,b) ((fix14_16)((((signed long long)(a))*((signed long long)(b)))>>15)) //multiply two fixed 16.15
 #define add_Q15(a,b)        (a + b)
 #define sub_Q15(a,b)        (a - b)
 #define mul_Q15(a,b)        ((Q15)((((int32_t)(a))*((int32_t)(b)))>>SHAMT)) //multiply two fixed 16.15
