@@ -33,6 +33,50 @@
     updates for LMS. (That's like... a good idea)
 */
 
+
+  //////////////////////////////////////////////////////////////////////
+ /////////////////////    GLOBAL ALLOCATIONS    ///////////////////////
+//////////////////////////////////////////////////////////////////////
+// Core 1 -> 0 transfer buffers
+struct Transfer_Data {
+    uint16_t    len;
+    Q15         data[TOTAL_ADAPTIVE_FIR_LEN];
+};
+
+struct Transfer_Data ICTXFR_A;
+
+
+struct BANDIT_SETTINGS  Global_Bandit_Settings;
+
+
+struct BANDIT_LED_COLORS {
+    uint8_t R;
+    uint8_t G;
+    uint8_t B;
+    uint8_t U;
+};
+
+struct BANDIT_LED_COLORS Bandit_RGBU;
+
+
+
+  //////////////////////////////////////////////////////////////////////
+ /////////////////////    CORE 0 ALLOCATIONS    ///////////////////////
+//////////////////////////////////////////////////////////////////////
+// FFT Tap Buffers
+CORE_0_MEM Q15 FR_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
+CORE_0_MEM Q15 FI_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
+
+// Reserve Buffer for Stored Results
+CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
+
+
+CORE_0_MEM uint16_t USB_STATE;
+CORE_0_MEM uint16_t USB_NEXT_STATE;
+
+  //////////////////////////////////////////////////////////////////////
+ /////////////////////    CORE 1 ALLOCATIONS    ///////////////////////
+//////////////////////////////////////////////////////////////////////
 // Sampling Banks
 CORE_1_MEM Q15 X_N_0[TOTAL_BUFF_LEN];
 CORE_1_MEM Q15 D_N_0[TOTAL_BUFF_LEN];
@@ -47,56 +91,21 @@ CORE_1_MEM Q15 LMS_H_HATS_CORRECTION[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_1_MEM Q15 DDSAMP_FIR_BANK[DDSAMP_FIR_LEN];
 CORE_1_MEM Q15 DDSAMP_TAP_BANK[DDSAMP_FIR_LEN][DDSAMP_TAP_OPTIONS];
 
-// Core 1 -> 0 transfer buffers
-struct Transfer_Data {
-    uint16_t    len;
-    Q15         data[TOTAL_ADAPTIVE_FIR_LEN];
-};
-
-struct Transfer_Data ICTXFR_A;
-struct Transfer_Data ICTXFR_B;
-
-// FFT Tap Buffers
-CORE_0_MEM Q15 FR_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
-CORE_0_MEM Q15 FI_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
-
-// Reserve Buffer for Stored Results
-CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
-
-
-// Global Settings Buffer, Mutual Exclusive Access via hardware semaphores
-//  to save on access stalls
-struct BANDIT_SETTINGS  Global_Bandit_Settings;
-CORE_0_MEM uint16_t USB_STATE;
-CORE_0_MEM uint16_t USB_NEXT_STATE;
-
 // Core 1 Defines
 #define ADCRES_BITS     12u
 #define ADC_RES_CODES   (1u << ADCRES_BITS)
 #define ADC_VREF_CODE   0x108                   // ~2.15 V from ADS7253 DAC
 
 #define ADC_PIO         pio1
-CORE_1_MEM uint16_t tmp_arr[ADS_READ_REG_COUNT] = {0,0,0};
-CORE_1_MEM uint8_t  CORE_1_STATE = CORE_1_IDLE;
+CORE_1_MEM uint16_t     tmp_arr[ADS_READ_REG_COUNT] = {0,0,0};
+CORE_1_MEM uint8_t      CORE_1_STATE = CORE_1_IDLE;
 
-struct BANDIT_LED_COLORS {
-    uint8_t R;
-    uint8_t G;
-    uint8_t B;
-    uint8_t U;
-};
 
-struct BANDIT_LED_COLORS Bandit_RGBU;
+
 
   //////////////////////////////////////////////////////////////////////
- ///////////////////   FUNCTION DEFINITIONS   /////////////////////////
+ ///////////////////  CORE 0 FUNCTION DEFINITIONS   ///////////////////
 //////////////////////////////////////////////////////////////////////
-// Generic Function Definitions
-
-
-
-
-// Core 0 Function Definitions
 static void core_0_main();
 
 static void USB_Handler(struct FFT_PARAMS *fft);
@@ -108,19 +117,24 @@ static void send_f_packets(Q15 *data, uint16_t num_samples);
 static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len);
 static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 
-// Core 1 Function Definitions
+
+  //////////////////////////////////////////////////////////////////////
+ ///////////////////  CORE 1 FUNCTION DEFINITIONS   ///////////////////
+//////////////////////////////////////////////////////////////////////
 static void    core_1_main();
 static void    transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, uint16_t len);
-//void    setup_ADC();
-//void    setup_sampling_ISR();
-//void    sampling_ISR_func();
-//int     run_adaptive_taps();
-//void    handle_intercore_h_hat_transfer();  // DMA tap data to other core, or error on overrun, start fft core 0
 
+
+/*
+    Spinlocks for mututally exclusive access to shared memory resources.
+
+    When a lock is held no other core can access that memory location, and by
+        extention in most cases the entire RAM bank, due to how accesses
+        are shared. (see: CORE_0_MEM and CORE_1_MEM)
+*/
 spin_lock_t *FFTMEMLOCK_A;
-spin_lock_t *FFTMEMLOCK_B;
 spin_lock_t *SETTINGS_LOCK;
-spin_lock_t *SETTINGS_UPDATED_LOCK;
+
 
   //////////////////////////////////////////////////////////////////////
  ////////////////////////////    Code!    /////////////////////////////
@@ -138,9 +152,7 @@ int main(){
     Setup_Semaphores();
 
     FFTMEMLOCK_A = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
-    FFTMEMLOCK_B = spin_lock_init(INTERCORE_FFTMEM_LOCK_B);
     SETTINGS_LOCK = spin_lock_init(INTERCORE_SETTINGS_LOCK);
-    SETTINGS_UPDATED_LOCK = spin_lock_init(INTERCORE_SETTINGS_CHANGED_LOCK);
 
     // Claim lock on settings until Core 0 can deal with initialization
     //  prevents Core 1 from starting any processing without settings
@@ -149,7 +161,6 @@ int main(){
 
     // Init h_hat core transfer register lengths to any known value.
     ICTXFR_A.len = 0;
-    ICTXFR_B.len = 0;
     
     /*
         The AHB Lite cross bar is a 2:3 priority MUX that connects:
@@ -180,6 +191,11 @@ int main(){
     // Wait for bus priority changes to be applied.
     //  "In normal circumstances this occurs almost immediately"
     while(!bus_ctrl_hw->priority_ack);
+
+    // Setup to count AHB-Lite MUX collisions
+    bus_ctrl_hw->counter[0].value = 0;
+    bus_ctrl_hw->counter[0].sel = arbiter_fastperi_perf_event_access_contested;
+
 
     // Initialize Status LEDs,
     //  If blue is seen bus priorities have been applied.
@@ -255,15 +271,10 @@ static void core_0_main(){
                 spin_lock_t *used_lock;
                 struct Transfer_Data *data_src;
 
-                if(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A)){
-                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_B);
-                    used_lock = FFTMEMLOCK_B;
-                    data_src = &ICTXFR_B;
-                } else {
-                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
-                    used_lock = FFTMEMLOCK_A;
-                    data_src = &ICTXFR_A;
-                }
+                spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
+                used_lock = FFTMEMLOCK_A;
+                data_src = &ICTXFR_A;
+
 
                 // Apply windowing here if needed!!!
                 for(uint16_t n = 0; n < data_src->len; ++n){
@@ -546,16 +557,12 @@ start_adc_setup:
                 //  1000% could be better tho
                 uint32_t spinlock_irq_status;
                 spin_lock_t *used_lock;
-                if(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A)){
-                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_B);
-                    used_lock = FFTMEMLOCK_B;
-                    transfer_results_to_safe_mem(LMS_FIR.data, &ICTXFR_B, LMS_Inst.tap_len);
-                } else {
-                    spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
-                    used_lock = FFTMEMLOCK_A;
-                    transfer_results_to_safe_mem(LMS_FIR.data, &ICTXFR_A, LMS_Inst.tap_len);
-                }
 
+                spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
+                used_lock = FFTMEMLOCK_A;
+                
+                transfer_results_to_safe_mem(LMS_FIR.data, &ICTXFR_A, LMS_Inst.tap_len);
+                
                 spin_unlock(used_lock, spinlock_irq_status);
 
                 CORE_1_STATE = CORE_1_IDLE;
