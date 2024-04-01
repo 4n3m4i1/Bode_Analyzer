@@ -6,6 +6,10 @@
 #include "hardware/spi.h"
 #include "hardware/resets.h"
 
+// Channel/Gain switch settling time (us)
+// t_ch + t_G = 1.5 + 1 = 2.5 us, round up
+#define MCP6S92_SETTLING_TIME   3
+
 enum MCP6S92_INSTRUCTIONS {
     MCP6S92_NOP,
     MCP6S92_SHUTDOWN,

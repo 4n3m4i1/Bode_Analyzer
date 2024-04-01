@@ -461,7 +461,7 @@ start_adc_setup:
 
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
                     // PGA Settling Time
-                    busy_wait_us_32(1);
+                    busy_wait_us_32(MCP6S92_SETTLING_TIME);
                 } else {
                     // if auto run or run signal -> CORE_1_STATE = CORE_1_SAMPLE;
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
@@ -535,6 +535,9 @@ start_adc_setup:
                     // Set PGA to EXTERNAL input x1 GAIN
                     MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
                     MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+
+                    // PGA Settling Time
+                    busy_wait_us_32(MCP6S92_SETTLING_TIME);
 
                     Bandit_Calibration_State = BANDIT_FULLY_CALIBRATED;
                     
