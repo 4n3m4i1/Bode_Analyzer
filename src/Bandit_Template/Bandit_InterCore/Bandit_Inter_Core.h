@@ -3,9 +3,10 @@
 
 #include "hardware/sync.h"
 
-#define INTERCORE_SETTINGS_LOCK     2
-#define INTERCORE_FFTMEM_LOCK_A     3
-#define INTERCORE_FFTMEM_LOCK_B     4
+#define INTERCORE_SETTINGS_CHANGED_LOCK 1
+#define INTERCORE_SETTINGS_LOCK         2
+#define INTERCORE_FFTMEM_LOCK_A         3
+#define INTERCORE_FFTMEM_LOCK_B         4
 
 
 void Setup_Semaphores();

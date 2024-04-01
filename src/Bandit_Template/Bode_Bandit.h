@@ -131,6 +131,7 @@ enum BANDIT_SETTINGS_BF {
 };
 
 struct BANDIT_SETTINGS {
+    uint8_t         updated;
     uint32_t        settings_bf;
     uint16_t        manual_tap_len_setting;
     uint32_t        manual_error_limit;

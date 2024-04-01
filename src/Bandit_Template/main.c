@@ -66,7 +66,7 @@ CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 
 // Global Settings Buffer, Mutual Exclusive Access via hardware semaphores
 //  to save on access stalls
-struct CORE_0_MEM BANDIT_SETTINGS  Global_Bandit_Settings;
+struct BANDIT_SETTINGS  Global_Bandit_Settings;
 CORE_0_MEM uint16_t USB_STATE;
 CORE_0_MEM uint16_t USB_NEXT_STATE;
 
@@ -120,6 +120,7 @@ static void    transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst,
 spin_lock_t *FFTMEMLOCK_A;
 spin_lock_t *FFTMEMLOCK_B;
 spin_lock_t *SETTINGS_LOCK;
+spin_lock_t *SETTINGS_UPDATED_LOCK;
 
   //////////////////////////////////////////////////////////////////////
  ////////////////////////////    Code!    /////////////////////////////
@@ -139,6 +140,9 @@ int main(){
     FFTMEMLOCK_A = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
     FFTMEMLOCK_B = spin_lock_init(INTERCORE_FFTMEM_LOCK_B);
     SETTINGS_LOCK = spin_lock_init(INTERCORE_SETTINGS_LOCK);
+    SETTINGS_UPDATED_LOCK = spin_lock_init(INTERCORE_SETTINGS_CHANGED_LOCK);
+
+    spin_lock_claim(INTERCORE_SETTINGS_LOCK);
 
     ICTXFR_A.len = 0;
     ICTXFR_B.len = 0;
@@ -167,15 +171,13 @@ int main(){
  /////////////////    Core 0 Main Loop    /////////////////////////////
 //////////////////////////////////////////////////////////////////////
 static void core_0_main(){
-    
-
-    // Do tiny USB and control stuff here,
-    
+    Global_Bandit_Settings.updated = true;
     Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS;
     Global_Bandit_Settings.manual_tap_len_setting = 0;
     Global_Bandit_Settings.manual_error_limit = 0;
     Global_Bandit_Settings.manual_freq_range = 0;
-
+    // Locked by main core at startup
+    spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
 
     // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
     setup_rosc_full_tilt();
@@ -301,6 +303,7 @@ static void core_1_main(){
     // Don't init frontend PGA until calibration
     //MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
     //MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+    
 
     /*
         Initialize ADC SPI w/ pio1
@@ -308,6 +311,7 @@ static void core_1_main(){
     pio_ads7253_spi_init(pio1, 16, 1, 0, ADC_CSN_PAD, ADC_SDI_PAD, ADC_SDO_A_PAD, 0);
 
     Bandit_RGBU.B = 0;
+    
 start_adc_setup:
 
     set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B++);
@@ -387,8 +391,26 @@ start_adc_setup:
             }
             break;
             case CORE_1_APPLY_SETTINGS: {
-                // if settings changed:
-                //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
+                uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+
+                if(Global_Bandit_Settings.updated){
+                    Global_Bandit_Settings.updated = false;
+
+                    // if settings changed:
+                    //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
+                    // Switch frontend PGA to White Noise Loopback
+                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
+                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+                
+                    Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
+
+                    // PGA Settling Time
+                    busy_wait_us_32(1);
+                }
+                
+                spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+                
+                
                 CORE_1_STATE = CORE_1_SAMPLE;
             }
             break;
@@ -422,10 +444,6 @@ start_adc_setup:
                 Bandit_DC_Offset_Cal = (Q15)dcavg_zone;
                 Bandit_Calibration_State = BANDIT_CAL_DC_BIAS_COMPLETE;
 
-                // Enable frontend PGA
-                MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
-                MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
-
                 CORE_1_STATE = CORE_1_IDLE;
             }
             break;
@@ -457,6 +475,10 @@ start_adc_setup:
                     for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
                         LMS_H_HATS_CORRECTION[n] = LMS_FIR.data[n];
                     }
+
+                    // Set PGA to EXTERNAL input x1 GAIN
+                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
+                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
 
                     Bandit_Calibration_State = BANDIT_FULLY_CALIBRATED;
                     
