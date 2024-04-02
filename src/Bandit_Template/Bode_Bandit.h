@@ -121,7 +121,8 @@ enum DDSAMP_FREQ_RANGE_IDX {
 */
 enum BANDIT_SETTINGS_BF {
     BS_ENABLE,
-    BS_RES0,
+    BS_DEBUG_MODE,
+    BS_SINGLE_SHOT_RUN,
     BS_AUTO_RUN,
     BS_AUTO_SEND,
     BS_WGN_ON,
@@ -130,6 +131,10 @@ enum BANDIT_SETTINGS_BF {
     BS_MAN_TAP_LEN,
     BS_MAN_FREQ_RANGE
 };
+
+/*
+    Bandit Main Settings
+*/
 
 struct BANDIT_SETTINGS {
     uint8_t         updated;
@@ -156,7 +161,8 @@ enum BANDIT_CORE_1_DSP_STATES {
     CORE_1_DOWNSAMPLE,
     CORE_1_LMS,
     CORE_1_POST_PROC,
-    CORE_1_SHIP_RESULTS
+    CORE_1_SHIP_RESULTS,
+    CORE_1_DEBUG_HANDLER
 };
 
 //tinyUsb definitions

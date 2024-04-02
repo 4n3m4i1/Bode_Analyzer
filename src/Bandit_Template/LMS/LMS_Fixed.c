@@ -9,6 +9,7 @@ void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable
     LMS->iteration_ct = max_runtime;
     LMS->fixed_offset = start_offset;
     LMS->samples_processed = 0;
+    LMS->max_convergence_attempts = LMS_DFL_MAX_FAILURES;
 }
 
 

@@ -30,9 +30,11 @@ enum LMS_LOOPER_RETURNS {
     LMS_FAIL_ERR_2_HI
 };
 
+#define LMS_DFL_MAX_FAILURES    32
 
 struct LMS_Fixed_Inst {
     uint16_t    tap_len;            // Number of taps (h hats)
+    uint16_t    max_convergence_attempts;   // Maximum amount of retries before FAILURE
     uint16_t    iteration_ct;       // Max Samples to Run Thru System
     uint16_t    ddsmpl_stride;      // Downsampling stride if not handled in Digi downsampler itself
     uint16_t    fixed_offset;       // Offset to both x[n] and d[n] due to downsampling FIR fillup time

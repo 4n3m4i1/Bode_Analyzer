@@ -256,15 +256,23 @@ static void core_0_main(){
         tud_task();
         USB_STATE = USB_NEXT_STATE;
         switch(USB_STATE) {
-            case USB_INIT:
+            case USB_INIT: {
                 //need idle work until GUI is ready
-                break;
+            }
+            break;
+            
             case USB_APPLY_SETTINGS: {
                 uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+
+                // Do USB Settings application here!!
+                //  set UPDATED = true if tap length, errors, or frequency ranges
+                //  have been changed
+                //  set UPDATED = true if any bitfield settings have been altered
 
                 spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
             }
             break;
+
             case USB_FFT_DATA_COLLECT: {
                 // Acquire safe access to FFT mem, can use 2 locks for ping pong access
                 uint32_t spinlock_irq_status;
@@ -290,7 +298,7 @@ static void core_0_main(){
                 USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
                 
                 }
-                break;
+            break;
             
             case USB_RUN_DMC_JK_RUN_FFT: {
                 FFT_fixdpt(&cool_fft);
@@ -298,13 +306,16 @@ static void core_0_main(){
             }
             break;
 
-            case USB_SEND_TUSB:
+            case USB_SEND_TUSB: {
                 USB_Handler(&cool_fft); //send data to GUI through tusb
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
-                break;
-            default:
+            }
+            break;
+            
+            default: {
                 USB_STATE = USB_INIT;
-                break; //need debug for USB_STATE error
+            }
+            break; //need debug for USB_STATE error
 
         }
 
@@ -416,6 +427,7 @@ start_adc_setup:
     Sampling_Setup(500000);
 
     uint16_t error_attempts;
+    bool CORE_1_DBG_MODE = false;
 
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
@@ -436,6 +448,8 @@ start_adc_setup:
 
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 }
+
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
             case CORE_1_APPLY_SETTINGS: {
@@ -456,16 +470,30 @@ start_adc_setup:
                     } else {
                         // Need to do DC Cal
                         // Keep PGA uninitialized
+                        //  Sample and adjust for DC
+                        CORE_1_STATE = CORE_1_SAMPLE;
                     }
                     
+                    // Apply Generic Settings
+                    CORE_1_DBG_MODE = (CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_DEBUG_MODE));
 
+                    // Free spinlock on Global Settings
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
                     // PGA Settling Time
                     busy_wait_us_32(MCP6S92_SETTLING_TIME);
                 } else {
                     // if auto run or run signal -> CORE_1_STATE = CORE_1_SAMPLE;
+                    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
+                        CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN)){
+                            
+                            CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN);
+                            CORE_1_STATE = CORE_1_SAMPLE;
+                    }
+
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
                 }
+
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
             case CORE_1_SAMPLE: {
@@ -487,6 +515,7 @@ start_adc_setup:
                     CORE_1_STATE = CORE_1_APPLY_DC_CORRECTION;
                 }
                 
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
             case CORE_1_APPLY_DC_CORRECTION: {  // One time startup calibration routine
@@ -504,6 +533,8 @@ start_adc_setup:
             case CORE_1_DOWNSAMPLE: {
                 
                 CORE_1_STATE = CORE_1_LMS;
+
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
             case CORE_1_LMS: {
@@ -515,12 +546,20 @@ start_adc_setup:
                     // Handle the error
                     //  Sample again and try again
                     error_attempts++;
-                    CORE_1_STATE = CORE_1_SAMPLE;
+
+                    if(error_attempts > LMS_Inst.max_convergence_attempts) {
+                        // Bring up failure to user here or something
+                        CORE_1_STATE = CORE_1_POST_PROC;
+                    } else {
+                        CORE_1_STATE = CORE_1_SAMPLE;
+                    }
                 } else {
                     CORE_1_STATE = CORE_1_POST_PROC;
                 }
                 
                 if(Bandit_Calibration_State != BANDIT_FULLY_CALIBRATED);
+
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
             case CORE_1_POST_PROC: {
@@ -549,6 +588,8 @@ start_adc_setup:
                     }
                     CORE_1_STATE = CORE_1_SHIP_RESULTS;
                 }
+
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
             case CORE_1_SHIP_RESULTS: {
@@ -569,11 +610,18 @@ start_adc_setup:
                 spin_unlock(used_lock, spinlock_irq_status);
 
                 CORE_1_STATE = CORE_1_IDLE;
+
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
+            }
+            break;
+            case CORE_1_DEBUG_HANDLER: {
+
             }
             break;
             default:
                 // Idk should have some out of bounds safety, but whatever
                 CORE_1_STATE = CORE_1_IDLE;
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             break;
         }
     }
