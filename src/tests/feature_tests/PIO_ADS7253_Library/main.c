@@ -41,6 +41,8 @@ int main(){
 
     uint8_t auto_mode = 0;
 
+    uint16_t refval = 0x108;
+
     while('!'){
         char read_val = getchar_timeout_us(0);
 
@@ -148,6 +150,54 @@ int main(){
                 }
 
                 printf("Read CFR with: 0x%4X\n", sendem[0]);
+            }
+            break;
+
+            case '+': {
+                uint16_t sendem[3] = {0,0,0};
+                sendem[0] = ADS7253_CMD(ADS7253_REFDAC_A_WRITE, refval << 3);
+                //sendem[1] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (1 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                //sendem[2] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (1 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+
+                ADS7253_write16_blocking(pio1, sendem, count_of(sendem));
+               
+                busy_wait_us_32(2);
+
+                sendem[0] = ADS7253_CMD(ADS7253_REFDAC_B_WRITE, refval << 3);
+
+                ADS7253_write16_blocking(pio1, sendem, count_of(sendem));
+
+                busy_wait_us_32(2);
+
+                while(!pio_sm_is_rx_fifo_empty(pio1, 1)){
+                    printf("RX: %6u\t%6u\n", pio1->rxf[1], pio1->rxf[2]);
+                }
+
+                printf("Refval Written: 0x%04X\n", refval++);
+            }
+            break;
+
+            case '-': {
+                uint16_t sendem[3] = {0,0,0};
+                sendem[0] = ADS7253_CMD(ADS7253_REFDAC_A_WRITE, refval << 3);
+                //sendem[1] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (1 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+                //sendem[2] = ADS7253_CMD(ADS7253_CFR_WRITE, ((1 << ADS7253_CFR_RD_CLK_MODE) | (1 << ADS7253_CFR_RD_DATA_LINES) | (1 << ADS7253_CFR_REF_SEL)));
+
+                ADS7253_write16_blocking(pio1, sendem, count_of(sendem));
+               
+                busy_wait_us_32(2);
+
+                sendem[0] = ADS7253_CMD(ADS7253_REFDAC_B_WRITE, refval << 3);
+
+                ADS7253_write16_blocking(pio1, sendem, count_of(sendem));
+
+                busy_wait_us_32(2);
+
+                while(!pio_sm_is_rx_fifo_empty(pio1, 1)){
+                    printf("RX: %6u\t%6u\n", pio1->rxf[1], pio1->rxf[2]);
+                }
+
+                printf("Refval Written: 0x%04X\n", refval--);
             }
             break;
         }
