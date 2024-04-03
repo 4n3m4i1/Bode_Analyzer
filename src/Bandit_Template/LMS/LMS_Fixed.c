@@ -17,7 +17,7 @@ Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR,
     Q15 retval = LMS_FAIL_DFL;
     Q15 *desired = LMS->d_n + LMS->fixed_offset;
     Q15 *white_noise = LMS->x_n + LMS->fixed_offset;
-    uint32_t *sp_ct = &LMS->samples_processed;
+    uint32_t *sp_ct = &(LMS->samples_processed);
 
     if(LMS->d_n_offset){
         if(LMS->d_n_offset > 0){

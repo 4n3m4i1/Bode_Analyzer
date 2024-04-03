@@ -98,7 +98,6 @@ CORE_1_MEM Q15 DDSAMP_TAP_BANK[DDSAMP_FIR_LEN][DDSAMP_TAP_OPTIONS];
 
 #define ADC_PIO         pio1
 CORE_1_MEM uint16_t     tmp_arr[ADS_READ_REG_COUNT] = {0,0,0};
-CORE_1_MEM uint8_t      CORE_1_STATE = CORE_1_IDLE;
 
 
 
@@ -121,9 +120,9 @@ static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
   //////////////////////////////////////////////////////////////////////
  ///////////////////  CORE 1 FUNCTION DEFINITIONS   ///////////////////
 //////////////////////////////////////////////////////////////////////
-static void    core_1_main();
-static void    transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, uint16_t len);
-
+static void     core_1_main();
+static void     transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, uint16_t len);
+static void     clear_adc_read_buffers();
 
 /*
     Spinlocks for mututally exclusive access to shared memory resources.
@@ -144,6 +143,13 @@ spin_lock_t *SETTINGS_LOCK;
 int main(){
     stdio_init_all();
     init_LED_pins();
+
+    Bandit_RGBU.R = 0;
+    Bandit_RGBU.G = 0;
+    Bandit_RGBU.B = 0;
+    Bandit_RGBU.U = 0;
+    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
+    set_ULED_level(Bandit_RGBU.U);
 
     gpio_init(VDDA_EN_PAD);
     gpio_set_dir(VDDA_EN_PAD, GPIO_OUT);
@@ -422,10 +428,112 @@ start_adc_setup:
         goto start_adc_setup;
     }
     
+    // Go Red for DAC calibration cycle
+    Bandit_RGBU.R = 200;
+    Bandit_RGBU.G = 0;
+    Bandit_RGBU.B = 0;
+    Bandit_RGBU.U = 0;
+    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
+    set_ULED_level(Bandit_RGBU.U);
+
+    // ADC Now configured for 16clk mode dual SDO, configure refdac now!
+    uint16_t ADC_REFDACVAL = 0x108;
+    uint32_t ADC_REFDAC_CAL_ACCUM;
+    tmp_arr[1] = 0;
+    tmp_arr[2] = 0;
+
+    // Limit of how many times a calibration approaching an exact value can be done.
+    const uint16_t DAC_CAL_EXACT_LIMIT = 128;
+    uint16_t DAC_CAL_ATTEMPTS = 0;
+
+    // Refdac init at 0x1FF -> 2.5V, we want some fraction of this estimated at 0x108 (2.19V)
+start_refdac_cal:
+    ADC_REFDAC_CAL_ACCUM = 0;
+    tmp_arr[0] = ADS7253_CMD(ADS7253_REFDAC_A_WRITE, ADC_REFDACVAL << 3);
+    ADS7253_write16_blocking(ADC_PIO, tmp_arr, ADS_WRITE_DAC_COUNT);
+
+    // ADS7253 Section 7.8: t_refon = 8ms settling time for REFDAC
+    //  go 10ms just to be sure
+    busy_wait_us_32(10000);
+
+    // Clear any read values
+    clear_adc_read_buffers();
+
+    for(uint16_t n = 0; n < 128; ++n){
+        ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, &D_N_0[n], &X_N_0[n], 1);
+        ADC_REFDAC_CAL_ACCUM += (uint16_t)D_N_0[n];
+        busy_wait_us_32(5);
+    }
+
+    // Clear any read values
+    clear_adc_read_buffers();
+
+    // Get average value of all 128 samples collected
+    //  over a 896us period idk man it's a cool number
+    ADC_REFDAC_CAL_ACCUM >>= 7;
+
+    // Calibration Logic:
+    //  The DC bias network on the ADC ideally is at VDDA / 2, thus
+    //      the reference DAC (REFDAC) should be equal to VDDA / 2,
+    //      This is due to the REFDAC * 2 setting in the CFR register.
+    //      The ideal code if the REFDAC is perfect is the midcode of the ADC.
+    //  We cannot 100% guarantee these values, so we have the MCU figure it out.
+    //
+    //  If the reference REFDAC is too low: the code
+    //      read from the ADC will be ABOVE the midcode.
+    //      Thus: Raise the DAC value
+    //
+    //  If the REFDAC output is too high: the code 
+    //      read from the ADC will be BELOW the midcode.
+    //      Thus: Lower the DAC value
+    //
+    //  Attempts at perfection are made, but highly unlikely to be met.
+    //  Eventually a fallback to a +/- 1 range around the midcode is done.
+    if( (ADC_REFDAC_CAL_ACCUM != (ADS_MID_CODE_BINARY)) && 
+        (DAC_CAL_ATTEMPTS++ < DAC_CAL_EXACT_LIMIT)){
+            if(ADC_REFDAC_CAL_ACCUM < ADS_MID_CODE_BINARY) ADC_REFDACVAL--;
+            else if(ADC_REFDAC_CAL_ACCUM > ADS_MID_CODE_BINARY) ADC_REFDACVAL++;
+            goto start_refdac_cal;
+    } else
+    if(ADC_REFDAC_CAL_ACCUM <= (ADS_MID_CODE_BINARY - 1)){  // If we can't hit exact fallback to +/-1 of exact
+            // ADC Reference is HIGH
+            ADC_REFDACVAL--;
+            goto start_refdac_cal;
+    } else
+    if(ADC_REFDAC_CAL_ACCUM >= (ADS_MID_CODE_BINARY + 1)){
+            // ADC Reference is LOW
+            ADC_REFDACVAL++;
+            goto start_refdac_cal;
+    }
+
+
+    // At this point the DAC value on channel A should be good
+    //  Set Channel B such that the relative gain of each channel is 
+    //  as close to the same as we can ensure given tolerance.
+    //  i.e. set DAC references to be equal. DC offsets in the bias network
+    //      will be corrected for later.
+    tmp_arr[0] = ADS7253_CMD(ADS7253_REFDAC_B_WRITE, ADC_REFDACVAL << 3);
+    ADS7253_write16_blocking(ADC_PIO, tmp_arr, ADS_WRITE_DAC_COUNT);
+    
+    busy_wait_us_32(5);
+
+    // Clear any read values
+    clear_adc_read_buffers();
+    
+
+    // Go Purple for DAC cal complete
+    Bandit_RGBU.R = 127;
+    Bandit_RGBU.G = (uint8_t) DAC_CAL_ATTEMPTS;
+    Bandit_RGBU.B = 127;
+    Bandit_RGBU.U = 0;
+    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
+    set_ULED_level(Bandit_RGBU.U);
+    
 
     // Setup Sampling Pace Flags
     Sampling_Setup(500000);
 
+    uint16_t CORE_1_STATE = CORE_1_IDLE;
     uint16_t error_attempts;
     bool CORE_1_DBG_MODE = false;
 
@@ -732,6 +840,13 @@ static void transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, ui
     dst->len = len;
     for(uint16_t n = 0; n < len; ++n){
         dst->data[n] = *src++;
+    }
+}
+
+static void clear_adc_read_buffers(){
+    while(!pio_sm_is_rx_fifo_empty(ADC_PIO, ADS_PIO_SDOA_SM)){
+        (ADC_PIO->rxf[ADS_PIO_SDOA_SM]);
+        (ADC_PIO->rxf[ADS_PIO_SDOB_SM]);
     }
 }
 
