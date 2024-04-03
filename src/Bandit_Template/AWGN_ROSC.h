@@ -12,6 +12,8 @@
 #define DMA_ROSC_CHANNEL    0
 #define DMA_ROSC_PIN        0
 
+#define WGN_PROP_TIME_US    1000
+
 int dma_awgn_data_chan, dma_awgn_ctrl_chan;
 
 const uint32_t awgn_txfer_ct = 0x0FFFFFFF;
@@ -72,7 +74,7 @@ void start_randombit_dma_chain(int dma_channel){
 }
 
 void stop_randombit_dma_chain(int dma_channel){
-    
+    dma_channel_abort(dma_channel);
 }
 
 #endif

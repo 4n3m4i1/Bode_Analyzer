@@ -96,7 +96,7 @@ struct CORE_1_MEM BANDIT_CORE_1_DEBUG_REPORT Bandit_Debug_Report;
 // Core 1 Defines
 #define ADCRES_BITS     12u
 #define ADC_RES_CODES   (1u << ADCRES_BITS)
-#define ADC_VREF_CODE   0x108                   // ~2.15 V from ADS7253 DAC
+#define ADC_VREF_CODE   0x108                   // ~2.19 V from ADS7253 DAC
 
 #define ADC_PIO         pio1
 CORE_1_MEM uint16_t     tmp_arr[ADS_READ_REG_COUNT] = {0,0,0};
@@ -237,14 +237,7 @@ static void core_0_main(){
     // Locked by main core at startup
     spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
 
-    // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
-    setup_rosc_full_tilt();
-    setup_PIO_for_switching();
-    setup_chained_dma_channels();
-
-    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
-        start_randombit_dma_chain(dma_awgn_ctrl_chan);
-    }
+    
 
     // Setup Structs and Default Parameters for FFT
     struct FFT_PARAMS cool_fft;
@@ -438,12 +431,8 @@ start_adc_setup:
     }
 
     // Go Red for DAC calibration cycle
-    Bandit_RGBU.R = 200;
-    Bandit_RGBU.G = 0;
-    Bandit_RGBU.B = 0;
-    Bandit_RGBU.U = 0;
-    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
-    set_ULED_level(Bandit_RGBU.U);
+    set_RGB_levels(Bandit_RGBU.R = 200, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
+    set_ULED_level(Bandit_RGBU.U = 0);
 
     // ADC Now configured for 16clk mode dual SDO, configure refdac now!
     uint16_t ADC_REFDACVAL = 0x108;
@@ -538,13 +527,8 @@ start_refdac_cal:
     
 
     // Go Purple for DAC cal complete
-    Bandit_RGBU.R = 127;
-   // Bandit_RGBU.G = (uint8_t) DAC_CAL_ATTEMPTS;
-    Bandit_RGBU.G = 0;
-    Bandit_RGBU.B = 127;
-    Bandit_RGBU.U = 0;
-    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
-    set_ULED_level(Bandit_RGBU.U);
+    set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
+    set_ULED_level(Bandit_RGBU.U = 0);
     
 
     // Setup Sampling Pace Flags
@@ -553,15 +537,26 @@ start_refdac_cal:
     uint16_t CORE_1_STATE = CORE_1_IDLE;
     uint16_t error_attempts;
     bool CORE_1_DBG_MODE = false;
+    bool CORE_1_WGN_STATE = false;          // Is WGN always on?
+
+    // Configure- White Noise Generation Signal Chain
+    // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
+    setup_rosc_full_tilt();
+    setup_PIO_for_switching();
+    setup_chained_dma_channels();
+
+    uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
+        start_randombit_dma_chain(dma_awgn_ctrl_chan);
+        CORE_1_WGN_STATE = true;
+    }
+    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
 
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
     while(1){
         switch(CORE_1_STATE){
             case CORE_1_IDLE: {
-                set_ULED_level(Bandit_RGBU.U++);
-                busy_wait_ms(20);
-                
                 // If starting conditions are met start the whole DSP cycle
                 if(Bandit_Calibration_State == BANDIT_UNCALIBRATED){
                     Bandit_Calibration_State = BANDIT_CAL_DC_BIAS_IN_PROG;
@@ -577,6 +572,7 @@ start_refdac_cal:
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
+
             case CORE_1_APPLY_SETTINGS: {
                 uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
 
@@ -590,22 +586,38 @@ start_refdac_cal:
                         MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
                         MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
 
+                        busy_wait_us_32(MCP6S92_SETTLING_TIME);
+
                         // Need to recalibrate transfer function if a settings update occurs
                         Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
                     } else {
+                        // First cycle through the states
                         // Need to do DC Cal
                         // Keep PGA uninitialized
                         //  Sample and adjust for DC
+                        // This is more of a catchall, this state is set in CORE_1_IDLE
                         CORE_1_STATE = CORE_1_SAMPLE;
                     }
                     
                     // Apply Generic Settings
                     CORE_1_DBG_MODE = (CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_DEBUG_MODE));
+                    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
+                        start_randombit_dma_chain(dma_awgn_ctrl_chan);
+                        CORE_1_WGN_STATE = true;
+                    }
 
                     // Free spinlock on Global Settings
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
-                    // PGA Settling Time
-                    busy_wait_us_32(MCP6S92_SETTLING_TIME);
+                    // PGA Settling Time, if WGN already on. If WGN is being tuned on its own delay will deal w this
+                    if(CORE_1_WGN_STATE) busy_wait_us_32(MCP6S92_SETTLING_TIME);
+
+                    // Start white noise for loopback testing
+                    if(!CORE_1_WGN_STATE){
+                        stop_randombit_dma_chain(dma_awgn_data_chan);
+                        busy_wait_us(1);
+                        start_randombit_dma_chain(dma_awgn_ctrl_chan);
+                        busy_wait_us(WGN_PROP_TIME_US);                     // Allow time to deal with RC time constants
+                    }
                 } else {
                     // if auto run or run signal -> CORE_1_STATE = CORE_1_SAMPLE;
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
@@ -621,7 +633,11 @@ start_refdac_cal:
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
+
             case CORE_1_SAMPLE: {
+                if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_COMPLETE){
+
+                }
                 tmp_arr[0] = 0;
                 Start_Sampling();   // You have 500 clocks between each flag, careful!
                 
@@ -643,18 +659,24 @@ start_refdac_cal:
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
+
             case CORE_1_APPLY_DC_CORRECTION: {  // One time startup calibration routine
                 int32_t dcavg_zone = 0;
                 for(uint16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                    dcavg_zone += ((int32_t)D_N_0[n] - (int32_t)X_N_0[n]);
+                    dcavg_zone += ((int32_t)X_N_0[n] - (int32_t)D_N_0[n]);
                 } 
                 dcavg_zone >>= LOG2_STD_MAX_SAMPLES;
                 Bandit_DC_Offset_Cal = (Q15)dcavg_zone;
                 Bandit_Calibration_State = BANDIT_CAL_DC_BIAS_COMPLETE;
 
+                // Go white for DC Cal done, Idle return
+                set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 127);
+                set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
+
                 CORE_1_STATE = CORE_1_IDLE;
             }
             break;
+            
             case CORE_1_DOWNSAMPLE: {
                 
                 CORE_1_STATE = CORE_1_LMS;
@@ -704,6 +726,10 @@ start_refdac_cal:
                     busy_wait_us_32(MCP6S92_SETTLING_TIME);
 
                     Bandit_Calibration_State = BANDIT_FULLY_CALIBRATED;
+
+                    // Indicate full CAL with green LEDs
+                    set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
+                    set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
                     
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
@@ -712,6 +738,11 @@ start_refdac_cal:
                         LMS_FIR.data[n] -= LMS_H_HATS_CORRECTION[n];
                     }
                     CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                }
+
+                // Turn off WGN if always on is disabled
+                if(!CORE_1_WGN_STATE){
+                    stop_randombit_dma_chain(dma_awgn_data_chan);
                 }
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
@@ -739,10 +770,12 @@ start_refdac_cal:
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
+            
             case CORE_1_DEBUG_HANDLER: {
 
             }
             break;
+            
             default:
                 // Idk should have some out of bounds safety, but whatever
                 CORE_1_STATE = CORE_1_IDLE;
