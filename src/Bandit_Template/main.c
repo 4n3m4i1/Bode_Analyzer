@@ -91,6 +91,8 @@ CORE_1_MEM Q15 LMS_H_HATS_CORRECTION[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_1_MEM Q15 DDSAMP_FIR_BANK[DDSAMP_FIR_LEN];
 CORE_1_MEM Q15 DDSAMP_TAP_BANK[DDSAMP_FIR_LEN][DDSAMP_TAP_OPTIONS];
 
+struct CORE_1_MEM BANDIT_CORE_1_DEBUG_REPORT Bandit_Debug_Report;
+
 // Core 1 Defines
 #define ADCRES_BITS     12u
 #define ADC_RES_CODES   (1u << ADCRES_BITS)
@@ -373,9 +375,11 @@ static void core_1_main(){
     pio_ads7253_spi_init(pio1, 16, 1, 0, ADC_CSN_PAD, ADC_SDI_PAD, ADC_SDO_A_PAD, 0);
 
     Bandit_RGBU.B = 0;
+    Bandit_RGBU.R = 0;
 
+    uint16_t banditsetup_adc_attempts = 0;
 start_adc_setup:
-
+    banditsetup_adc_attempts++;
     set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B++);
     ADS7253_TI_Approved_Configuration(ADC_PIO,
                                 ADS7253_SET_DUAL_SDO |
@@ -415,15 +419,18 @@ start_adc_setup:
         //  This DOES NOT match the datasheet, but through testing is
         //  legit... so idk dude, sendit - Joseph 03/31/2024
         if(tmp_arr[0] == 2624){
-            Bandit_RGBU.G = 127;
-            set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
+            // Fill out debug report
+            Bandit_Debug_Report.adc_init_cfr_readback = tmp_arr[0];
+            Bandit_Debug_Report.adc_init_attempts = banditsetup_adc_attempts;
+
+            banditsetup_adc_attempts = 0;   // Set null, indicating successful match
+            
             break;
         }
     }
 
 
-    if(Bandit_RGBU.G != 127){
-        set_RGB_levels(Bandit_RGBU.R++, Bandit_RGBU.G, Bandit_RGBU.B);
+    if(banditsetup_adc_attempts){
         busy_wait_us_32(50);
         goto start_adc_setup;
     }
@@ -497,6 +504,7 @@ start_refdac_cal:
     } else
     if(ADC_REFDAC_CAL_ACCUM <= (ADS_MID_CODE_BINARY - 1)){  // If we can't hit exact fallback to +/-1 of exact
             // ADC Reference is HIGH
+            DAC_CAL_ATTEMPTS++;
             ADC_REFDACVAL--;
             goto start_refdac_cal;
     } else
@@ -506,7 +514,6 @@ start_refdac_cal:
             goto start_refdac_cal;
     }
 
-
     // At this point the DAC value on channel A should be good
     //  Set Channel B such that the relative gain of each channel is 
     //  as close to the same as we can ensure given tolerance.
@@ -515,6 +522,12 @@ start_refdac_cal:
     tmp_arr[0] = ADS7253_CMD(ADS7253_REFDAC_B_WRITE, ADC_REFDACVAL << 3);
     ADS7253_write16_blocking(ADC_PIO, tmp_arr, ADS_WRITE_DAC_COUNT);
     
+    // Fill out Debug Report
+    if(DAC_CAL_ATTEMPTS < DAC_CAL_EXACT_LIMIT) Bandit_Debug_Report.dac_cal_state = BDBG_DAC_EXACT_CAL;
+    else Bandit_Debug_Report.dac_cal_state = BDBG_DAC_RANGE_CAL;
+    Bandit_Debug_Report.dac_cal_value = ADC_REFDACVAL;
+    Bandit_Debug_Report.dac_cal_attempts = DAC_CAL_ATTEMPTS;
+
     busy_wait_us_32(5);
 
     // Clear any read values

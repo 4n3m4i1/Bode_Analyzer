@@ -6,6 +6,7 @@
 #include "Memory_Management.h"
 #include "Bandit_Sampling.h"
 #include "hardware/structs/bus_ctrl.h"
+#include "Bandit_Debug.h"
 
 #include "FFT/fft_half.h"
 #include "circular_buffers/RP2040_Circ_Buffer.h"
@@ -152,7 +153,10 @@ struct BANDIT_SETTINGS {
                                 (1 << BS_AUTO_SEND)
 
 
-
+/*
+    States for CORE 1
+        These must run in sequence with no interruptions!
+*/
 enum BANDIT_CORE_1_DSP_STATES {
     CORE_1_IDLE,
     CORE_1_APPLY_SETTINGS,
@@ -194,7 +198,4 @@ enum BANDIT_CALIBRATION_STATES {
     BANDIT_CAL_AA_TXFR_FUNC_COMPLETE,
     BANDIT_FULLY_CALIBRATED
 };
-
-
-
 #endif
