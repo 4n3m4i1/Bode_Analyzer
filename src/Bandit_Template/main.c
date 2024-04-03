@@ -335,6 +335,7 @@ static void core_0_main(){
  /////////////////    Core 1 Main Loop    /////////////////////////////
 //////////////////////////////////////////////////////////////////////
 static void core_1_main(){
+    Bandit_Debug_Report.epoch_core_1_boot_us = timer_hw->timelr;
     uint8_t Bandit_Calibration_State = BANDIT_UNCALIBRATED;
     Q15 Bandit_DC_Offset_Cal = 0;
     
@@ -420,6 +421,7 @@ start_adc_setup:
         //  legit... so idk dude, sendit - Joseph 03/31/2024
         if(tmp_arr[0] == 2624){
             // Fill out debug report
+            Bandit_Debug_Report.epoch_ads_init_complete_us = timer_hw->timelr;
             Bandit_Debug_Report.adc_init_cfr_readback = tmp_arr[0];
             Bandit_Debug_Report.adc_init_attempts = banditsetup_adc_attempts;
 
@@ -434,7 +436,7 @@ start_adc_setup:
         busy_wait_us_32(50);
         goto start_adc_setup;
     }
-    
+
     // Go Red for DAC calibration cycle
     Bandit_RGBU.R = 200;
     Bandit_RGBU.G = 0;
@@ -502,13 +504,13 @@ start_refdac_cal:
             else if(ADC_REFDAC_CAL_ACCUM > ADS_MID_CODE_BINARY) ADC_REFDACVAL++;
             goto start_refdac_cal;
     } else
-    if(ADC_REFDAC_CAL_ACCUM <= (ADS_MID_CODE_BINARY - 1)){  // If we can't hit exact fallback to +/-1 of exact
+    if(ADC_REFDAC_CAL_ACCUM < (ADS_MID_CODE_BINARY - 1)){  // If we can't hit exact fallback to +/-1 of exact
             // ADC Reference is HIGH
             DAC_CAL_ATTEMPTS++;
             ADC_REFDACVAL--;
             goto start_refdac_cal;
     } else
-    if(ADC_REFDAC_CAL_ACCUM >= (ADS_MID_CODE_BINARY + 1)){
+    if(ADC_REFDAC_CAL_ACCUM > (ADS_MID_CODE_BINARY + 1)){
             // ADC Reference is LOW
             ADC_REFDACVAL++;
             goto start_refdac_cal;
@@ -527,8 +529,9 @@ start_refdac_cal:
     else Bandit_Debug_Report.dac_cal_state = BDBG_DAC_RANGE_CAL;
     Bandit_Debug_Report.dac_cal_value = ADC_REFDACVAL;
     Bandit_Debug_Report.dac_cal_attempts = DAC_CAL_ATTEMPTS;
+    Bandit_Debug_Report.epoch_dac_cal_complete_us = timer_hw->timelr;
 
-    busy_wait_us_32(5);
+    busy_wait_us_32(10000);
 
     // Clear any read values
     clear_adc_read_buffers();
@@ -536,7 +539,8 @@ start_refdac_cal:
 
     // Go Purple for DAC cal complete
     Bandit_RGBU.R = 127;
-    Bandit_RGBU.G = (uint8_t) DAC_CAL_ATTEMPTS;
+   // Bandit_RGBU.G = (uint8_t) DAC_CAL_ATTEMPTS;
+    Bandit_RGBU.G = 0;
     Bandit_RGBU.B = 127;
     Bandit_RGBU.U = 0;
     set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
