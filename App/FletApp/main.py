@@ -30,6 +30,7 @@ os = platform.system()
 
 # dataPort = None
 # ctrlPort = None
+
 connected = Event()
 
 class Port():
@@ -59,7 +60,6 @@ elif os == LINUX_STR:
 #         port_selections.append(ft.dropdown.Option(str(port)))
 else: pass
 
-
 parametric_taps =[16,32,64,128,256]
 taps_list =[]
 size = len(parametric_taps)
@@ -71,8 +71,6 @@ range_list = []
 size1 = len(frequency_ranges)
 for index1 in range(size1):
     range_list.append(ft.dropdown.Option(frequency_ranges[index1]))
-
-
 
 data_port = Port()
 ctrl_port = Port()
@@ -200,13 +198,12 @@ def main(page: ft.Page):
     page.title = PAGE_TITLE
     page.route = "/"
     page.bgcolor = '#e3e3e3'
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER ## test
     page.theme = ft.Theme(
     color_scheme=ft.ColorScheme(
         primary=ft.colors.BLACK,   
     )
-) 
-
-
+)
     
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
@@ -214,7 +211,7 @@ def main(page: ft.Page):
                 ft.View(
                     route = "/about",
                     controls = [
-                        ft.AppBar(title=ft.Text("About Us"), bgcolor=ft.colors.SURFACE_VARIANT), 
+                        ft.AppBar(title=ft.Text(ABOUT_TITLE), bgcolor=ft.colors.SURFACE_VARIANT), 
                         logo, about_header, mission_statement, meet_team
                     ],   
                 )
@@ -244,10 +241,12 @@ def main(page: ft.Page):
     def handle_stop_button_clicked(e):
         connected.clear()
         GraphEvent.clear()
+
+    
         
     ## Graph configurations
     #figure = plt.figure()
-    figure = plt.figure(figsize=(10,6))
+    figure = plt.figure(figsize=(15,7))
     ax = figure.add_subplot()
     line, = ax.plot(init_graph, animated=True,)
     ax.grid()
@@ -257,14 +256,13 @@ def main(page: ft.Page):
     #ax.set_facecolor('#e3e3e3')
     figure.set_facecolor('#e3e3e3')
 
-    ax.set_xscale("log")
-    ax.set_yscale("linear")
+    ax.set_xscale(PLOT_XUNIT)
+    ax.set_yscale(PLOT_YUNIT)
 
     # put in ref.py
-    ax.set_title("BANDIT Output", fontsize = 18)
-    ax.set_xlabel("x-axis placeholder", fontsize = 18) 
-    ax.set_ylabel("y-axis placeholder", fontsize = 18)
-
+    ax.set_title(PLOT_TITLE, fontsize = 18)
+    ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
+    ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
     
     
     def is_connected():
@@ -320,21 +318,60 @@ def main(page: ft.Page):
     )
 
     stop_container = ft.Container (
-
         content= ft.OutlinedButton(
         text=STOP_BUTTON_TEXT,
         width=150,
         on_click = handle_stop_button_clicked,
     ),
-        bgcolor='#e895c0',
+        #bgcolor='#e895c0',
+        bgcolor='#c27ba0',
         border_radius=20,
     )
 
 
+#######################################################
+    
+    table_container = ft.Container (
+        #page.add(
+        ft.DataTable(
+                columns=[
+                    ft.DataColumn(ft.Text("Control Port")),
+                    ft.DataColumn(ft.Text("Data Port")),
+                    ft.DataColumn(ft.Text("Taps")),
+                    ft.DataColumn(ft.Text("Frequency Range")),
+                    #ft.DataColumn(ft.Text("Taps"), numeric=True),
+                    #ft.DataColumn(ft.Text("Parameter"), numeric=True)
+                ],
+                rows=[
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text("Port 1")),
+                            ft.DataCell(ft.Text("Port 2")),
+                            ft.DataCell(ft.Text("43")),
+                            ft.DataCell(ft.Text("Low: 20Hz to 25khz")),
+                        ],
+                    ),
+
+
+                ],
+            ),
+            bgcolor = 'white',
+            border=ft.border.all(1, "black"),
+            
+            
+            
+        #)
+
+
+    )
+    ## end of test codec###############
+
+    
     Controls = ft.Row(
-        [ start_container
-        ,stop_container
-        ])
+        [start_container
+        ,stop_container,
+        ] 
+        )
     
 
     def open_modal(e): # handle settings modal opening
@@ -343,7 +380,7 @@ def main(page: ft.Page):
         page.update()
 
     def close_modal(e): #handle settings modal closing
-        SettingsSelection.open = False
+        SettingsSelection.open = False      
         page.update()
 
     def select_data_port(e): #handle data port selection
@@ -405,14 +442,17 @@ def main(page: ft.Page):
 
         title=ft.Text(APPBAR_TITLE),
         #bgcolor=ft.colors.SURFACE_VARIANT,
-        bgcolor= '#f08dbf',
+        #bgcolor= '#f08dbf',
+        bgcolor= '#d5a6bd',
         actions=[
             ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
             ft.IconButton(icon=ft.icons.UNDO)
         ]
     )
-    page.add(ft.Column([Controls]), chart)
+    # page.add(ft.Column([Controls]),table_container ,chart ) ## dynamic table not done yet
+    page.add(ft.Column([Controls]) ,chart ) 
+
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
     serial_reader.daemon = True
