@@ -360,6 +360,13 @@ static void core_1_main(){
     LMS_FIR.taps = LMS_H_HATS;
 
     /*
+        For Tap Length Update:
+            - Set LMS_Inst.tap_len = len
+            - setup_Q15_FIR(&LMS_FIR, len)
+            - len must be power of 2
+    */
+
+    /*
         Initiate frontend PGA/MUX
             Set channel 0 (D_N), 1x gain
     */
