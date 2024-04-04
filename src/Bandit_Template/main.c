@@ -542,8 +542,8 @@ start_refdac_cal:
     Sampling_Setup(500000);
 
     uint16_t CORE_1_STATE = CORE_1_IDLE;
-    uint16_t error_attempts;
-    bool CORE_1_DBG_MODE = false;
+    uint16_t error_attempts;                // How many times the LMS algorithm has failed to converge
+    bool CORE_1_DBG_MODE = false;           // Are we in debug mode?
     bool CORE_1_WGN_STATE = false;          // Is WGN always on?
 
     // Configure- White Noise Generation Signal Chain

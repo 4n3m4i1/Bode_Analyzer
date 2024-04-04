@@ -17,7 +17,7 @@ void LMS_Struct_Equate(struct LMS_Fixed_Inst *src, struct LMS_Fixed_Inst *dst){
 void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable_error, int16_t samples_offset, uint16_t max_runtime, uint16_t start_offset){
     LMS->target_error = tgt_err;
     LMS->d_n_offset = samples_offset;
-    LMS->ddsmpl_stride = 0;
+    LMS->ddsmpl_stride = 1;
     LMS->max_error_allowed = max_acceptable_error;
     LMS->iteration_ct = max_runtime;
     LMS->fixed_offset = start_offset;
@@ -46,7 +46,7 @@ Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR,
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
     uint16_t n;
     for(n = 0; n < LMS->iteration_ct; ++n){
-        retval = *(desired++) - run_2n_FIR_cycle(WGN_FIR, *(white_noise++));
+        retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
         LMS_Update_Taps(LMS, WGN_FIR, retval);
 
         *sp_ct++;        
