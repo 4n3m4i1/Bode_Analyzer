@@ -381,6 +381,10 @@ def main(page: ft.Page):
 
     def close_modal(e): #handle settings modal closing
         SettingsSelection.open = False      
+        print(data_select.value)
+        print(ctrl_select.value)
+        print(tap_select.value)
+        print(freq_range_select.value)
         page.update()
 
     def select_data_port(e): #handle data port selection
@@ -416,6 +420,7 @@ def main(page: ft.Page):
             label=SELECT_TAP_STR,
             options=taps_list
         )
+    
     freq_range_select = ft.Dropdown(
             label= SELECT_RANGE_STR,
             options=range_list
@@ -450,8 +455,8 @@ def main(page: ft.Page):
             ft.IconButton(icon=ft.icons.UNDO)
         ]
     )
-    # page.add(ft.Column([Controls]),table_container ,chart ) ## dynamic table not done yet
-    page.add(ft.Column([Controls]) ,chart ) 
+    page.add(ft.Column([Controls]),table_container ,chart ) ## dynamic table not done yet
+    #page.add(ft.Column([Controls]) ,chart ) 
 
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
