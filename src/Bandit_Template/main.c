@@ -14,8 +14,9 @@
 
 /*
     Testing Defines
+    DO NOT UNCOMMENT UNLESS YOU KNOW EXACTLY WHAT YOU'RE DOING!!!!!!
 */
-#define FORCE_SAMPLING_4_TESTING
+//#define FORCE_SAMPLING_4_TESTING
 
   //////////////////////////////////////////////////////////////////////
  //////////////////   GLOBAL PREALLOC BUFFERS   ///////////////////////
@@ -212,12 +213,8 @@ int main(){
 
     // Initialize Status LEDs,
     //  If blue is seen bus priorities have been applied.
-    Bandit_RGBU.R = 0;
-    Bandit_RGBU.G = 0;
-    Bandit_RGBU.B = 120;
-    Bandit_RGBU.U = 0;
-    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
-    set_ULED_level(Bandit_RGBU.U);
+    set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
+    set_ULED_level(Bandit_RGBU.U = 0);
 
     // Setup for peripherals done on core 0
     multicore_launch_core1(core_1_main);
