@@ -199,11 +199,14 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
 def main(page: ft.Page):
     page.title = PAGE_TITLE
     page.route = "/"
+    page.bgcolor = '#e3e3e3'
     page.theme = ft.Theme(
     color_scheme=ft.ColorScheme(
-        primary=ft.colors.BLACK,
+        primary=ft.colors.BLACK,   
     )
 ) 
+
+
     
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
@@ -241,13 +244,27 @@ def main(page: ft.Page):
     def handle_stop_button_clicked(e):
         connected.clear()
         GraphEvent.clear()
-
-    figure = plt.figure()
+        
+    ## Graph configurations
+    #figure = plt.figure()
+    figure = plt.figure(figsize=(10,6))
     ax = figure.add_subplot()
     line, = ax.plot(init_graph, animated=True,)
-    line.set_color('#F55BB0')
+    ax.grid()
 
+    line.set_color('#F55BB0')
     chart = MatplotlibChart(figure, expand=True,)
+    #ax.set_facecolor('#e3e3e3')
+    figure.set_facecolor('#e3e3e3')
+
+    ax.set_xscale("log")
+    ax.set_yscale("linear")
+
+    # put in ref.py
+    ax.set_title("BANDIT Output", fontsize = 18)
+    ax.set_xlabel("x-axis placeholder", fontsize = 18) 
+    ax.set_ylabel("y-axis placeholder", fontsize = 18)
+
     
     
     def is_connected():
@@ -387,7 +404,8 @@ def main(page: ft.Page):
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
 
         title=ft.Text(APPBAR_TITLE),
-        bgcolor=ft.colors.SURFACE_VARIANT,
+        #bgcolor=ft.colors.SURFACE_VARIANT,
+        bgcolor= '#f08dbf',
         actions=[
             ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
