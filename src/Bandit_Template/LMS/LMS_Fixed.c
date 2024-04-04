@@ -45,7 +45,7 @@ Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR,
 
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
     uint16_t n;
-    for(n = 0; n < LMS->iteration_ct; ++n){
+    for(n = 0; n < LMS->iteration_ct; n += LMS->ddsmpl_stride){
         retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
         LMS_Update_Taps(LMS, WGN_FIR, retval);
 
