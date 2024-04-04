@@ -101,7 +101,7 @@ struct CORE_1_MEM BANDIT_CORE_1_DEBUG_REPORT Bandit_Debug_Report;
 #define ADC_PIO         pio1
 CORE_1_MEM uint16_t     tmp_arr[ADS_READ_REG_COUNT] = {0,0,0};
 
-
+struct CORE_1_MEM LMS_Fixed_Inst DFL_LMS_Inst;
 
 
   //////////////////////////////////////////////////////////////////////
@@ -332,18 +332,25 @@ static void core_1_main(){
     uint8_t Bandit_Calibration_State = BANDIT_UNCALIBRATED;
     Q15 Bandit_DC_Offset_Cal = 0;
     
+    DFL_LMS_Inst.iteration_ct = 0;
+    DFL_LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
+
     // Setup LMS controller and buffering
     struct LMS_Fixed_Inst LMS_Inst;
-    LMS_Struct_Init(&LMS_Inst, 
+    
+    LMS_Struct_Init(&DFL_LMS_Inst, 
                         0x1111, 
                         0x1111, 
                         0, 
                         STD_MAX_SAMPLES, 
                         0
                         ); // Errors are just straight guesses rn, offset as well
-    LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
-    LMS_Inst.d_n = D_N_0;
-    LMS_Inst.x_n = X_N_0;
+    DFL_LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
+    DFL_LMS_Inst.d_n = D_N_0;
+    DFL_LMS_Inst.x_n = X_N_0;
+
+    // Set default settings to local struct copy
+    LMS_Struct_Equate(&DFL_LMS_Inst, &LMS_Inst);
 
     // Setup FIR component of the LMS
     struct Q15_FIR_PARAMS LMS_FIR;

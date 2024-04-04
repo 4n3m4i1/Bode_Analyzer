@@ -1,5 +1,18 @@
 #include "LMS_Fixed.h"
 
+void LMS_Struct_Equate(struct LMS_Fixed_Inst *src, struct LMS_Fixed_Inst *dst){
+    dst->tap_len = src->tap_len;
+    dst->max_convergence_attempts = src->max_convergence_attempts;
+    dst->iteration_ct = src->iteration_ct;
+    dst->ddsmpl_stride = src->ddsmpl_stride;
+    dst->fixed_offset = src->fixed_offset;
+    dst->d_n_offset = src->d_n_offset;
+    dst->max_error_allowed = src->max_error_allowed;
+    dst->target_error = src->target_error;
+    dst->learning_rate = src->learning_rate;
+    dst->d_n = src->d_n;
+    dst->samples_processed = src->samples_processed;
+}
 
 void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable_error, int16_t samples_offset, uint16_t max_runtime, uint16_t start_offset){
     LMS->target_error = tgt_err;
