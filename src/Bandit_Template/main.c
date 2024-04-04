@@ -12,6 +12,12 @@
 
 #include "Bode_Bandit.h"
 
+/*
+    Testing Defines
+    DO NOT UNCOMMENT UNLESS YOU KNOW EXACTLY WHAT YOU'RE DOING!!!!!!
+*/
+//#define FORCE_SAMPLING_4_TESTING
+
   //////////////////////////////////////////////////////////////////////
  //////////////////   GLOBAL PREALLOC BUFFERS   ///////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -207,12 +213,8 @@ int main(){
 
     // Initialize Status LEDs,
     //  If blue is seen bus priorities have been applied.
-    Bandit_RGBU.R = 0;
-    Bandit_RGBU.G = 0;
-    Bandit_RGBU.B = 120;
-    Bandit_RGBU.U = 0;
-    set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B);
-    set_ULED_level(Bandit_RGBU.U);
+    set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
+    set_ULED_level(Bandit_RGBU.U = 0);
 
     // Setup for peripherals done on core 0
     multicore_launch_core1(core_1_main);
@@ -360,6 +362,13 @@ static void core_1_main(){
     LMS_FIR.taps = LMS_H_HATS;
 
     /*
+        For Tap Length Update:
+            - Set LMS_Inst.tap_len = len
+            - setup_Q15_FIR(&LMS_FIR, len)
+            - len must be power of 2
+    */
+
+    /*
         Initiate frontend PGA/MUX
             Set channel 0 (D_N), 1x gain
     */
@@ -377,6 +386,10 @@ static void core_1_main(){
 
     Bandit_RGBU.B = 0;
     Bandit_RGBU.R = 0;
+
+#ifdef FORCE_SAMPLING_4_TESTING
+    goto debug_no_adc_setup_label;
+#endif
 
     uint16_t banditsetup_adc_attempts = 0;
 start_adc_setup:
@@ -539,11 +552,12 @@ start_refdac_cal:
     
 
     // Setup Sampling Pace Flags
-    Sampling_Setup(500000);
+    //  fs in khz
+    Sampling_Setup(500);
 
     uint16_t CORE_1_STATE = CORE_1_IDLE;
-    uint16_t error_attempts;
-    bool CORE_1_DBG_MODE = false;
+    uint16_t error_attempts;                // How many times the LMS algorithm has failed to converge
+    bool CORE_1_DBG_MODE = false;           // Are we in debug mode?
     bool CORE_1_WGN_STATE = false;          // Is WGN always on?
 
     // Configure- White Noise Generation Signal Chain
@@ -561,6 +575,14 @@ start_refdac_cal:
 
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
+
+    // FOR TESTING ONLY
+#ifdef FORCE_SAMPLING_4_TESTING
+debug_no_adc_setup_label:
+    CORE_1_DBG_MODE = true;
+    CORE_1_STATE = CORE_1_DEBUG_HANDLER;
+#endif
+
     while(1){
         switch(CORE_1_STATE){
             case CORE_1_IDLE: {
@@ -642,21 +664,47 @@ start_refdac_cal:
             break;
 
             case CORE_1_SAMPLE: {
-                if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_COMPLETE){
-
-                }
                 tmp_arr[0] = 0;
-                Start_Sampling();   // You have 500 clocks between each flag, careful!
+                uint32_t NVIC_ISR_EN = nvic_hw->icer;
+
+                // No interrupts :)
+                nvic_hw->icer = 0ul;
+
+                //Start_Sampling();   // You have 500 clocks between each flag, careful!
                 
                 for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                    while(!Sample_Now());
+                    //while(!Sample_Now());
                     //Sample_Flag_Clear();
-                    hw_clear_bits(&pwm_hw->intr, PWM_INTR_CH3_BITS);
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop"); asm("nop"); asm("nop"); 
                     ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, &D_N_0[n], &X_N_0[n], 1);
                     X_N_0[n] -= Bandit_DC_Offset_Cal;
                 }
 
-                Stop_Sampling();
+                //Stop_Sampling();
+
+                // Interrupts okay :)
+                nvic_hw->icer = NVIC_ISR_EN;
+
                 if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_COMPLETE){
                     CORE_1_STATE = CORE_1_DOWNSAMPLE;
                 } else {
@@ -779,7 +827,12 @@ start_refdac_cal:
             break;
             
             case CORE_1_DEBUG_HANDLER: {
+#ifdef FORCE_SAMPLING_4_TESTING
+                CORE_1_DBG_MODE = true;
+                CORE_1_STATE = CORE_1_SAMPLE;
+#else
 
+#endif
             }
             break;
             

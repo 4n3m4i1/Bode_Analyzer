@@ -25,3 +25,13 @@ NONE_PORTS_WARNING = "Select Ports in Configurations"
 INVALID_PORTS_WARNING = "Invalid Port Selection"
 
 SR_ACK = b"a"
+
+PLOT_TITLE = "BANDIT Output"
+PLOT_XLABEL = "x-axis placeholder"
+PLOT_YLABEL = "y-axis placeholder"
+
+PLOT_XUNIT = "log"
+PLOT_YUNIT = "linear"
+
+## About us page components
+ABOUT_TITLE = "About Us"

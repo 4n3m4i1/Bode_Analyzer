@@ -8,6 +8,8 @@
 #include "hardware/structs/bus_ctrl.h"
 #include "Bandit_Debug.h"
 
+#include "hardware/structs/nvic.h"
+
 #include "FFT/fft_half.h"
 #include "circular_buffers/RP2040_Circ_Buffer.h"
 #include "FIR/FIR_Fast_Fixed.h"
