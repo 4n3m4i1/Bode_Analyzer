@@ -368,6 +368,20 @@ static void core_1_main(){
             - len must be power of 2
     */
 
+    struct Q15_FIR_PARAMS CUT_125KHZ;
+    setup_Q15_FIR(&CUT_125KHZ, DOWNSAMPLE_LEN);
+    CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
+    CUT_125KHZ.taps = h125;
+   
+    struct Q15_FIR_PARAMS CUT_62KHZ;
+    CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
+    CUT_125KHZ.taps = h62;
+
+    struct Q15_FIR_PARAMS CUT_31KHZ;
+    CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
+    CUT_125KHZ.taps = h31;
+
+
     /*
         Initiate frontend PGA/MUX
             Set channel 0 (D_N), 1x gain
@@ -733,7 +747,40 @@ debug_no_adc_setup_label:
             break;
             
             case CORE_1_DOWNSAMPLE: {
-                
+                struct Q15_FIR_PARAMS *torun ;
+                // FIR go here
+                /*
+                switch(whatever the fuck the setting is){
+                    case DOWNSAMPLE_1X_250K_CUT:
+                        LMS_Inst.fixed_offset = 0;
+                        LMS_Inst.ddsmpl_stride = 1;
+                        goto skip_downsampling_label;
+                    break
+
+                    case DOWNSAMPLE_2X_125K_CUT:
+                        LMS_Inst.ddsmpl_stride = 2;
+                    break;
+                    case DOWNSAMPLE_4X_62K5_CUT:
+                        LMS_Inst.ddsmpl_stride = 4;
+                    break;
+                    case DOWNSAMPLE_8X_32K2_CUT:
+                        LMS_Inst.ddsmpl_stride = 8;
+                    break;
+                    default:
+                        torun = CUT_125KHZ;
+                    break;
+                }
+                */
+
+               for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                    D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+               }
+               for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                    X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+               }
+               LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
+
+skip_downsampling_label:
                 CORE_1_STATE = CORE_1_LMS;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
