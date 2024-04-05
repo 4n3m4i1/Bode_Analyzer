@@ -264,54 +264,6 @@ static void core_0_main(){
             break;
             
             case USB_APPLY_SETTINGS: {
-                uint8_t temp;
-                if (tud_cdc_n_peek(CDC_CTRL_CHAN, &temp)) {
-                    uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, BS_RX_BF, BS_BF_LEN);
-                    if (count != BS_BF_LEN) {
-                        break;
-                    }
-
-                    //  Byte[0] If Enabled
-                    //  Byte[1] Auto run
-                    //  Byte[2] Auto send
-                    //  Byte[3] WGN Always on
-                    //  Byte[4] RESERVED
-                    //  Byte[5] Manual Error Limit LSB
-                    //  Byte[6] Manual Error Limit MSB
-                    //  Byte[7] Manual Tap Length (LSB)
-                    //  Byte[8] Manual Tap Length (MSB)
-                    //  Byte[9] F Range (ENUM)
-
-                    uint32_t tmp_new_bf = ((BS_RX_BF[USBBSRX_EN] > 0) << BS_ENABLE) | 
-                                          ((BS_RX_BF[USBBSRX_AUTORUN] > 0) << BS_AUTO_RUN) |
-                                          ((BS_RX_BF[USBBSRX_AUTOSEND] > 0) << BS_AUTO_SEND) |
-                                          ((BS_RX_BF[USBBSRX_WGN_ALWAYS_ON] > 0) << BS_WGN_ON);
-
-                    uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
-
-                    uint16_t newtaplen = BS_RX_BF[USBBSRX_TAPLEN_MSB] << 8 | BS_RX_BF[USBBSRX_TAPLEN_LSB];
-                    uint16_t man_error_limit = BS_RX_BF[USBBSRX_ERR_MSB] << 8 | BS_RX_BF[USBBSRX_ERR_LSB];
-
-                    // Acquire settings lock
-                    uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
-
-                    Global_Bandit_Settings.settings_bf = tmp_new_bf;
-                    Global_Bandit_Settings.manual_freq_range = newfreq_range;
-
-                    Global_Bandit_Settings.manual_error_limit = man_error_limit;
-                    Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
-
-                    Global_Bandit_Settings.updated = true;
-                    // Do USB Settings application here!!
-                    //  set UPDATED = true if tap length, errors, or frequency ranges
-                    //  have been changed
-                    //  set UPDATED = true if any bitfield settings have been altered
-
-                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
-                } else {
-                    tud_cdc_n_read_flush(CDC_CTRL_CHAN);
-                    tud_task();
-                }
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break;
