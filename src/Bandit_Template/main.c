@@ -80,7 +80,7 @@ CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_0_MEM uint16_t USB_STATE;
 CORE_0_MEM uint16_t USB_NEXT_STATE;
 
-CORE_0_MEM uint8_t* BS_RX_BF[BS_BF_LEN];
+CORE_0_MEM uint8_t  BS_RX_BF[BS_BF_LEN];
   //////////////////////////////////////////////////////////////////////
  /////////////////////    CORE 1 ALLOCATIONS    ///////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -265,14 +265,41 @@ static void core_0_main(){
             
             case USB_APPLY_SETTINGS: {
                 uint8_t temp;
-                if (tud_cdc_n_peak(CDC_CTRL_CHAN, (uint8_t*)temp)) {
-                    uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, (uint8_t *)BS_RX_BF, BS_BF_LEN);
+                if (tud_cdc_n_peek(CDC_CTRL_CHAN, &temp)) {
+                    uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, BS_RX_BF, BS_BF_LEN);
                     if (count != BS_BF_LEN) {
                         break;
                     }
+
+                    //  Byte[0] If Enabled
+                    //  Byte[1] Auto run
+                    //  Byte[2] Auto send
+                    //  Byte[3] WGN Always on
+                    //  Byte[4] RESERVED
+                    //  Byte[5] Manual Error Limit LSB
+                    //  Byte[6] Manual Error Limit MSB
+                    //  Byte[7] Manual Tap Length (LSB)
+                    //  Byte[8] Manual Tap Length (MSB)
+                    //  Byte[9] F Range (ENUM)
+
+                    uint32_t tmp_new_bf = ((BS_RX_BF[USBBSRX_EN] > 0) << BS_ENABLE) | 
+                                          ((BS_RX_BF[USBBSRX_AUTORUN] > 0) << BS_AUTO_RUN) |
+                                          ((BS_RX_BF[USBBSRX_AUTOSEND] > 0) << BS_AUTO_SEND) |
+                                          ((BS_RX_BF[USBBSRX_WGN_ALWAYS_ON] > 0) << BS_WGN_ON);
+
+                    uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
+
+                    uint16_t newtaplen = BS_RX_BF[USBBSRX_TAPLEN_MSB] << 8 | BS_RX_BF[USBBSRX_TAPLEN_LSB];
+                    uint16_t man_error_limit = BS_RX_BF[USBBSRX_ERR_MSB] << 8 | BS_RX_BF[USBBSRX_ERR_LSB];
+
+                    // Acquire settings lock
                     uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
 
-                    Global_Bandit_Settings.settings_bf = &BS_RX_BF;
+                    Global_Bandit_Settings.settings_bf = tmp_new_bf;
+                    Global_Bandit_Settings.manual_freq_range = newfreq_range;
+
+                    Global_Bandit_Settings.manual_error_limit = man_error_limit;
+                    Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
 
                     Global_Bandit_Settings.updated = true;
                     // Do USB Settings application here!!
@@ -586,6 +613,7 @@ start_refdac_cal:
     uint16_t error_attempts;                // How many times the LMS algorithm has failed to converge
     bool CORE_1_DBG_MODE = false;           // Are we in debug mode?
     bool CORE_1_WGN_STATE = false;          // Is WGN always on?
+    uint8_t CORE_1_FRANGE = DOWNSAMPLE_1X_250K_CUT;
 
     // Configure- White Noise Generation Signal Chain
     // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
@@ -638,7 +666,7 @@ debug_no_adc_setup_label:
                         Global_Bandit_Settings.updated = false;
                         // Need to recalibrate transfer function if a settings update occurs
                         Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
-                        
+
                     } else {
                         // First cycle through the states
                         // Need to do DC Cal
@@ -654,6 +682,10 @@ debug_no_adc_setup_label:
                         start_randombit_dma_chain(dma_awgn_ctrl_chan);
                         CORE_1_WGN_STATE = true;
                     }
+
+                    CORE_1_FRANGE = Global_Bandit_Settings.manual_freq_range;
+                    LMS_Inst.max_error_allowed = Global_Bandit_Settings.manual_error_limit;
+                    LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
 
                     // Free spinlock on Global Settings
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
@@ -767,14 +799,8 @@ debug_no_adc_setup_label:
             case CORE_1_DOWNSAMPLE: {
                 struct Q15_FIR_PARAMS *torun ;
                 // FIR go here
-                /*
-                switch(whatever the fuck the setting is){
-                    case DOWNSAMPLE_1X_250K_CUT:
-                        LMS_Inst.fixed_offset = 0;
-                        LMS_Inst.ddsmpl_stride = 1;
-                        goto skip_downsampling_label;
-                    break
-
+                
+                switch(CORE_1_FRANGE){
                     case DOWNSAMPLE_2X_125K_CUT:
                         LMS_Inst.ddsmpl_stride = 2;
                     break;
@@ -784,11 +810,15 @@ debug_no_adc_setup_label:
                     case DOWNSAMPLE_8X_32K2_CUT:
                         LMS_Inst.ddsmpl_stride = 8;
                     break;
+
+                    case DOWNSAMPLE_1X_250K_CUT:
                     default:
-                        torun = CUT_125KHZ;
+                        LMS_Inst.fixed_offset = 0;
+                        LMS_Inst.ddsmpl_stride = 1;
+                        goto skip_downsampling_label;
                     break;
                 }
-                */
+                
 
                for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
                     D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
@@ -964,14 +994,40 @@ static void send_f_packets(Q15 *data, uint16_t num_samples){
 //triggered when wanted_char is recieved thru ctrl channel
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) { 
     uint8_t temp;
-    if (tud_cdc_n_peak(CDC_CTRL_CHAN, (uint8_t*)temp)) {
+    if (tud_cdc_n_peek(CDC_CTRL_CHAN, &temp)) {
         uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, (uint8_t *)BS_RX_BF, BS_BF_LEN);
         if (count != BS_BF_LEN) {
             // removed break idk
         }
+        //  Byte[0] If Enabled
+        //  Byte[1] Auto run
+        //  Byte[2] Auto send
+        //  Byte[3] WGN Always on
+        //  Byte[4] RESERVED
+        //  Byte[5] Manual Error Limit LSB
+        //  Byte[6] Manual Error Limit MSB
+        //  Byte[7] Manual Tap Length (LSB)
+        //  Byte[8] Manual Tap Length (MSB)
+        //  Byte[9] F Range (ENUM)
+
+        uint32_t tmp_new_bf = ((BS_RX_BF[USBBSRX_EN] > 0) << BS_ENABLE) | 
+                                ((BS_RX_BF[USBBSRX_AUTORUN] > 0) << BS_AUTO_RUN) |
+                                ((BS_RX_BF[USBBSRX_AUTOSEND] > 0) << BS_AUTO_SEND) |
+                                ((BS_RX_BF[USBBSRX_WGN_ALWAYS_ON] > 0) << BS_WGN_ON);
+
+        uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
+
+        uint16_t newtaplen = BS_RX_BF[USBBSRX_TAPLEN_MSB] << 8 | BS_RX_BF[USBBSRX_TAPLEN_LSB];
+        uint16_t man_error_limit = BS_RX_BF[USBBSRX_ERR_MSB] << 8 | BS_RX_BF[USBBSRX_ERR_LSB];
+
+        // Acquire settings lock
         uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
 
-        Global_Bandit_Settings.settings_bf = &BS_RX_BF;
+        Global_Bandit_Settings.settings_bf = tmp_new_bf;
+        Global_Bandit_Settings.manual_freq_range = newfreq_range;
+
+        Global_Bandit_Settings.manual_error_limit = man_error_limit;
+        Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
 
         Global_Bandit_Settings.updated = true;
         // Do USB Settings application here!!

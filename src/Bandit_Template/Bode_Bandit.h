@@ -195,6 +195,37 @@ enum USB_STATE_MACHINEEEEE {
     USB_UPDATE_CONFIG
 };    
 
+
+    //  Byte[0] If Enabled
+    //  Byte[1] Auto run
+    //  Byte[2] Auto send
+    //  Byte[3] WGN Always on
+    //  Byte[4] RESERVED
+    //  Byte[5] Manual Error Limit LSB
+    //  Byte[6] Manual Error Limit MSB
+    //  Byte[7] Manual Tap Length (LSB)
+    //  Byte[8] Manual Tap Length (MSB)
+    //  Byte[9] F Range (ENUM)
+enum USB_BS_RX_BUF_BYTES {
+    USBBSRX_EN,
+    USBBSRX_AUTORUN,
+    USBBSRX_AUTOSEND,
+    USBBSRX_WGN_ALWAYS_ON,
+    USBBSRX_RESERVED,
+    USBBSRX_ERR_LSB,
+    USBBSRX_ERR_MSB,
+    USBBSRX_TAPLEN_LSB,
+    USBBSRX_TAPLEN_MSB,
+    USBBSRX_F_FRANGE
+};
+
+//enum BANDIT_FRANGE {
+//    DOWNSAMPLE_1X_250K_CUT,
+//    DOWNSAMPLE_2X_125K_CUT,
+//    DOWNSAMPLE_4X_62K5_CUT,
+//    DOWNSAMPLE_8X_32K2_CUT
+//};
+
 enum BANDIT_CALIBRATION_STATES {
     BANDIT_UNCALIBRATED,
     BANDIT_CAL_DC_BIAS_IN_PROG,

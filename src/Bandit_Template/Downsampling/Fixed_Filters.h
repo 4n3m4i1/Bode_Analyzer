@@ -6,7 +6,7 @@
 #include "../Memory_Management.h"
 //Fixed FIR filters in Q15 for different downsampling values (M)
 
-// M = 2
+//// M = 2
 #define DOWNSAMPLE_LEN  32
 
 enum DOWNSAMPLING_AMOUNTS {
