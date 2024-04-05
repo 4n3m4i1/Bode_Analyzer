@@ -80,6 +80,7 @@ CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_0_MEM uint16_t USB_STATE;
 CORE_0_MEM uint16_t USB_NEXT_STATE;
 
+CORE_0_MEM uint8_t* BS_RX_BF[BS_BF_LEN];
   //////////////////////////////////////////////////////////////////////
  /////////////////////    CORE 1 ALLOCATIONS    ///////////////////////
 //////////////////////////////////////////////////////////////////////
@@ -116,7 +117,6 @@ struct CORE_1_MEM LMS_Fixed_Inst DFL_LMS_Inst;
 static void core_0_main();
 
 static void USB_Handler(struct FFT_PARAMS *fft);
-static void update_bandit_config();
 
 static void send_header_packet(Q15 *h_data);
 static void send_f_packets(Q15 *data, uint16_t num_samples);
@@ -252,8 +252,6 @@ static void core_0_main(){
 
     // USB State Machine, Settings Application, FFT
     while(1){
-        static volatile uint16_t a = 0;
-        ++a;
         tight_loop_contents();
 
         tud_task();
@@ -261,18 +259,33 @@ static void core_0_main(){
         switch(USB_STATE) {
             case USB_INIT: {
                 //need idle work until GUI is ready
+                tud_task();
             }
             break;
             
             case USB_APPLY_SETTINGS: {
-                uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+                uint8_t temp;
+                if (tud_cdc_n_peak(CDC_CTRL_CHAN, (uint8_t*)temp)) {
+                    uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, (uint8_t *)BS_RX_BF, BS_BF_LEN);
+                    if (count != BS_BF_LEN) {
+                        break;
+                    }
+                    uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
 
-                // Do USB Settings application here!!
-                //  set UPDATED = true if tap length, errors, or frequency ranges
-                //  have been changed
-                //  set UPDATED = true if any bitfield settings have been altered
+                    Global_Bandit_Settings.settings_bf = &BS_RX_BF;
 
-                spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+                    Global_Bandit_Settings.updated = true;
+                    // Do USB Settings application here!!
+                    //  set UPDATED = true if tap length, errors, or frequency ranges
+                    //  have been changed
+                    //  set UPDATED = true if any bitfield settings have been altered
+
+                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+                } else {
+                    tud_cdc_n_read_flush(CDC_CTRL_CHAN);
+                    tud_task();
+                }
+                USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break;
 
@@ -316,7 +329,7 @@ static void core_0_main(){
             break;
             
             default: {
-                USB_STATE = USB_INIT;
+                USB_NEXT_STATE = USB_INIT;
             }
             break; //need debug for USB_STATE error
 
@@ -945,30 +958,35 @@ static void send_f_packets(Q15 *data, uint16_t num_samples){
 
 //triggered when wanted_char is recieved thru ctrl channel
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) { 
-    switch (wanted_char) {
-        case START_CHAR:
-            // signal core 1 to begin processing
-            USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
-            tud_cdc_n_read_flush(itf);
-            tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, SETTINGS_CHAR);
+    uint8_t temp;
+    if (tud_cdc_n_peak(CDC_CTRL_CHAN, (uint8_t*)temp)) {
+        uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, (uint8_t *)BS_RX_BF, BS_BF_LEN);
+        if (count != BS_BF_LEN) {
             break;
-        case SETTINGS_CHAR:
-            //update_fft_config();      // idk bandit config?
-            update_bandit_config();
-            tud_cdc_n_read_flush(itf); 
-            USB_NEXT_STATE = USB_FFT_DATA_COLLECT; 
-            break;
-        default:
-            tud_cdc_n_read_flush(itf);
-            break;
+        }
+        uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+
+        Global_Bandit_Settings.settings_bf = &BS_RX_BF;
+
+        Global_Bandit_Settings.updated = true;
+        // Do USB Settings application here!!
+        //  set UPDATED = true if tap length, errors, or frequency ranges
+        //  have been changed
+        //  set UPDATED = true if any bitfield settings have been altered
+
+        spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+    } else {
+        tud_cdc_n_read_flush(CDC_CTRL_CHAN);
+        tud_task();
     }
+    if (USB_STATE == USB_INIT) {
+        USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
+
+    } 
+    
 }
 
 
-// recieve config data from GUI and update BANDIT_SETTINGS accordingly
-static void update_bandit_config(){
-
-}
 
 static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len){
     cool_fft->num_samples = len;

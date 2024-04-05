@@ -135,7 +135,7 @@ enum BANDIT_SETTINGS_BF {
     BS_MAN_TAP_LEN,
     BS_MAN_FREQ_RANGE
 };
-
+#define BS_BF_LEN               10
 /*
     Bandit Main Settings
 */
@@ -143,6 +143,7 @@ enum BANDIT_SETTINGS_BF {
 struct BANDIT_SETTINGS {
     uint8_t         updated;
     uint32_t        settings_bf;
+    uint32_t        auto_freq_range;
     uint16_t        manual_tap_len_setting;
     uint32_t        manual_error_limit;
     uint32_t        manual_freq_range;
@@ -180,6 +181,7 @@ enum BANDIT_CORE_1_DSP_STATES {
 #define CDC_DATA_CHAN           0
 #define CDC_CTRL_CHAN           1
 #define CDC_PACKET_LEN          64
+
 //core0 state machine init
 //#define STATE             // variables?
 //#define NEXT_STATE         
