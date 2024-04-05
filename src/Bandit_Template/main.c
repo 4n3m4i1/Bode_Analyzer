@@ -411,15 +411,15 @@ static void core_1_main(){
     struct Q15_FIR_PARAMS CUT_125KHZ;
     setup_Q15_FIR(&CUT_125KHZ, DOWNSAMPLE_LEN);
     CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
-    CUT_125KHZ.taps = h125;
+    CUT_125KHZ.taps = h125_taps;
    
     struct Q15_FIR_PARAMS CUT_62KHZ;
     CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
-    CUT_125KHZ.taps = h62;
+    CUT_125KHZ.taps = h62_taps;
 
     struct Q15_FIR_PARAMS CUT_31KHZ;
     CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
-    CUT_125KHZ.taps = h31;
+    CUT_125KHZ.taps = h31_taps;
 
 
     /*
