@@ -634,18 +634,11 @@ debug_no_adc_setup_label:
 
                 if(Global_Bandit_Settings.updated){
                     if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_IN_PROG){
+                        
                         Global_Bandit_Settings.updated = false;
-
-                        // if settings changed:
-                        //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
-                        // Switch frontend PGA to White Noise Loopback
-                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
-                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
-
-                        busy_wait_us_32(MCP6S92_SETTLING_TIME);
-
                         // Need to recalibrate transfer function if a settings update occurs
                         Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
+                        
                     } else {
                         // First cycle through the states
                         // Need to do DC Cal
@@ -664,8 +657,20 @@ debug_no_adc_setup_label:
 
                     // Free spinlock on Global Settings
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
-                    // PGA Settling Time, if WGN already on. If WGN is being tuned on its own delay will deal w this
-                    if(CORE_1_WGN_STATE) busy_wait_us_32(MCP6S92_SETTLING_TIME);
+
+                    if(Bandit_Calibration_State == BANDIT_CAL_AA_TXFR_FUNC_IN_PROG){
+                        // if settings changed:
+                        //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
+                        // Switch frontend PGA to White Noise Loopback
+                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
+                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+                        busy_wait_us_32(MCP6S92_SETTLING_TIME);
+                    } else
+                    if(CORE_1_WGN_STATE) {
+                        // If WGN State toggled
+                        // PGA Settling Time, if WGN already on. If WGN is being tuned on its own delay will deal w this
+                        busy_wait_us_32(MCP6S92_SETTLING_TIME);
+                    }
 
                     // Start white noise for loopback testing
                     if(!CORE_1_WGN_STATE){
@@ -962,7 +967,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
     if (tud_cdc_n_peak(CDC_CTRL_CHAN, (uint8_t*)temp)) {
         uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, (uint8_t *)BS_RX_BF, BS_BF_LEN);
         if (count != BS_BF_LEN) {
-            break;
+            // removed break idk
         }
         uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
 
