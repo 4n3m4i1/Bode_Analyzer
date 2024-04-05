@@ -19,6 +19,7 @@
 #include "Bandit_LED/Bandit_LED.h"
 #include "PIO_ADS7253/PIO_ADS7253.h"
 #include "Bandit_InterCore/Bandit_Inter_Core.h"
+#include "Downsampling/Fixed_Filters.h"
 
 /*
     Remember:
