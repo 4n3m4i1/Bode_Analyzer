@@ -135,7 +135,7 @@ enum BANDIT_SETTINGS_BF {
     BS_MAN_TAP_LEN,
     BS_MAN_FREQ_RANGE
 };
-
+#define BS_BF_LEN               10
 /*
     Bandit Main Settings
 */
@@ -143,6 +143,7 @@ enum BANDIT_SETTINGS_BF {
 struct BANDIT_SETTINGS {
     uint8_t         updated;
     uint32_t        settings_bf;
+    uint32_t        auto_freq_range;
     uint16_t        manual_tap_len_setting;
     uint32_t        manual_error_limit;
     uint32_t        manual_freq_range;
@@ -180,6 +181,7 @@ enum BANDIT_CORE_1_DSP_STATES {
 #define CDC_DATA_CHAN           0
 #define CDC_CTRL_CHAN           1
 #define CDC_PACKET_LEN          64
+
 //core0 state machine init
 //#define STATE             // variables?
 //#define NEXT_STATE         
@@ -192,6 +194,37 @@ enum USB_STATE_MACHINEEEEE {
     USB_RECIEVE_CONFIG,
     USB_UPDATE_CONFIG
 };    
+
+
+    //  Byte[0] If Enabled
+    //  Byte[1] Auto run
+    //  Byte[2] Auto send
+    //  Byte[3] WGN Always on
+    //  Byte[4] RESERVED
+    //  Byte[5] Manual Error Limit LSB
+    //  Byte[6] Manual Error Limit MSB
+    //  Byte[7] Manual Tap Length (LSB)
+    //  Byte[8] Manual Tap Length (MSB)
+    //  Byte[9] F Range (ENUM)
+enum USB_BS_RX_BUF_BYTES {
+    USBBSRX_EN,
+    USBBSRX_AUTORUN,
+    USBBSRX_AUTOSEND,
+    USBBSRX_WGN_ALWAYS_ON,
+    USBBSRX_RESERVED,
+    USBBSRX_ERR_LSB,
+    USBBSRX_ERR_MSB,
+    USBBSRX_TAPLEN_LSB,
+    USBBSRX_TAPLEN_MSB,
+    USBBSRX_F_FRANGE
+};
+
+//enum BANDIT_FRANGE {
+//    DOWNSAMPLE_1X_250K_CUT,
+//    DOWNSAMPLE_2X_125K_CUT,
+//    DOWNSAMPLE_4X_62K5_CUT,
+//    DOWNSAMPLE_8X_32K2_CUT
+//};
 
 enum BANDIT_CALIBRATION_STATES {
     BANDIT_UNCALIBRATED,
