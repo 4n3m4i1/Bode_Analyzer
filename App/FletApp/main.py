@@ -371,8 +371,9 @@ def main(page: ft.Page):
                             ft.DataCell(ft.Text(data_select.value)),
                             ft.DataCell(ft.Text(ctrl_select.value)),
                             ft.DataCell(ft.Text(tap_select.value)),
-                            ft.DataCell(ft.Text(freq_range_select.value)),
+                            ft.DataCell(ft.Text(frequency_ranges[int(freq_range_select.value)])),
                         ],
+                        
                 ),
                 ],
             )
