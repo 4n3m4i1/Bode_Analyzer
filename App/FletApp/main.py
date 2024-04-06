@@ -207,8 +207,6 @@ def main(page: ft.Page):
                     ],   
                 )
             )
-
-
         page.update()
 
 
@@ -249,8 +247,6 @@ def main(page: ft.Page):
 
     ax.set_xscale(PLOT_XUNIT)
     ax.set_yscale(PLOT_YUNIT)
-
-    # put in ref.py
     ax.set_title(PLOT_TITLE, fontsize = 18)
     ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
     ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
@@ -321,57 +317,69 @@ def main(page: ft.Page):
 
 
 #######################################################
-    
-    table_container = ft.Container (
-        #page.add(
-        ft.DataTable(
-                columns=[
-                    ft.DataColumn(ft.Text("Control Port")),
-                    ft.DataColumn(ft.Text("Data Port")),
-                    ft.DataColumn(ft.Text("Taps")),
-                    ft.DataColumn(ft.Text("Frequency Range")),
-                    #ft.DataColumn(ft.Text("Taps"), numeric=True),
-                    #ft.DataColumn(ft.Text("Parameter"), numeric=True)
-                ],
-                rows=[
-                    ft.DataRow(
-                        cells=[
-                            ft.DataCell(ft.Text("Port 1")),
-                            ft.DataCell(ft.Text("Port 2")),
-                            ft.DataCell(ft.Text("43")),
-                            ft.DataCell(ft.Text("Low: 20Hz to 25khz")),
-                        ],
-                    ),
+    config_table = ft.DataTable(
+        border=ft.border.all(1, "black"),
+        bgcolor = 'white',
 
-
-                ],
+            columns=[
+                ft.DataColumn(ft.Text("Control Port")),
+                ft.DataColumn(ft.Text("Data Port")),
+                ft.DataColumn(ft.Text("Taps")),
+                ft.DataColumn(ft.Text("Frequency Range")),
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Not Selected")),
+                        ft.DataCell(ft.Text("Not Selected")),
+                        ft.DataCell(ft.Text("Not Selected")),
+                        ft.DataCell(ft.Text("Not Selected")),
+                    ],
             ),
-            bgcolor = 'white',
-            border=ft.border.all(1, "black"),
-            
-            
-            
-        #)
-
-
-    )
-    ## end of test codec###############
-
+            ],
+        )
     
+
     Controls = ft.Row(
         [start_container
         ,stop_container,
         ] 
         )
     
-
+    
     def open_modal(e): # handle settings modal opening
         page.dialog = SettingsSelection
         SettingsSelection.open = True
         page.update()
 
     def close_modal(e): #handle settings modal closing
-        SettingsSelection.open = False    
+        SettingsSelection.open = False      
+
+        updated_table = ft.DataTable(
+            border=ft.border.all(1, "black"),
+            bgcolor = 'white',
+
+                columns=[
+                    ft.DataColumn(ft.Text("Control Port")),
+                    ft.DataColumn(ft.Text("Data Port")),
+                    ft.DataColumn(ft.Text("Taps")),
+                    ft.DataColumn(ft.Text("Frequency Range")),
+                ],
+                rows=[
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(data_select.value)),
+                            ft.DataCell(ft.Text(ctrl_select.value)),
+                            ft.DataCell(ft.Text(tap_select.value)),
+                            ft.DataCell(ft.Text(freq_range_select.value)),
+                        ],
+                ),
+                ],
+            )
+
+        page.controls.clear()
+        page.add(ft.Column([Controls]),updated_table,chart )
+
         page.update()
 
     def select_data_port(e): #handle data port selection
@@ -417,6 +425,7 @@ def main(page: ft.Page):
             options=taps_list,
             on_change=select_tap_length
         )
+    
     freq_range_select = ft.Dropdown(
             label= SELECT_RANGE_STR,
             options=range_list,
@@ -453,10 +462,10 @@ def main(page: ft.Page):
             ft.IconButton(icon=ft.icons.UNDO)
         ]
     )
-    # page.add(ft.Column([Controls]),table_container ,chart ) ## dynamic table not done yet
-    page.add(ft.Column([Controls]) ,chart ) 
 
-
+    #page.add(ft.Column([Controls]) ,chart ) 
+    page.add(ft.Column([Controls]),config_table,chart )
+    
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
