@@ -31,7 +31,9 @@ os = platform.system()
 # dataPort = None
 # ctrlPort = None
 
-connected = Event()
+start_event = Event()
+
+settings_event = Event()
 
 class Port():
     def __init__(self, portString = None):
@@ -60,17 +62,17 @@ elif os == LINUX_STR:
 #         port_selections.append(ft.dropdown.Option(str(port)))
 else: pass
 
-parametric_taps =[16,32,64,128,256]
+parametric_taps =[32,64,128,256, 512, 1024]
 taps_list =[]
 size = len(parametric_taps)
 for index in range(size):
-    taps_list.append(ft.dropdown.Option(parametric_taps[index]))
+    taps_list.append(ft.dropdown.Option(key=parametric_taps[index]))
 
-frequency_ranges = ["High: 20Hz to 125kHz","Mid: 20Hz to 50kHz ","Low: 20Hz to 25kHz"]
+frequency_ranges = ["250K","125K","62.5K", "32.25K"]
 range_list = []
 size1 = len(frequency_ranges)
 for index1 in range(size1):
-    range_list.append(ft.dropdown.Option(frequency_ranges[index1]))
+    range_list.append(ft.dropdown.Option(key=index1, text=frequency_ranges[index1]))
 
 data_port = Port()
 ctrl_port = Port()
@@ -83,7 +85,7 @@ FFT_converted_queue = Queue()
 GraphEvent = Event()
 
 ##########################################################################################SERIALREAD
-def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
+def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
     DATA_PACKET_LENGTH = 128
@@ -100,7 +102,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
     
     x = 0
     while x < 1:
-        is_conn = connected.wait()
+        is_conn = start_event.wait()
         try:
             if dataPort.name == ctrlPort.name:
                 raise serial.SerialException
@@ -118,35 +120,24 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
                 timeout = 1,
             )
             x = x + 1
+            #send initial settings
+            CTRLCHANNEL.write('~')
+            CTRLCHANNEL.write(INIT_SETTINGS)
+            CTRLCHANNEL.flush()
             while True:
-                is_set = GraphEvent.wait()
+                #if settings have been changed
+                if settings_event.is_set():
+                    CTRLCHANNEL.write('~')
+                    CTRLCHANNEL.write(settings_Queue.get(block=False))
+                    settings_event.clear()
+                else:
+                    if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
+                        header_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
+                        CTRLCHANNEL.write('a')
 
-                # test_val = bytes([random.randint(0, 255) for _ in range(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)])
-                match STATE:
-                    case 1:
-                        CTRLCHANNEL.write(SR_ACK)
-                        HEADER = DATACHANNEL.read(HEADER_PACKET_LENGTH * BYTES_PER_NUMBER)
-                        STATE = HH
-                    case 2:
-                        CTRLCHANNEL.write(SR_ACK)
-                        # HHat = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                        # data_Queue.put(HHat, True)
-                        STATE = FFR
-                    case 3:
-                        CTRLCHANNEL.write(SR_ACK)
-                        FFR_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                        data_Queue.put(FFR_data, True)
-                        # data_Queue.put(test_val, True)
-                        STATE = FFI
-                    case 4:
-                        CTRLCHANNEL.write(SR_ACK)
-                        # FFI_data = DATACHANNEL.read(DATA_PACKET_LENGTH * BYTES_PER_NUMBER)
-                        # data_Queue.put(FFI_data, True)
-                        STATE = IDLE
-                    case 5:
-                        CTRLCHANNEL.write(SR_ACK)
-                        # IDLE_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
-                        STATE = H
+                        num_samples = header_data[3] * 256 + header_data[4]
+                        f_data = DATACHANNEL.read(CDC_PACKET_LENGTH * num_samples * BYTES_PER_NUMBER)
+                        data_Queue.put(f_data)
         except serial.SerialException:
             page.banner = ft.Banner(
                 bgcolor=ft.colors.AMBER_100,
@@ -155,7 +146,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, page):
                 actions=[ft.TextButton(CLOSE_STR, on_click=close_banner),]
                 )
             page.banner.open = True
-            connected.clear()
+            start_event.clear()
             page.update()
 ##########################################################################################DATACONVERTER
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
@@ -167,7 +158,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             graph_data_raw = data_in_Queue.get(block=False)
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
-            converted_graph_data = Q15_to_float_array(listed_graph_data, 128)
+            converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
 
             data_out_Queue.put(converted_graph_data, block=False)
 
@@ -230,14 +221,14 @@ def main(page: ft.Page):
 
     def handle_start_button_clicked(e):
         if is_connected():
-            connected.set()
+            start_event.set()
             GraphEvent.set()
             page.update()
         else:
             handle_not_connected()
 
     def handle_stop_button_clicked(e):
-        connected.clear()
+        start_event.clear()
         GraphEvent.clear()
 
     
@@ -388,6 +379,7 @@ def main(page: ft.Page):
 
         page.controls.clear()
         page.add(ft.Column([Controls]),updated_table,chart )
+
         page.update()
 
     def select_data_port(e): #handle data port selection
@@ -419,14 +411,26 @@ def main(page: ft.Page):
             options=port_selections,
             on_change=select_ctrl_port
         )
+    temp_settings = [0 for i in range(SETTINGS_BF_LEN)]
+
+    def select_tap_length(e):
+        bytes_tmp = int(tap_select.value).to_bytes(2, 'little')
+        temp_settings[7] = bytes_tmp[0]
+        temp_settings[8] = bytes_tmp[1]
+    def select_frange(e):
+        temp_settings[9] = int(freq_range_select.value)
+
     tap_select = ft.Dropdown(
             label=SELECT_TAP_STR,
-            options=taps_list
+            options=taps_list,
+            on_change=select_tap_length
         )
     
     freq_range_select = ft.Dropdown(
             label= SELECT_RANGE_STR,
-            options=range_list
+            options=range_list,
+            on_change=select_frange
+
         )
     
     ConfigDisplay = ft.Column([

@@ -249,7 +249,7 @@ static void core_0_main(){
     tud_init(BOARD_TUD_RHPORT);
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
     USB_NEXT_STATE = USB_INIT;
-
+    tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
     // USB State Machine, Settings Application, FFT
     while(1){
         tight_loop_contents();
@@ -933,7 +933,7 @@ static void send_header_packet(Q15 *h_data){
 //sends fft data through data chan to GUI interface
 static void send_f_packets(Q15 *data, uint16_t num_samples){
     uint16_t NUM_PACKET_PER_BUF = num_samples / CDC_PACKET_LEN;
-
+    
     for(uint16_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
         while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
             tud_task(); // tinyusb device task
