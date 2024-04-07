@@ -1,5 +1,8 @@
 #include "RP2040_Circ_Buffer.h"
 
+#ifdef USE_CIRC_BUFFER
+
+#ifdef ALLOW_32_SIZE_BUFFER
 void setup_circular_buffer_I32(struct Circular_Buffer_Int32 *a, int size){
     if(a){
         a->size = size;
@@ -24,31 +27,36 @@ void setup_circular_buffer_I32(struct Circular_Buffer_Int32 *a, int size){
     }
 }
 
-
-void static inline add_sample_to_buffer_I32(struct Circular_Buffer_Int32 *a, int32_t val){
+#ifdef ALLOW_NON_2N_BUFFER
+inline   void add_sample_to_buffer_I32(struct Circular_Buffer_Int32 *a, int32_t val){
     a->data[a->curr_zero] = val;
     if(++a->curr_zero >= a->size) a->curr_zero = 0;
 }
+#endif
 
-void static inline add_sample_to_2n_buffer_I32(struct Circular_Buffer_Int32 *a, int32_t val){
+inline   void add_sample_to_2n_buffer_I32(struct Circular_Buffer_Int32 *a, int32_t val){
     a->data[a->curr_zero++ & a->size_mask] = val;
 }
 
-int32_t static inline recall_sample_from_buffer_I32(struct Circular_Buffer_Int32 *a, int offset){
+#ifdef ALLOW_NON_2N_BUFFER
+inline   int32_t recall_sample_from_buffer_I32(struct Circular_Buffer_Int32 *a, int offset){
     return a->data[(((offset + a->curr_zero) >= a->size) ? a->curr_zero + (offset -= a->size) : (a->curr_zero + offset))];
 }
+#endif
 
-int32_t static inline recall_sample_from_2n_buffer_I32(struct Circular_Buffer_Int32 *a, int offset){
+inline   int32_t recall_sample_from_2n_buffer_I32(struct Circular_Buffer_Int32 *a, int offset){
     return a->data[(offset + a->curr_zero) & a->size_mask];
 }
 
+#ifdef ALLOW_NON_2N_BUFFER
 void destroy_circular_buffer_I32(struct Circular_Buffer_Int32 *a){
     if(a){
         free(a->data);
     }
 }
+#endif
 
-
+#endif
 
 
 void setup_circular_buffer_I16(struct Circular_Buffer_Int16 *a, int size){
@@ -75,25 +83,33 @@ void setup_circular_buffer_I16(struct Circular_Buffer_Int16 *a, int size){
     }
 }
 
-void static inline add_sample_to_buffer_I16(struct Circular_Buffer_Int16 *a, int16_t val){
+#ifdef ALLOW_NON_2N_BUFFER
+inline   void add_sample_to_buffer_I16(struct Circular_Buffer_Int16 *a, int16_t val){
     a->data[a->curr_zero] = val;
     if(++a->curr_zero >= a->size) a->curr_zero = 0;
 }
+#endif
 
-void static inline add_sample_to_2n_buffer_I16(struct Circular_Buffer_Int16 *a, int32_t val){
+inline   void add_sample_to_2n_buffer_I16(struct Circular_Buffer_Int16 *a, int16_t val){
     a->data[a->curr_zero++ & a->size_mask] = val;
 }
 
-int16_t static inline recall_sample_from_buffer_I16(struct Circular_Buffer_Int16 *a, int offset){
+#ifdef ALLOW_NON_2N_BUFFER
+inline   int16_t recall_sample_from_buffer_I16(struct Circular_Buffer_Int16 *a, int offset){
     return a->data[(((offset + a->curr_zero) >= a->size) ? a->curr_zero + (offset -= a->size) : (a->curr_zero + offset))];
 }
+#endif
 
-int16_t static inline recall_sample_from_2n_buffer_I16(struct Circular_Buffer_Int16 *a, int offset){
+inline   int16_t recall_sample_from_2n_buffer_I16(struct Circular_Buffer_Int16 *a, uint16_t offset){
     return a->data[(offset + a->curr_zero) & a->size_mask];
 }
 
+#ifdef ALLOW_NON_2N_BUFFER
 void destroy_circular_buffer_I16(struct Circular_Buffer_Int16 *a){
     if(a){
         free(a->data);
     }
 }
+
+#endif
+#endif

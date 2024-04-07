@@ -246,6 +246,7 @@ static void core_0_main(){
     fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
 
     // Initialize tinyUSB with board and start listening for start char from GUI
+    board_init();
     tud_init(BOARD_TUD_RHPORT);
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
     USB_NEXT_STATE = USB_INIT;
@@ -270,11 +271,11 @@ static void core_0_main(){
 
             case USB_FFT_DATA_COLLECT: {
                 // Acquire safe access to FFT mem, can use 2 locks for ping pong access
-                uint32_t spinlock_irq_status;
+                uint32_t spinlock_irq_status_A;
                 spin_lock_t *used_lock;
                 struct Transfer_Data *data_src;
 
-                spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
+                spinlock_irq_status_A = spin_lock_blocking(FFTMEMLOCK_A);
                 used_lock = FFTMEMLOCK_A;
                 data_src = &ICTXFR_A;
 
@@ -288,7 +289,7 @@ static void core_0_main(){
                 fft_setup(&cool_fft, data_src->len);
                 
                 // Free memory constraints
-                spin_unlock(used_lock, spinlock_irq_status);
+                spin_unlock(used_lock, spinlock_irq_status_A);
 
                 USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
                 
@@ -366,12 +367,12 @@ static void core_1_main(){
     CUT_125KHZ.taps = h125_taps;
    
     struct Q15_FIR_PARAMS CUT_62KHZ;
-    CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
-    CUT_125KHZ.taps = h62_taps;
+    CUT_62KHZ.size_true = DOWNSAMPLE_LEN;
+    CUT_62KHZ.taps = h62_taps;
 
     struct Q15_FIR_PARAMS CUT_31KHZ;
-    CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
-    CUT_125KHZ.taps = h31_taps;
+    CUT_31KHZ.size_true = DOWNSAMPLE_LEN;
+    CUT_31KHZ.taps = h31_taps;
 
 
     /*
@@ -484,7 +485,7 @@ start_refdac_cal:
     clear_adc_read_buffers();
 
     for(uint16_t n = 0; n < 128; ++n){
-        ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, &D_N_0[n], &X_N_0[n], 1);
+        ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, (uint16_t *)&D_N_0[n], (uint16_t *)&X_N_0[n], 1);
         ADC_REFDAC_CAL_ACCUM += (uint16_t)D_N_0[n];
         busy_wait_us_32(5);
     }
@@ -562,7 +563,7 @@ start_refdac_cal:
     Sampling_Setup(500);
 
     uint16_t CORE_1_STATE = CORE_1_IDLE;
-    uint16_t error_attempts;                // How many times the LMS algorithm has failed to converge
+    uint16_t error_attempts = 0;            // How many times the LMS algorithm has failed to converge
     bool CORE_1_DBG_MODE = false;           // Are we in debug mode?
     bool CORE_1_WGN_STATE = false;          // Is WGN always on?
     uint8_t CORE_1_FRANGE = DOWNSAMPLE_1X_250K_CUT;
@@ -573,12 +574,12 @@ start_refdac_cal:
     setup_PIO_for_switching();
     setup_chained_dma_channels();
 
-    uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+    uint32_t spinlock_irq_status_B = spin_lock_blocking(SETTINGS_LOCK);
     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
         start_randombit_dma_chain(dma_awgn_ctrl_chan);
         CORE_1_WGN_STATE = true;
     }
-    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+    spin_unlock(SETTINGS_LOCK, spinlock_irq_status_B);
 
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
@@ -610,7 +611,7 @@ debug_no_adc_setup_label:
             break;
 
             case CORE_1_APPLY_SETTINGS: {
-                uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+                uint32_t spinlock_irq_status_C = spin_lock_blocking(SETTINGS_LOCK);
 
                 if(Global_Bandit_Settings.updated){
                     if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_IN_PROG){
@@ -640,7 +641,7 @@ debug_no_adc_setup_label:
                     LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
 
                     // Free spinlock on Global Settings
-                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status_C);
 
                     if(Bandit_Calibration_State == BANDIT_CAL_AA_TXFR_FUNC_IN_PROG){
                         // if settings changed:
@@ -672,7 +673,7 @@ debug_no_adc_setup_label:
                             CORE_1_STATE = CORE_1_SAMPLE;
                     }
 
-                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status_C);
                 }
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
@@ -712,7 +713,7 @@ debug_no_adc_setup_label:
                     asm("nop"); asm("nop"); asm("nop"); asm("nop");
                     asm("nop"); asm("nop"); asm("nop"); asm("nop");
                     asm("nop"); asm("nop"); asm("nop"); asm("nop"); asm("nop"); 
-                    ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, &D_N_0[n], &X_N_0[n], 1);
+                    ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, (uint16_t *)&D_N_0[n], (uint16_t *)&X_N_0[n], 1);
                     X_N_0[n] -= Bandit_DC_Offset_Cal;
                 }
 
@@ -754,12 +755,15 @@ debug_no_adc_setup_label:
                 
                 switch(CORE_1_FRANGE){
                     case DOWNSAMPLE_2X_125K_CUT:
+                        torun = &CUT_125KHZ;
                         LMS_Inst.ddsmpl_stride = 2;
                     break;
                     case DOWNSAMPLE_4X_62K5_CUT:
+                        torun = &CUT_62KHZ;
                         LMS_Inst.ddsmpl_stride = 4;
                     break;
                     case DOWNSAMPLE_8X_32K2_CUT:
+                        torun = &CUT_31KHZ;
                         LMS_Inst.ddsmpl_stride = 8;
                     break;
 
@@ -805,8 +809,6 @@ skip_downsampling_label:
                 } else {
                     CORE_1_STATE = CORE_1_POST_PROC;
                 }
-                
-                if(Bandit_Calibration_State != BANDIT_FULLY_CALIBRATED);
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
@@ -857,15 +859,15 @@ skip_downsampling_label:
                 // If this didn't need to be serialized DMA would be sick here
                 //  but really no benefit due to overall processing structure
                 //  1000% could be better tho
-                uint32_t spinlock_irq_status;
+                uint32_t spinlock_irq_status_D;
                 spin_lock_t *used_lock;
 
-                spinlock_irq_status = spin_lock_blocking(FFTMEMLOCK_A);
+                spinlock_irq_status_D = spin_lock_blocking(FFTMEMLOCK_A);
                 used_lock = FFTMEMLOCK_A;
                 
                 transfer_results_to_safe_mem(LMS_FIR.data, &ICTXFR_A, LMS_Inst.tap_len);
                 
-                spin_unlock(used_lock, spinlock_irq_status);
+                spin_unlock(used_lock, spinlock_irq_status_D);
 
                 CORE_1_STATE = CORE_1_IDLE;
 
@@ -946,8 +948,9 @@ static void send_f_packets(Q15 *data, uint16_t num_samples){
 //triggered when wanted_char is recieved thru ctrl channel
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) { 
     uint8_t temp;
-    if (tud_cdc_n_peek(CDC_CTRL_CHAN, &temp)) {
-        uint32_t count = tud_cdc_n_read(CDC_CTRL_CHAN, (uint8_t *)BS_RX_BF, BS_BF_LEN);
+    if(itf != CDC_CTRL_CHAN) itf = CDC_CTRL_CHAN;
+    if (tud_cdc_n_peek(itf, &temp) == wanted_char) {
+        uint32_t count = tud_cdc_n_read(itf, (uint8_t *)BS_RX_BF, BS_BF_LEN);
         if (count != BS_BF_LEN) {
             // removed break idk
         }
@@ -973,7 +976,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         uint16_t man_error_limit = BS_RX_BF[USBBSRX_ERR_MSB] << 8 | BS_RX_BF[USBBSRX_ERR_LSB];
 
         // Acquire settings lock
-        uint32_t spinlock_irq_status = spin_lock_blocking(SETTINGS_LOCK);
+        uint32_t spinlock_irq_status_E = spin_lock_blocking(SETTINGS_LOCK);
 
         Global_Bandit_Settings.settings_bf = tmp_new_bf;
         Global_Bandit_Settings.manual_freq_range = newfreq_range;
@@ -987,14 +990,13 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         //  have been changed
         //  set UPDATED = true if any bitfield settings have been altered
 
-        spin_unlock(SETTINGS_LOCK, spinlock_irq_status);
+        spin_unlock(SETTINGS_LOCK, spinlock_irq_status_E);
     } else {
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
         tud_task();
     }
     if (USB_STATE == USB_INIT) {
         USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
-
     } 
     
 }

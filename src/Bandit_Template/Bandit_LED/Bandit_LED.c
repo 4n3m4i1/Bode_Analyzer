@@ -49,7 +49,7 @@ void set_RGB_levels(uint8_t R_, uint8_t G_, uint8_t B_){
     //  Green   -> Channel B, slice 6
     //  Blue    -> Channel A, slice 7
     pwm_hw->slice[PWMSLICE_RG].cc = (((uint16_t)G_ << 16) | (uint16_t)R_);
-    pwm_hw->slice[PWMSLICE_BU].cc = (pwm_hw->slice[PWMSLICE_BU].cc & 0xFFFF0000 | (uint16_t)B_); 
+    pwm_hw->slice[PWMSLICE_BU].cc = ((pwm_hw->slice[PWMSLICE_BU].cc & 0xFFFF0000) | ((uint16_t)B_)); 
 }
 void set_ULED_level(uint8_t _L){
     // Channel B is upper 16 bits, CHannel A is lower 16 bits

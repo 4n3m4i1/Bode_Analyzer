@@ -2,14 +2,22 @@ cmake_minimum_required(VERSION 3.12)
 
 include(pico_sdk_import.cmake)
 
-project(BANDIT_TEMPLATE C CXX ASM)
+include($ENV{PICO_SDK_PATH}/lib/tinyusb/hw/bsp/family_support.cmake)
+
+family_get_project_name(PROJECT ${CMAKE_CURRENT_LIST_DIR})
+#project(BANDIT_TEMPLATE C CXX ASM)
+project(${PROJECT})
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 set(PICO_EXAMPLES_PATH ${PROJECT_SOURCE_DIR})
 
+# Checks this example is valid for the family and initializes the project
+family_initialize_project(${PROJECT} ${CMAKE_CURRENT_LIST_DIR})
+
 # initialize the Raspberry Pi Pico SDK
-pico_sdk_init()
+#pico_sdk_init()
 
 add_executable(
                 ${PROJECT_NAME}
@@ -22,6 +30,8 @@ add_executable(
                 Bandit_LED/Bandit_LED.c
                 PIO_ADS7253/PIO_ADS7253.c
                 Bandit_InterCore/Bandit_Inter_Core.c
+
+                usb_descriptors.c
                 )
 
 #pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_val_2_pin.pio)
@@ -29,7 +39,7 @@ pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/PIO_PROG/pio_
 
 # Link Libraries
 target_link_libraries(
-                        ${PROJECT_NAME}
+                        ${PROJECT}  PUBLIC
                         pico_stdlib
                         pico_multicore
                         hardware_i2c
@@ -52,47 +62,47 @@ add_library(LED Bandit_LED/Bandit_LED.c Bandit_LED/Bandit_LED.h)
 add_library(PIOSPI PIO_ADS7253/PIO_ADS7253.c PIO_ADS7253/PIO_ADS7253.h)
 add_library(CORESYNC Bandit_InterCore/Bandit_Inter_Core.c Bandit_InterCore/Bandit_Inter_Core.h)
 
-target_link_libraries(FFT
+target_link_libraries(FFT PUBLIC
     pico_stdlib
 )
 
-target_link_libraries(circular_buffers
+target_link_libraries(circular_buffers PUBLIC
     pico_stdlib
     stdlib
     pico_malloc
 )
 
-target_link_libraries(FIR
+target_link_libraries(FIR PUBLIC
     pico_stdlib
 )
 
-target_link_libraries(LMS
+target_link_libraries(LMS PUBLIC
     pico_stdlib
     FIR
 )
 
-target_link_libraries(PGA
+target_link_libraries(PGA PUBLIC
     pico_stdlib
     hardware_spi
     hardware_resets
 )
 
-target_link_libraries(LED
+target_link_libraries(LED PUBLIC
     pico_stdlib
     hardware_pwm
 )
 
-target_link_libraries(PIOSPI
+target_link_libraries(PIOSPI PUBLIC
     pico_stdlib
     hardware_pio
 )
 
-target_link_libraries(CORESYNC
+target_link_libraries(CORESYNC PUBLIC
     hardware_sync
 )
 
-pico_enable_stdio_usb(${PROJECT_NAME} 1)
-pico_enable_stdio_uart(${PROJECT_NAME} 0)
+#pico_enable_stdio_usb(${PROJECT_NAME} 1)
+#pico_enable_stdio_uart(${PROJECT_NAME} 0)
 
 # Create EXEC binaries like uf2
 pico_add_extra_outputs(${PROJECT_NAME})
@@ -104,3 +114,6 @@ pico_add_extra_outputs(${PROJECT_NAME})
 #pico_set_linker_script(${PROJECT_NAME}  ../linking_scripts/memmap_blocked_ram.ld)
 pico_set_linker_script(${PROJECT_NAME}  ../linking_scripts/memmap_custom_blocks.ld)
 
+# Configure compilation flags and libraries for the example... see the corresponding function
+# in hw/bsp/FAMILY/family.cmake for details.
+family_configure_device_example(${PROJECT})

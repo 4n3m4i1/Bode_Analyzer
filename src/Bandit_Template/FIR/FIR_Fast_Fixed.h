@@ -20,8 +20,8 @@ struct Q15_FIR_PARAMS {
 void setup_Q15_FIR(struct Q15_FIR_PARAMS *a, uint16_t size);
 
 void add_sample_to_FIR(struct Q15_FIR_PARAMS *a, Q15 val);
-void add_sample_to_2n_FIR_I32(struct Q15_FIR_PARAMS *a, Q15 val);
-void add_sample_to_2n_FIR_I32_no_inc(struct Q15_FIR_PARAMS *a, Q15 val);
+void add_sample_to_2n_FIR_I16(struct Q15_FIR_PARAMS *a, Q15 val);
+void add_sample_to_2n_FIR_I16_no_inc(struct Q15_FIR_PARAMS *a, Q15 val);
 
 Q15 recall_sample_from_FIR(struct Q15_FIR_PARAMS *a, int offset);
 Q15 recall_sample_from_2n_FIR(struct Q15_FIR_PARAMS *a, int offset);

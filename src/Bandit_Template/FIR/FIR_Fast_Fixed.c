@@ -23,16 +23,16 @@ void setup_Q15_FIR(struct Q15_FIR_PARAMS *a, uint16_t size){
     }
 }
 
-void inline add_sample_to_FIR(struct Q15_FIR_PARAMS *a, Q15 val){
+inline void add_sample_to_FIR(struct Q15_FIR_PARAMS *a, Q15 val){
     a->data[a->curr_zero] = val;
     if(++a->curr_zero >= a->size) a->curr_zero = 0;
 }
 
-void inline add_sample_to_2n_FIR_I32(struct Q15_FIR_PARAMS *a, Q15 val){
+inline void add_sample_to_2n_FIR_I16(struct Q15_FIR_PARAMS *a, Q15 val){
     a->data[a->curr_zero++ & a->size_mask] = val;
 }
 
-void inline add_sample_to_2n_FIR_I32_no_inc(struct Q15_FIR_PARAMS *a, Q15 val){
+inline void add_sample_to_2n_FIR_I16_no_inc(struct Q15_FIR_PARAMS *a, Q15 val){
     a->data[a->curr_zero & a->size_mask] = val;
 }
 
@@ -40,18 +40,18 @@ Q15 recall_sample_from_FIR(struct Q15_FIR_PARAMS *a, int offset){
     return a->data[(((offset + a->curr_zero) >= a->size) ? a->curr_zero + (offset -= a->size) : (a->curr_zero + offset))];
 }
 
-Q15 inline recall_sample_from_2n_FIR(struct Q15_FIR_PARAMS *a, int offset){
+inline Q15 recall_sample_from_2n_FIR(struct Q15_FIR_PARAMS *a, int offset){
     return a->data[(offset + a->curr_zero) & a->size_mask];
 }
 
-Q15 inline read_inc_2n_FIR(struct Q15_FIR_PARAMS *a){
+inline Q15 read_inc_2n_FIR(struct Q15_FIR_PARAMS *a){
     return a->data[a->curr_zero++ & a->size_mask];
 }
 
 
 
-Q15 inline run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data){
-    add_sample_to_2n_FIR_I32_no_inc(a, new_data);
+inline Q15 run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data){
+    add_sample_to_2n_FIR_I16_no_inc(a, new_data);
     Q15 retval = 0;
     for(int n = 0; n < a->size; ++n){
         retval += mul_Q15((recall_sample_from_2n_FIR(a, n)), a->taps[n]);

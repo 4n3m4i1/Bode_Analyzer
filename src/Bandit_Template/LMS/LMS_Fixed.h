@@ -57,7 +57,7 @@ struct LMS_Fixed_Inst {
 void LMS_Struct_Equate(struct LMS_Fixed_Inst *src, struct LMS_Fixed_Inst *dst);
 void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable_error, int16_t samples_offset, uint16_t max_runtime, uint16_t start_offset);
 //void Associate_LMS_and_FIR_Struct(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *FIR);
-Q15 LMS_Looper(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool flush_FIR);
+Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool flush_FIR);
 void LMS_Update_Taps(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, Q15 error);
 
 
