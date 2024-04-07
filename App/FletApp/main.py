@@ -82,6 +82,7 @@ init_graph = [0 for i in range(NUM_VALUES)]
 FFT_real_queue = Queue()
 FFT_converted_queue = Queue()
 
+Settings_Queue = Queue()
 GraphEvent = Event()
 
 ##########################################################################################SERIALREAD
@@ -457,7 +458,7 @@ def main(page: ft.Page):
     page.add(ft.Column([Controls]) ,chart ) 
 
 
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page))
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
     data_converter_process.daemon = True
