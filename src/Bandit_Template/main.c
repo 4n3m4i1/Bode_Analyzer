@@ -149,7 +149,9 @@ spin_lock_t *DEBUG_REPORT_LOCK;
 // Main
 // Start up in Core 0
 int main(){
-    stdio_init_all();
+    board_init();
+    tud_init(BOARD_TUD_RHPORT);
+
     init_LED_pins();
 
     Bandit_RGBU.R = 0;
@@ -168,11 +170,6 @@ int main(){
     FFTMEMLOCK_A        = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
     SETTINGS_LOCK       = spin_lock_init(INTERCORE_SETTINGS_LOCK);
     DEBUG_REPORT_LOCK   = spin_lock_init(INTERCORE_CORE_1_DBG_LOCK);
-
-    // Claim lock on settings until Core 0 can deal with initialization
-    //  prevents Core 1 from starting any processing without settings
-    //  in place.
-    spin_lock_claim(INTERCORE_SETTINGS_LOCK);
 
     // Init h_hat core transfer register lengths to any known value.
     ICTXFR_A.len = 0;
@@ -213,9 +210,9 @@ int main(){
 
 
     // Initialize Status LEDs,
-    //  If blue is seen bus priorities have been applied.
-    set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
-    set_ULED_level(Bandit_RGBU.U = 0);
+    //  Sequence Seen on Proper Init
+    set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
+    set_ULED_level(Bandit_RGBU.U = 10);
 
     // Setup for peripherals done on core 0
     multicore_launch_core1(core_1_main);
@@ -232,6 +229,10 @@ int main(){
  /////////////////    Core 0 Main Loop    /////////////////////////////
 //////////////////////////////////////////////////////////////////////
 static void core_0_main(){
+    // Claim lock on settings until Core 0 can deal with initialization
+    //  prevents Core 1 from starting any processing without settings
+    //  in place.
+    spin_lock_claim(INTERCORE_SETTINGS_LOCK);
     //Global_Bandit_Settings.updated = true;
     Global_Bandit_Settings.updated = false;
     Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS;
@@ -246,8 +247,8 @@ static void core_0_main(){
     fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
 
     // Initialize tinyUSB with board and start listening for start char from GUI
-    board_init();
-    tud_init(BOARD_TUD_RHPORT);
+    //board_init();
+    //tud_init(BOARD_TUD_RHPORT);
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
     USB_NEXT_STATE = USB_INIT;
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
@@ -256,6 +257,9 @@ static void core_0_main(){
         tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
         tud_task();
         USB_STATE = USB_NEXT_STATE;
+
+        uint32_t spinlock_irq_status_A;
+
         switch(USB_STATE) {
             case USB_INIT: {
                 //need idle work until GUI is ready
@@ -270,12 +274,11 @@ static void core_0_main(){
 
             case USB_FFT_DATA_COLLECT: {
                 // Acquire safe access to FFT mem, can use 2 locks for ping pong access
-                uint32_t spinlock_irq_status_A;
-                spin_lock_t *used_lock;
+                
                 struct Transfer_Data *data_src;
 
                 spinlock_irq_status_A = spin_lock_blocking(FFTMEMLOCK_A);
-                used_lock = FFTMEMLOCK_A;
+                
                 data_src = &ICTXFR_A;
 
 
@@ -287,8 +290,8 @@ static void core_0_main(){
 
                 fft_setup(&cool_fft, data_src->len);
                 
-                // Free memory constraints
-                spin_unlock(used_lock, spinlock_irq_status_A);
+                //// Free memory constraints
+                //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
 
                 USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
                 
@@ -297,6 +300,8 @@ static void core_0_main(){
             
             case USB_RUN_DMC_JK_RUN_FFT: {
                 FFT_fixdpt(&cool_fft);
+                // Free memory constraints
+                spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
                 USB_NEXT_STATE = USB_SEND_TUSB;
             }
             break;
@@ -332,6 +337,8 @@ static void core_0_main(){
  /////////////////    Core 1 Main Loop    /////////////////////////////
 //////////////////////////////////////////////////////////////////////
 static void core_1_main(){
+    busy_wait_us_32(1000);
+
     Bandit_Debug_Report.epoch_core_1_boot_us = timer_hw->timelr;
     uint8_t Bandit_Calibration_State = BANDIT_UNCALIBRATED;
     Q15 Bandit_DC_Offset_Cal = 0;
@@ -375,20 +382,25 @@ static void core_1_main(){
             - len must be power of 2
     */
 
+    Q15 DOWNSAMPLE_SAMP_BUFFR[DOWNSAMPLE_LEN];
+
     struct Q15_FIR_PARAMS CUT_125KHZ;
     setup_Q15_FIR(&CUT_125KHZ, DOWNSAMPLE_LEN);
     CUT_125KHZ.size_true = DOWNSAMPLE_LEN;
     CUT_125KHZ.taps = h125_taps;
+    CUT_125KHZ.data = DOWNSAMPLE_SAMP_BUFFR;
    
     struct Q15_FIR_PARAMS CUT_62KHZ;
     setup_Q15_FIR(&CUT_62KHZ, DOWNSAMPLE_LEN);
     CUT_62KHZ.size_true = DOWNSAMPLE_LEN;
     CUT_62KHZ.taps = h62_taps;
+    CUT_62KHZ.data = DOWNSAMPLE_SAMP_BUFFR;
 
     struct Q15_FIR_PARAMS CUT_31KHZ;
     setup_Q15_FIR(&CUT_31KHZ, DOWNSAMPLE_LEN);
     CUT_31KHZ.size_true = DOWNSAMPLE_LEN;
     CUT_31KHZ.taps = h31_taps;
+    CUT_31KHZ.data = DOWNSAMPLE_SAMP_BUFFR;
 
 
     /*
@@ -414,7 +426,7 @@ static void core_1_main(){
     goto debug_no_adc_setup_label;
 #endif
 
-    uint16_t banditsetup_adc_attempts = 0;
+    uint32_t banditsetup_adc_attempts = 0;
 start_adc_setup:
     banditsetup_adc_attempts++;
     set_RGB_levels(Bandit_RGBU.R, Bandit_RGBU.G, Bandit_RGBU.B++);
@@ -432,7 +444,7 @@ start_adc_setup:
             ADS7253_Read_Dual_Data(ADC_PIO, &tmp_arr[0], &tmp_arr[1]);
     }
 
-    busy_wait_us_32(10);
+    busy_wait_us_32(20);
     
     // Read the CFR and ensure it's lookin good before proceeding
     tmp_arr[0] = ADS7253_CMD(ADS7253_CFR_READ, 0);
@@ -607,6 +619,14 @@ debug_no_adc_setup_label:
     CORE_1_STATE = CORE_1_DEBUG_HANDLER;
 #endif
 
+    set_ULED_level(Bandit_RGBU.U = 255);
+    busy_wait_ms(1000);
+    set_ULED_level(Bandit_RGBU.U = 0);
+    busy_wait_ms(1000);
+    set_ULED_level(Bandit_RGBU.U = 255);
+    busy_wait_ms(1000);
+    set_ULED_level(Bandit_RGBU.U = 0);
+
     while(1){
         switch(CORE_1_STATE){
             case CORE_1_IDLE: {
@@ -631,7 +651,7 @@ debug_no_adc_setup_label:
 
             case CORE_1_APPLY_SETTINGS: {
 #ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
+                set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
 #endif
                 uint32_t spinlock_irq_status_C = spin_lock_blocking(SETTINGS_LOCK);
 
@@ -784,17 +804,51 @@ debug_no_adc_setup_label:
                 struct Q15_FIR_PARAMS *torun ;
                 // FIR go here
                 
+                
                 switch(CORE_1_FRANGE){
                     case DOWNSAMPLE_2X_125K_CUT:
                         torun = &CUT_125KHZ;
+
+                        flush_FIR_buffer(&CUT_125KHZ);
+
+                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                             D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                        }
+                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                             X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                        }
+                        LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
+                        
                         LMS_Inst.ddsmpl_stride = 2;
                     break;
                     case DOWNSAMPLE_4X_62K5_CUT:
                         torun = &CUT_62KHZ;
+
+                        flush_FIR_buffer(&CUT_62KHZ);
+                        
+                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                             D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                        }
+                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                             X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                        }
+                        LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
+                        
                         LMS_Inst.ddsmpl_stride = 4;
                     break;
                     case DOWNSAMPLE_8X_32K2_CUT:
                         torun = &CUT_31KHZ;
+                        
+                        flush_FIR_buffer(&CUT_31KHZ);
+
+                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                             D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                        }
+                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                             X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                        }
+                        LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
+                        
                         LMS_Inst.ddsmpl_stride = 8;
                     break;
 
@@ -802,18 +856,19 @@ debug_no_adc_setup_label:
                     default:
                         LMS_Inst.fixed_offset = 0;
                         LMS_Inst.ddsmpl_stride = 1;
-                        goto skip_downsampling_label;
+                       // goto skip_downsampling_label;
                     break;
                 }
                 
+                //flush_FIR_buffer(torun);
 
-               for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                    D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
-               }
-               for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                    X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
-               }
-               LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
+                //for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                //     D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                //}
+                //for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
+                //     X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                //}
+                //LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
 
 skip_downsampling_label:
                 CORE_1_STATE = CORE_1_LMS;
@@ -823,7 +878,8 @@ skip_downsampling_label:
             break;
             case CORE_1_LMS: {
 #ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
+                //set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
+                set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
                 set_ULED_level(Bandit_RGBU.U++);
 #endif
                 // If first run: error_attempts = 0, thus we flush FIR buffer
@@ -831,8 +887,8 @@ skip_downsampling_label:
                 Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR, (!error_attempts) ? true : false);
 
 #ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 255);
-                set_ULED_level(Bandit_RGBU.U++);
+                set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 255);
+                set_ULED_level(++Bandit_RGBU.U);
 #endif
                 //CORE_1_STATE = CORE_1_POST_PROC;
 
@@ -863,7 +919,7 @@ skip_downsampling_label:
                     // Apply correction in time domain, it's linear idk man should be right
                     
                     for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-                        LMS_H_HATS_CORRECTION[n] = LMS_FIR.data[n];
+                        LMS_H_HATS_CORRECTION[n] = LMS_FIR.taps[n];
                     }
 
                     // Set PGA to EXTERNAL input x1 GAIN
@@ -883,7 +939,7 @@ skip_downsampling_label:
                 } else {
                     // Move on with a normal run
                     for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-                        LMS_FIR.data[n] -= LMS_H_HATS_CORRECTION[n];
+                        LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
                     }
                     CORE_1_STATE = CORE_1_SHIP_RESULTS;
                 }
@@ -912,7 +968,7 @@ skip_downsampling_label:
                 spinlock_irq_status_D = spin_lock_blocking(FFTMEMLOCK_A);
                 used_lock = FFTMEMLOCK_A;
                 
-                transfer_results_to_safe_mem(LMS_FIR.data, &ICTXFR_A, LMS_Inst.tap_len);
+                transfer_results_to_safe_mem(LMS_FIR.taps, &ICTXFR_A, LMS_Inst.tap_len);
                 
                 spin_unlock(used_lock, spinlock_irq_status_D);
 
@@ -927,7 +983,7 @@ skip_downsampling_label:
                 CORE_1_DBG_MODE = true;
                 CORE_1_STATE = CORE_1_SAMPLE;
 #else
-
+                if(!CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_IDLE;
 #endif
             }
             break;
@@ -1004,27 +1060,6 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
             tud_task();    
         }
         uint32_t count = tud_cdc_n_read(itf, BS_RX_BF, BS_BF_LEN);
-        
-        //tud_cdc_n_write(CDC_CTRL_CHAN, BS_RX_BF, count);
-       // uint8_t tmp = BS_RX_BF[0];
-       // BS_RX_BF[0] = BS_RX_BF[9];
-       // BS_RX_BF[9] = tmp;
-//
-       // tmp = BS_RX_BF[1];
-       // BS_RX_BF[1] = BS_RX_BF[8];
-       // BS_RX_BF[8] = tmp;
-//
-       // tmp = BS_RX_BF[2];
-       // BS_RX_BF[2] = BS_RX_BF[7];
-       // BS_RX_BF[7] = tmp;
-//
-       // tmp = BS_RX_BF[3];
-       // BS_RX_BF[3] = BS_RX_BF[6];
-       // BS_RX_BF[6] = tmp;
-//
-       // tmp = BS_RX_BF[4];
-       // BS_RX_BF[4] = BS_RX_BF[5];
-       // BS_RX_BF[5] = tmp;
 
         tud_cdc_n_write_flush(CDC_DATA_CHAN);
         tud_cdc_n_write_flush(CDC_CTRL_CHAN);
@@ -1039,6 +1074,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         //    BS_RX_BF[USBBSRX_F_FRANGE] = 0;
         //}
         
+        // Settings come in as byte stream for future compatibility w ASCII control modes
         //  Byte[0] If Enabled
         //  Byte[1] Auto run
         //  Byte[2] Auto send
@@ -1100,7 +1136,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
         tud_task();
     }
-    if (USB_STATE == USB_INIT) {
+    if (USB_STATE < USB_FFT_DATA_COLLECT) {
         USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
     } 
     

@@ -5,7 +5,7 @@
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
 
-
+#define BANDIT_PINK_SUPER_ARGUMENT      Bandit_RGBU.R = 236, Bandit_RGBU.G = 10, Bandit_RGBU.B = 50
 #define USER_LED_BANDIT_RDY             127
 #define USER_LED_BANDIT_DC_CAL_DONE     32
 

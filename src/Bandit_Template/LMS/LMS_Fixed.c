@@ -28,17 +28,17 @@ void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable
 
 Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool flush_FIR){
     Q15 retval = LMS_FAIL_DFL;
-    Q15 *desired = LMS->d_n + LMS->fixed_offset;
-    Q15 *white_noise = LMS->x_n + LMS->fixed_offset;
+    //Q15 *desired = LMS->d_n + LMS->fixed_offset;
+    //Q15 *white_noise = LMS->x_n + LMS->fixed_offset;
     
 
-    if(LMS->d_n_offset){
-        if(LMS->d_n_offset > 0){
-            desired += LMS->d_n_offset;
-        } else {
-            white_noise -= LMS->d_n_offset;
-        }
-    }
+    //if(LMS->d_n_offset){
+    //    if(LMS->d_n_offset > 0){
+    //        desired += LMS->d_n_offset;
+    //    } else {
+    //        white_noise -= LMS->d_n_offset;
+    //    }
+    //}
 
     // If new run, flush the FIR buffer
     if(flush_FIR) flush_FIR_buffer_and_taps(WGN_FIR);
@@ -49,7 +49,8 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
     
     for(n = 0; n < LMS->iteration_ct; n += LMS->ddsmpl_stride){
         //retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
-        retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
+        //retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
+        retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
         LMS_Update_Taps(LMS, WGN_FIR, retval);
 
         LMS->samples_processed++;      
