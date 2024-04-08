@@ -379,7 +379,7 @@ def main(page: ft.Page):
             portName = data_select.value.split("-")[0].strip()
             data_port.set(portName)
         elif os == LINUX_STR:
-            portName = data_select.value
+            portName = data_select.value.split("-")[0].strip()
             data_port.set(portName)
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
@@ -387,7 +387,7 @@ def main(page: ft.Page):
             portName = data_select.value.split("-")[0].strip()
             ctrl_port.set(portName)
         elif os == LINUX_STR:
-            portName = data_select.value
+            portName = data_select.value.split("-")[0].strip()
             ctrl_port.set(portName)
         page.update()
 
