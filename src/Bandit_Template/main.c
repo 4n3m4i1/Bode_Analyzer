@@ -141,7 +141,7 @@ static void     clear_adc_read_buffers();
 */
 spin_lock_t *FFTMEMLOCK_A;
 spin_lock_t *SETTINGS_LOCK;
-
+spin_lock_t *DEBUG_REPORT_LOCK;
 
   //////////////////////////////////////////////////////////////////////
  ////////////////////////////    Code!    /////////////////////////////
@@ -165,8 +165,9 @@ int main(){
 
     Setup_Semaphores();
 
-    FFTMEMLOCK_A = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
-    SETTINGS_LOCK = spin_lock_init(INTERCORE_SETTINGS_LOCK);
+    FFTMEMLOCK_A        = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
+    SETTINGS_LOCK       = spin_lock_init(INTERCORE_SETTINGS_LOCK);
+    DEBUG_REPORT_LOCK   = spin_lock_init(INTERCORE_CORE_1_DBG_LOCK);
 
     // Claim lock on settings until Core 0 can deal with initialization
     //  prevents Core 1 from starting any processing without settings
@@ -231,20 +232,14 @@ int main(){
  /////////////////    Core 0 Main Loop    /////////////////////////////
 //////////////////////////////////////////////////////////////////////
 static void core_0_main(){
-    Global_Bandit_Settings.updated = true;
+    //Global_Bandit_Settings.updated = true;
+    Global_Bandit_Settings.updated = false;
     Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS;
     Global_Bandit_Settings.manual_tap_len_setting = 0;
     Global_Bandit_Settings.manual_error_limit = 0;
     Global_Bandit_Settings.manual_freq_range = 0;
     // Locked by main core at startup
     spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
-
-    BS_RX_BF[USBBSRX_EN] = true;
-    BS_RX_BF[USBBSRX_AUTORUN] = true;
-    BS_RX_BF[USBBSRX_AUTOSEND] = true;
-    BS_RX_BF[USBBSRX_TAPLEN_LSB] = 32;
-    BS_RX_BF[USBBSRX_TAPLEN_MSB] = 0;
-    BS_RX_BF[USBBSRX_F_FRANGE] = 0;
 
     // Setup Structs and Default Parameters for FFT
     struct FFT_PARAMS cool_fft;
@@ -308,6 +303,16 @@ static void core_0_main(){
 
             case USB_SEND_TUSB: {
                 USB_Handler(&cool_fft); //send data to GUI through tusb
+                USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
+            }
+            break;
+
+            case USB_SEND_CORE_DEBUG: {
+                uint32_t spinlock_irq_status_F = spin_lock_blocking(DEBUG_REPORT_LOCK);
+
+                // idk yet
+
+                spin_unlock(DEBUG_REPORT_LOCK, spinlock_irq_status_F);
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break;
@@ -655,13 +660,11 @@ debug_no_adc_setup_label:
                         CORE_1_WGN_STATE = true;
                     }
 
-#ifdef COMMS_TESTED_GOOD
                     CORE_1_FRANGE = Global_Bandit_Settings.manual_freq_range;
                     LMS_Inst.max_error_allowed = Global_Bandit_Settings.manual_error_limit;
                     LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
 
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
-#endif
                     // Free spinlock on Global Settings
                     spin_unlock(SETTINGS_LOCK, spinlock_irq_status_C);
 
