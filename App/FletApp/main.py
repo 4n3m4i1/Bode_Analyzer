@@ -384,10 +384,10 @@ def main(page: ft.Page):
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
         if os == MACOS_STR:
-            portName = data_select.value.split("-")[0].strip()
+            portName = ctrl_select.value.split("-")[0].strip()
             ctrl_port.set(portName)
         elif os == LINUX_STR:
-            portName = data_select.value.split("-")[0].strip()
+            portName = ctrl_select.value.split("-")[0].strip()
             ctrl_port.set(portName)
         page.update()
 
