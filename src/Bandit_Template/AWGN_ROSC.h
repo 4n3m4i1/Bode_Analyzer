@@ -6,6 +6,8 @@
 #include "hardware/pio.h"
 #include "hardware/structs/pio.h"
 
+#include "Bandit_Pins.h"
+
 #include "pio_val_2_pin.pio.h"
 
 
@@ -29,7 +31,7 @@ void setup_PIO_for_switching(){
     int awgn_sm = 0;
     uint offset = pio_add_program(awgn_pio, &val2pin_program);
     awgn_pio->sm[awgn_sm].clkdiv = (uint32_t) ((15 << 16));
-    val2pin_program_init(awgn_pio, awgn_sm, offset, DMA_ROSC_PIN);
+    val2pin_program_init(awgn_pio, awgn_sm, offset, PDM_WGN_PAD);
 }
 
 void setup_chained_dma_channels(){

@@ -30,7 +30,7 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
     Q15 retval = LMS_FAIL_DFL;
     Q15 *desired = LMS->d_n + LMS->fixed_offset;
     Q15 *white_noise = LMS->x_n + LMS->fixed_offset;
-    uint32_t *sp_ct = &(LMS->samples_processed);
+    
 
     if(LMS->d_n_offset){
         if(LMS->d_n_offset > 0){
@@ -46,22 +46,25 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
     uint16_t n;
     //uint16_t max_loops = LMS->iteration_ct - LMS->fixed_offset - LMS->d_n_offset;
+    
     for(n = 0; n < LMS->iteration_ct; n += LMS->ddsmpl_stride){
-        retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
+        //retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
+        retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
         LMS_Update_Taps(LMS, WGN_FIR, retval);
 
-        (*sp_ct)++;        
+        LMS->samples_processed++;      
 
         // Error processing Stuff goes here!!!!!!!!!!!
         //  break if avg < min err
-        if(retval < LMS->target_error) break;
+        if(retval < LMS->target_error){
+            retval = LMS_OK;
+            break;
+        } 
     }
 
     if(n >= LMS->iteration_ct){
         if(retval > LMS->max_error_allowed) retval = LMS_FAIL_DFL;
     }
-
-    LMS->samples_processed = *sp_ct;
 
     // Error should be acceptable by now, or we've failed and everything sucks..
     return retval;
