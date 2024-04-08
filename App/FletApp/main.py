@@ -18,6 +18,8 @@ from multiprocess import Process, Queue, Event
 from threading import Thread
 from queue import Empty
 
+from bitstring import BitArray
+
 os = platform.system()
 
 # dataPort = None
@@ -103,7 +105,12 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             CTRLCHANNEL.write(b'~')
             CTRLCHANNEL.write(bytes(INIT_SETTINGS))
             # print(bytes(INIT_SETTINGS))
-            print(CTRLCHANNEL.read(64))
+            #print(CTRLCHANNEL.read(64))
+            setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
+            rest = BitArray(hex=CTRLCHANNEL.read(7).hex())
+            print(setting)
+            print(rest)
+            # print(thing.bin)
             # CTRLCHANNEL.flush()
             while True:
                 #if settings have been changed
