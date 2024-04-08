@@ -1003,8 +1003,26 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         uint32_t count = tud_cdc_n_read(itf, BS_RX_BF, BS_BF_LEN);
         
         //tud_cdc_n_write(CDC_CTRL_CHAN, BS_RX_BF, count);
-        
-        
+       // uint8_t tmp = BS_RX_BF[0];
+       // BS_RX_BF[0] = BS_RX_BF[9];
+       // BS_RX_BF[9] = tmp;
+//
+       // tmp = BS_RX_BF[1];
+       // BS_RX_BF[1] = BS_RX_BF[8];
+       // BS_RX_BF[8] = tmp;
+//
+       // tmp = BS_RX_BF[2];
+       // BS_RX_BF[2] = BS_RX_BF[7];
+       // BS_RX_BF[7] = tmp;
+//
+       // tmp = BS_RX_BF[3];
+       // BS_RX_BF[3] = BS_RX_BF[6];
+       // BS_RX_BF[6] = tmp;
+//
+       // tmp = BS_RX_BF[4];
+       // BS_RX_BF[4] = BS_RX_BF[5];
+       // BS_RX_BF[5] = tmp;
+
         tud_cdc_n_write_flush(CDC_DATA_CHAN);
         tud_cdc_n_write_flush(CDC_CTRL_CHAN);
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
@@ -1032,38 +1050,48 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         // Acquire settings lock
         uint32_t spinlock_irq_status_E = spin_lock_blocking(SETTINGS_LOCK);
 
-        if(BS_RX_BF[USBBSRX_EN]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_ENABLE);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_ENABLE);
+        uint32_t new_settings = 0;
 
-        if(BS_RX_BF[USBBSRX_AUTORUN]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
+        //if(BS_RX_BF[USBBSRX_EN]) SET_BANDIT_SETTING(new_settings, BS_ENABLE);
+        //else CLR_BANDIT_SETTING(new_settings, BS_ENABLE);
+//
+        //if(BS_RX_BF[USBBSRX_AUTORUN]) SET_BANDIT_SETTING(new_settings, BS_AUTO_RUN);
+        //else CLR_BANDIT_SETTING(new_settings, BS_AUTO_RUN);
+//
+        //if(BS_RX_BF[USBBSRX_AUTOSEND]) SET_BANDIT_SETTING(new_settings, BS_AUTO_SEND);
+        //else CLR_BANDIT_SETTING(new_settings, BS_AUTO_SEND);
+//
+        //if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) SET_BANDIT_SETTING(new_settings, BS_WGN_ON);
+        //else CLR_BANDIT_SETTING(new_settings, BS_WGN_ON);
 
-        if(BS_RX_BF[USBBSRX_AUTOSEND]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
-
-        if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON);
+        new_settings |= BS_RX_BF[USBBSRX_EN];
+        new_settings |= BS_RX_BF[USBBSRX_AUTORUN] << BS_AUTO_RUN;
+        new_settings |= BS_RX_BF[USBBSRX_AUTOSEND] << BS_AUTO_SEND;
+        new_settings |= BS_RX_BF[USBBSRX_WGN_ALWAYS_ON] << BS_WGN_ON;
 
         uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
 
-        uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB] ? 1u : 0u) << 8 | (BS_RX_BF[USBBSRX_TAPLEN_LSB] ? 1u : 0u);
-        //uint16_t man_error_limit = (BS_RX_BF[USBBSRX_ERR_MSB] ? 1u : 0u) << 8 | (BS_RX_BF[USBBSRX_ERR_LSB] ? 1u : 0u);
+        uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB]) << 8 | (BS_RX_BF[USBBSRX_TAPLEN_LSB]);
+        uint16_t man_error_limit = (BS_RX_BF[USBBSRX_ERR_MSB]) << 8 | (BS_RX_BF[USBBSRX_ERR_LSB]);
 
         
-        uint32_t Gbs = Global_Bandit_Settings.settings_bf;
         
-        //Global_Bandit_Settings.settings_bf = 0xAABBCCDD;
+        
+        //Global_Bandit_Settings.settings_bf = new_settings;
 
 
         tud_cdc_n_write(CDC_CTRL_CHAN, BS_RX_BF, 10);
-        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&Global_Bandit_Settings.settings_bf, 4);
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&new_settings, 4);
         tud_cdc_n_write(CDC_CTRL_CHAN, &newfreq_range, 1);
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newtaplen, 2);
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&man_error_limit, 2);
+
+
         tud_cdc_n_write_flush(CDC_DATA_CHAN);
         tud_cdc_n_write_flush(CDC_CTRL_CHAN);
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
 
-        Global_Bandit_Settings.settings_bf = Gbs;
+        Global_Bandit_Settings.settings_bf = new_settings;
 
         Global_Bandit_Settings.manual_freq_range = newfreq_range;
 
