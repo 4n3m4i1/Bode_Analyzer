@@ -103,7 +103,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             CTRLCHANNEL.write(b'~')
             CTRLCHANNEL.write(bytes(INIT_SETTINGS))
             # print(bytes(INIT_SETTINGS))
-            # print(CTRLCHANNEL.read(64))
+            print(CTRLCHANNEL.read(64))
             # CTRLCHANNEL.flush()
             while True:
                 #if settings have been changed
@@ -112,7 +112,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                     settings = settings_Queue.get(block=False)
                     # print(settings)
                     CTRLCHANNEL.write(bytes(settings))
-                    # print(CTRLCHANNEL.read(64))
+                    print(CTRLCHANNEL.read(64))
                     settings_event.clear()
                 else:
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH * BYTES_PER_NUMBER:
