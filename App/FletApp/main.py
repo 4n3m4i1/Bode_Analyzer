@@ -4,24 +4,15 @@ import serial
 import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
 import serial.tools.list_ports_linux as list_ports_linux
-import atexit
-
-import time
 import platform
-import random
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-# import numpy as np
 from itertools import chain
-
-# from scipy import fft
 import struct 
-
 import flet as ft
 from flet.matplotlib_chart import MatplotlibChart
 from flet import RouteChangeEvent, ViewPopEvent
-
 from multiprocess import Process, Queue, Event
 from threading import Thread
 from queue import Empty
@@ -40,14 +31,6 @@ class Port():
         self.name = portString
     def set(self, port):
         self.name = port
-
-
-
-# dataPort = "/dev/tty.usbmodem1234561"
-# ctrlPort = "/dev/tty.usbmodem1234563"
-
-# dataPort = "/dev/tty.URT0"
-# ctrlPort = "/dev/tty.URT0"
 
 NUM_VALUES = 128
 port_selections = []
@@ -81,21 +64,14 @@ init_graph = [0 for i in range(NUM_VALUES)]
 
 FFT_real_queue = Queue()
 FFT_converted_queue = Queue()
-
+Settings_Queue = Queue()
 GraphEvent = Event()
 
 ##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
-    DATA_PACKET_LENGTH = 128
-    HEADER_PACKET_LENGTH = 64
-    H = 1
-    HH = 2
-    FFR = 3
-    FFI = 4
-    IDLE = 5   
-    STATE = 5
+
     def close_banner(e):
         page.banner.open = False
         page.update()
@@ -121,22 +97,29 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             )
             x = x + 1
             #send initial settings
-            CTRLCHANNEL.write('~')
-            CTRLCHANNEL.write(INIT_SETTINGS)
-            CTRLCHANNEL.flush()
+            CTRLCHANNEL.write(b'~')
+            CTRLCHANNEL.write(bytes(INIT_SETTINGS))
+            # print(bytes(INIT_SETTINGS))
+            # print(CTRLCHANNEL.read(64))
+            # CTRLCHANNEL.flush()
             while True:
                 #if settings have been changed
                 if settings_event.is_set():
-                    CTRLCHANNEL.write('~')
-                    CTRLCHANNEL.write(settings_Queue.get(block=False))
+                    CTRLCHANNEL.write(b'~')
+                    settings = settings_Queue.get(block=False)
+                    # print(settings)
+                    CTRLCHANNEL.write(bytes(settings))
+                    # print(CTRLCHANNEL.read(64))
                     settings_event.clear()
                 else:
-                    if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
+                    if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH * BYTES_PER_NUMBER:
                         header_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
-                        CTRLCHANNEL.write('a')
+                        # print(header_data)
+                        CTRLCHANNEL.write(b'a')
 
                         num_samples = header_data[3] * 256 + header_data[4]
                         f_data = DATACHANNEL.read(CDC_PACKET_LENGTH * num_samples * BYTES_PER_NUMBER)
+                        # print(f_data)
                         data_Queue.put(f_data)
         except serial.SerialException:
             page.banner = ft.Banner(
@@ -159,7 +142,6 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
-
             data_out_Queue.put(converted_graph_data, block=False)
 
         except Empty:
@@ -173,8 +155,10 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
                 raise Empty
             data = data_Queue.get()
             line.set_ydata(data)
-            
-            plt.ylim(0, max(data))
+            if data:
+                plt.ylim(0, max(data)) 
+            else:
+                raise Empty
 
             axis.draw_artist(line)
             fig.canvas.blit(fig.bbox)
@@ -353,8 +337,10 @@ def main(page: ft.Page):
         page.update()
 
     def close_modal(e): #handle settings modal closing
-        SettingsSelection.open = False      
-
+        SettingsSelection.open = False  
+        if max(temp_settings) != 0 and start_event.is_set(): 
+            Settings_Queue.put(temp_settings)
+            settings_event.set()
         updated_table = ft.DataTable(
             border=ft.border.all(1, "black"),
             bgcolor = 'white',
@@ -370,8 +356,10 @@ def main(page: ft.Page):
                         cells=[
                             ft.DataCell(ft.Text(data_select.value)),
                             ft.DataCell(ft.Text(ctrl_select.value)),
-                            ft.DataCell(ft.Text(tap_select.value)),
-                            ft.DataCell(ft.Text(frequency_ranges[int(freq_range_select.value)])),
+                            ft.DataCell(ft.Text(tap_select.value)) if tap_select.value else ft.DataCell(ft.Text(parametric_taps[0])),
+                            ft.DataCell(ft.Text(frequency_ranges[int(freq_range_select.value)]))
+                                if freq_range_select.value
+                                else ft.DataCell(ft.Text(frequency_ranges[0]))
                         ],
                         
                 ),
@@ -412,14 +400,16 @@ def main(page: ft.Page):
             options=port_selections,
             on_change=select_ctrl_port
         )
-    temp_settings = [0 for i in range(SETTINGS_BF_LEN)]
+    temp_settings = INIT_SETTINGS
 
     def select_tap_length(e):
         bytes_tmp = int(tap_select.value).to_bytes(2, 'little')
         temp_settings[7] = bytes_tmp[0]
         temp_settings[8] = bytes_tmp[1]
+        print(temp_settings)
     def select_frange(e):
         temp_settings[9] = int(freq_range_select.value)
+        print(temp_settings)
 
     tap_select = ft.Dropdown(
             label=SELECT_TAP_STR,
@@ -467,7 +457,7 @@ def main(page: ft.Page):
     #page.add(ft.Column([Controls]) ,chart ) 
     page.add(ft.Column([Controls]),config_table,chart )
     
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, page))
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page))
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
     data_converter_process.daemon = True
