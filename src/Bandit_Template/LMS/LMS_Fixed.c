@@ -57,7 +57,9 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
 
         // Error processing Stuff goes here!!!!!!!!!!!
         //  break if avg < min err
-        if(retval < LMS->target_error){
+        // Cheap abs
+        if(retval < 0) retval = mul_Q15(retval, -1); 
+        if(retval <= LMS->target_error){
             retval = LMS_OK;
             break;
         } 

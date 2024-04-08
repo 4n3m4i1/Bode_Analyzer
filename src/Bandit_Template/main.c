@@ -167,9 +167,9 @@ int main(){
 
     Setup_Semaphores();
 
-    FFTMEMLOCK_A        = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
-    SETTINGS_LOCK       = spin_lock_init(INTERCORE_SETTINGS_LOCK);
-    DEBUG_REPORT_LOCK   = spin_lock_init(INTERCORE_CORE_1_DBG_LOCK);
+    //FFTMEMLOCK_A        = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
+    //SETTINGS_LOCK       = spin_lock_init(INTERCORE_SETTINGS_LOCK);
+    //DEBUG_REPORT_LOCK   = spin_lock_init(INTERCORE_CORE_1_DBG_LOCK);
 
     // Init h_hat core transfer register lengths to any known value.
     ICTXFR_A.len = 0;
@@ -232,15 +232,18 @@ static void core_0_main(){
     // Claim lock on settings until Core 0 can deal with initialization
     //  prevents Core 1 from starting any processing without settings
     //  in place.
-    spin_lock_claim(INTERCORE_SETTINGS_LOCK);
+    //spin_lock_claim(INTERCORE_SETTINGS_LOCK);
+    Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
     //Global_Bandit_Settings.updated = true;
     Global_Bandit_Settings.updated = false;
     Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS;
     Global_Bandit_Settings.manual_tap_len_setting = 0;
     Global_Bandit_Settings.manual_error_limit = 0;
     Global_Bandit_Settings.manual_freq_range = 0;
-    // Locked by main core at startup
-    spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
+    CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
+    SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
+    //spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
+    Release_Lock(INTERCORE_SETTINGS_LOCK);
 
     // Setup Structs and Default Parameters for FFT
     struct FFT_PARAMS cool_fft;
@@ -258,7 +261,7 @@ static void core_0_main(){
         tud_task();
         USB_STATE = USB_NEXT_STATE;
 
-        uint32_t spinlock_irq_status_A;
+        //volatile uint32_t spinlock_irq_status_A;
 
         switch(USB_STATE) {
             case USB_INIT: {
@@ -277,8 +280,12 @@ static void core_0_main(){
                 
                 struct Transfer_Data *data_src;
 
-                spinlock_irq_status_A = spin_lock_blocking(FFTMEMLOCK_A);
+                //while(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A));
+                //spin_lock_claim(INTERCORE_FFTMEM_LOCK_A);
+                //spinlock_irq_status_A = spin_lock_blocking(FFTMEMLOCK_A);
                 
+                Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
+
                 data_src = &ICTXFR_A;
 
 
@@ -301,7 +308,10 @@ static void core_0_main(){
             case USB_RUN_DMC_JK_RUN_FFT: {
                 FFT_fixdpt(&cool_fft);
                 // Free memory constraints
-                spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
+                
+                Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+                //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
+                //spin_lock_unclaim(INTERCORE_FFTMEM_LOCK_A);
                 USB_NEXT_STATE = USB_SEND_TUSB;
             }
             break;
@@ -313,17 +323,24 @@ static void core_0_main(){
             break;
 
             case USB_SEND_CORE_DEBUG: {
-                uint32_t spinlock_irq_status_F = spin_lock_blocking(DEBUG_REPORT_LOCK);
+                // indicate to CORE 1 debug report is wanted
+                //while(spin_lock_is_claimed(INTERCORE_CORE_1_DBG_LOCK));
+                //spin_lock_claim(INTERCORE_CORE_1_DBG_LOCK);
+                //volatile uint32_t spinlock_irq_status_F = spin_lock_blocking(DEBUG_REPORT_LOCK);
+
+                Acquire_Lock_Blocking(INTERCORE_CORE_1_DBG_LOCK);
 
                 // idk yet
 
-                spin_unlock(DEBUG_REPORT_LOCK, spinlock_irq_status_F);
+                //spin_unlock(DEBUG_REPORT_LOCK, spinlock_irq_status_F);
+                //spin_lock_unclaim(INTERCORE_CORE_1_DBG_LOCK);
+                Release_Lock(INTERCORE_CORE_1_DBG_LOCK);
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break;
             
             default: {
-                USB_NEXT_STATE = USB_INIT;
+                USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break; //need debug for USB_STATE error
 
@@ -338,7 +355,7 @@ static void core_0_main(){
 //////////////////////////////////////////////////////////////////////
 static void core_1_main(){
     busy_wait_us_32(1000);
-
+    Acquire_Lock_Blocking(INTERCORE_CORE_1_DBG_LOCK);
     Bandit_Debug_Report.epoch_core_1_boot_us = timer_hw->timelr;
     uint8_t Bandit_Calibration_State = BANDIT_UNCALIBRATED;
     Q15 Bandit_DC_Offset_Cal = 0;
@@ -444,7 +461,7 @@ start_adc_setup:
             ADS7253_Read_Dual_Data(ADC_PIO, &tmp_arr[0], &tmp_arr[1]);
     }
 
-    busy_wait_us_32(20);
+    busy_wait_us_32(150);
     
     // Read the CFR and ensure it's lookin good before proceeding
     tmp_arr[0] = ADS7253_CMD(ADS7253_CFR_READ, 0);
@@ -454,9 +471,9 @@ start_adc_setup:
     // Ask for CFR readback twice just to be sure the data is latched
     //  and CFR is updated.
     ADS7253_write16_blocking(ADC_PIO, tmp_arr, ADS_READ_REG_COUNT);
-    busy_wait_us_32(50);
+    busy_wait_us_32(150);
     ADS7253_write16_blocking(ADC_PIO, tmp_arr, ADS_READ_REG_COUNT);
-    busy_wait_us_32(50);
+    busy_wait_us_32(150);
     
     while(!pio_sm_is_rx_fifo_empty(ADC_PIO, ADS_PIO_SDOA_SM)){
         tmp_arr[0] = ADC_PIO->rxf[ADS_PIO_SDOA_SM];
@@ -481,7 +498,7 @@ start_adc_setup:
 
 
     if(banditsetup_adc_attempts){
-        busy_wait_us_32(50);
+        busy_wait_us_32(150);
         goto start_adc_setup;
     }
 
@@ -590,11 +607,12 @@ start_refdac_cal:
     //  fs in khz
     Sampling_Setup(500);
 
-    uint16_t CORE_1_STATE = CORE_1_IDLE;
-    uint16_t error_attempts = 0;            // How many times the LMS algorithm has failed to converge
-    bool CORE_1_DBG_MODE = false;           // Are we in debug mode?
-    bool CORE_1_WGN_STATE = false;          // Is WGN always on?
-    uint8_t CORE_1_FRANGE = DOWNSAMPLE_1X_250K_CUT;
+    bool SET_STALL          = false;
+    uint16_t CORE_1_STATE   = CORE_1_IDLE;
+    uint16_t error_attempts = 0;                // How many times the LMS algorithm has failed to converge
+    bool CORE_1_DBG_MODE    = false;            // Are we in debug mode?
+    bool CORE_1_WGN_STATE   = false;            // Is WGN always on?
+    uint8_t CORE_1_FRANGE   = DOWNSAMPLE_1X_250K_CUT;
 
     // Configure- White Noise Generation Signal Chain
     // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
@@ -602,12 +620,16 @@ start_refdac_cal:
     setup_PIO_for_switching();
     setup_chained_dma_channels();
 
-    uint32_t spinlock_irq_status_B = spin_lock_blocking(SETTINGS_LOCK);
+    //volatile uint32_t spinlock_irq_status_B = spin_lock_blocking(SETTINGS_LOCK);
+    
+    Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
+        start_wgn_dma_channels();
         start_randombit_dma_chain(dma_awgn_ctrl_chan);
         CORE_1_WGN_STATE = true;
     }
-    spin_unlock(SETTINGS_LOCK, spinlock_irq_status_B);
+    //spin_unlock(SETTINGS_LOCK, spinlock_irq_status_B);
+    Release_Lock(INTERCORE_SETTINGS_LOCK);
 
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
@@ -620,18 +642,18 @@ debug_no_adc_setup_label:
 #endif
 
     set_ULED_level(Bandit_RGBU.U = 255);
-    busy_wait_ms(1000);
+    busy_wait_ms(500);
     set_ULED_level(Bandit_RGBU.U = 0);
-    busy_wait_ms(1000);
+    busy_wait_ms(500);
     set_ULED_level(Bandit_RGBU.U = 255);
-    busy_wait_ms(1000);
+    busy_wait_ms(500);
     set_ULED_level(Bandit_RGBU.U = 0);
 
     while(1){
         switch(CORE_1_STATE){
             case CORE_1_IDLE: {
 #ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
+                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
 #endif
                 // If starting conditions are met start the whole DSP cycle
                 if(Bandit_Calibration_State == BANDIT_UNCALIBRATED){
@@ -642,40 +664,26 @@ debug_no_adc_setup_label:
                     
                     LMS_Inst.samples_processed = 0;
 
-                    CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+                    CORE_1_STATE = CORE_1_SET_SETTINGS;
                 }
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
 
-            case CORE_1_APPLY_SETTINGS: {
+            case CORE_1_SET_SETTINGS: {
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
 #endif
-                uint32_t spinlock_irq_status_C = spin_lock_blocking(SETTINGS_LOCK);
+                Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
+
+#ifndef NO_DEBUG_LED
+                set_ULED_level(Bandit_RGBU.U++);
+#endif
 
                 if(Global_Bandit_Settings.updated){
-                    if(Bandit_Calibration_State > BANDIT_CAL_DC_BIAS_IN_PROG){
-                        
-                        Global_Bandit_Settings.updated = false;
-                        // Need to recalibrate transfer function if a settings update occurs
-                        Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
-
-                    } else {
-                        // First cycle through the states
-                        // Need to do DC Cal
-                        // Keep PGA uninitialized
-                        //  Sample and adjust for DC
-                        // This is more of a catchall, this state is set in CORE_1_IDLE
-                        CORE_1_STATE = CORE_1_SAMPLE;
-                    }
-                    
-                    // Apply Generic Settings
-#ifdef ENABLE_DBG_MODE_OPTION                    
-                    CORE_1_DBG_MODE = (CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_DEBUG_MODE));
-#endif
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
+                        start_wgn_dma_channels();
                         start_randombit_dma_chain(dma_awgn_ctrl_chan);
                         CORE_1_WGN_STATE = true;
                     }
@@ -685,41 +693,64 @@ debug_no_adc_setup_label:
                     LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
 
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
-                    // Free spinlock on Global Settings
-                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status_C);
 
-                    if(Bandit_Calibration_State == BANDIT_CAL_AA_TXFR_FUNC_IN_PROG){
-                        // if settings changed:
-                        //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
-                        // Switch frontend PGA to White Noise Loopback
-                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
-                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
-                        busy_wait_us_32(MCP6S92_SETTLING_TIME);
-                    } else
-                    if(CORE_1_WGN_STATE) {
-                        // If WGN State toggled
-                        // PGA Settling Time, if WGN already on. If WGN is being tuned on its own delay will deal w this
-                        busy_wait_us_32(MCP6S92_SETTLING_TIME);
-                    }
 
-                    // Start white noise for loopback testing
-                    if(!CORE_1_WGN_STATE){
-                        stop_randombit_dma_chain(dma_awgn_data_chan);
-                        busy_wait_us(1);
-                        start_randombit_dma_chain(dma_awgn_ctrl_chan);
-                        busy_wait_us(WGN_PROP_TIME_US);                     // Allow time to deal with RC time constants
-                    }
+                    Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
+                    Global_Bandit_Settings.updated = false;
+                    CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
-                    // if auto run or run signal -> CORE_1_STATE = CORE_1_SAMPLE;
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
                         CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN)){
                             
                             CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN);
-                            CORE_1_STATE = CORE_1_SAMPLE;
+                            CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+                    } else {
+                        SET_STALL = true;
                     }
-
-                    spin_unlock(SETTINGS_LOCK, spinlock_irq_status_C);
                 }
+
+                Release_Lock(INTERCORE_SETTINGS_LOCK);
+
+                if(SET_STALL){
+                    set_ULED_level(--Bandit_RGBU.U);
+                    busy_wait_ms(500);
+                    SET_STALL = 0;
+                }
+
+                if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
+            }
+            break;
+
+            case CORE_1_APPLY_SETTINGS: {
+#ifndef NO_DEBUG_LED
+                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 255);
+                set_ULED_level(0);
+#endif
+                if(Bandit_Calibration_State == BANDIT_CAL_AA_TXFR_FUNC_IN_PROG){
+                    // if settings changed:
+                    //  Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG
+                    // Switch frontend PGA to White Noise Loopback
+                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_1, PGA_CSN_PAD);
+                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+                    busy_wait_us_32(MCP6S92_SETTLING_TIME);
+                } else
+                if(CORE_1_WGN_STATE) {
+                    // If WGN State toggled
+                    // PGA Settling Time, if WGN already on. If WGN is being tuned on its own delay will deal w this
+                    busy_wait_us_32(MCP6S92_SETTLING_TIME);
+                } else
+                if(!CORE_1_WGN_STATE){
+                    // Start white noise for loopback testing
+                    //stop_randombit_dma_chain(dma_awgn_data_chan);
+                    //stop_randombit_dma_chain(dma_awgn_ctrl_chan);
+                    stop_wgn_dma_channels();
+                    busy_wait_us(1);
+                    start_wgn_dma_channels();
+                    start_randombit_dma_chain(dma_awgn_ctrl_chan);
+                    busy_wait_us(WGN_PROP_TIME_US);                     // Allow time to deal with RC time constants
+                }
+
+                CORE_1_STATE = CORE_1_SAMPLE;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
@@ -727,7 +758,8 @@ debug_no_adc_setup_label:
 
             case CORE_1_SAMPLE: {
 #ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
+                set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 255, Bandit_RGBU.B = 255);
+                set_ULED_level(Bandit_RGBU.U = 0);
 #endif
                 tmp_arr[0] = 0;
                 uint32_t NVIC_ISR_EN = nvic_hw->icer;
@@ -791,7 +823,8 @@ debug_no_adc_setup_label:
 
                 // Go white for DC Cal done, Idle return
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 127);
-                set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
+                busy_wait_ms(1000);
+                //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
 
                 CORE_1_STATE = CORE_1_IDLE;
             }
@@ -870,7 +903,7 @@ debug_no_adc_setup_label:
                 //}
                 //LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
 
-skip_downsampling_label:
+//skip_downsampling_label:
                 CORE_1_STATE = CORE_1_LMS;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
@@ -878,34 +911,33 @@ skip_downsampling_label:
             break;
             case CORE_1_LMS: {
 #ifndef NO_DEBUG_LED
-                //set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
-                set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
-                set_ULED_level(Bandit_RGBU.U++);
+                set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
+                //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
+                set_ULED_level(Bandit_RGBU.U = 0);
 #endif
                 // If first run: error_attempts = 0, thus we flush FIR buffer
                 //  else we should maintain results for more iterations
-                Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR, (!error_attempts) ? true : false);
+                //Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR, (!error_attempts) ? true : false);
+
+                Q15 LMS_Error = LMS_OK;
 
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 255);
-                set_ULED_level(++Bandit_RGBU.U);
+                //set_ULED_level(++Bandit_RGBU.U);
 #endif
                 //CORE_1_STATE = CORE_1_POST_PROC;
 
-                if(LMS_Error == LMS_FAIL_DFL){
+                if(LMS_Error != LMS_OK){
                     // Handle the error
                     //  Sample again and try again
                     error_attempts++;
-
-                    if(error_attempts > LMS_Inst.max_convergence_attempts) {
-                        // Bring up failure to user here or something
-                        CORE_1_STATE = CORE_1_POST_PROC;
-                    } else {
-                        CORE_1_STATE = CORE_1_SAMPLE;
-                    }
+                    CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     CORE_1_STATE = CORE_1_POST_PROC;
                 }
+
+                // If we've errored out too many times...
+                if(error_attempts > LMS_Inst.max_convergence_attempts) CORE_1_STATE = CORE_1_POST_PROC;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
@@ -933,8 +965,9 @@ skip_downsampling_label:
 
                     // Indicate full CAL with green LEDs
                     set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-                    set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
+                    //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
                     
+                    // Calibration Acquired, go back to do first run
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
                     // Move on with a normal run
@@ -946,7 +979,9 @@ skip_downsampling_label:
 
                 // Turn off WGN if always on is disabled
                 if(!CORE_1_WGN_STATE){
-                    stop_randombit_dma_chain(dma_awgn_data_chan);
+                    //stop_randombit_dma_chain(dma_awgn_data_chan);
+                    //stop_randombit_dma_chain(dma_awgn_ctrl_chan);
+                    stop_wgn_dma_channels();
                 }
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
@@ -962,16 +997,32 @@ skip_downsampling_label:
                 // If this didn't need to be serialized DMA would be sick here
                 //  but really no benefit due to overall processing structure
                 //  1000% could be better tho
-                uint32_t spinlock_irq_status_D;
-                spin_lock_t *used_lock;
+                //volatile uint32_t spinlock_irq_status_D;
+                //spin_lock_t *used_lock;
 
-                spinlock_irq_status_D = spin_lock_blocking(FFTMEMLOCK_A);
-                used_lock = FFTMEMLOCK_A;
+                //while(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A));
+                //spin_lock_claim(INTERCORE_FFTMEM_LOCK_A);
+                //spinlock_irq_status_D = spin_lock_blocking(FFTMEMLOCK_A);
+                //used_lock = FFTMEMLOCK_A;
                 
+                Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
+
                 transfer_results_to_safe_mem(LMS_FIR.taps, &ICTXFR_A, LMS_Inst.tap_len);
-                
-                spin_unlock(used_lock, spinlock_irq_status_D);
 
+                //spin_lock_unclaim(INTERCORE_FFTMEM_LOCK_A);                
+                //spin_unlock(used_lock, spinlock_irq_status_D);
+                Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+
+#ifndef NO_DEBUG_LED
+                busy_wait_ms(500);
+                set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
+                busy_wait_ms(500);
+                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
+                busy_wait_ms(500);
+                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
+                busy_wait_ms(500);
+                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
+#endif
                 CORE_1_STATE = CORE_1_IDLE;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
@@ -1087,27 +1138,52 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         //  Byte[9] F Range (ENUM)
 
         // Acquire settings lock
-        uint32_t spinlock_irq_status_E = spin_lock_blocking(SETTINGS_LOCK);
+        //while(spin_lock_is_claimed(INTERCORE_SETTINGS_LOCK));
+        //spin_lock_claim(INTERCORE_SETTINGS_LOCK);
+        //volatile uint32_t spinlock_irq_status_E = spin_lock_blocking(SETTINGS_LOCK);
 
-        if(BS_RX_BF[USBBSRX_EN]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_ENABLE);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_ENABLE);
+        Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
 
-        if(BS_RX_BF[USBBSRX_AUTORUN]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
+        uint32_t new_settings_value = Global_Bandit_Settings.settings_bf;
+        
+        if(BS_RX_BF[USBBSRX_EN]) new_settings_value |= (1u << BS_ENABLE);
+        else new_settings_value &= ~(1u << BS_ENABLE); 
+        if(BS_RX_BF[USBBSRX_AUTORUN]) new_settings_value |= (1u << BS_AUTO_RUN);
+        else new_settings_value &= ~(1u << BS_AUTO_RUN);
+        if(BS_RX_BF[USBBSRX_AUTOSEND]) new_settings_value |= (1u << BS_AUTO_SEND);
+        else new_settings_value &= ~(1u << BS_AUTO_SEND);
+        if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) new_settings_value |= (1u << BS_WGN_ON);
+        else new_settings_value &= ~(1u << BS_WGN_ON);
 
-        if(BS_RX_BF[USBBSRX_AUTOSEND]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
 
-        if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON);
-        else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON);
+        // WHY DOESN"T THIS WORK
+        //if(BS_RX_BF[USBBSRX_EN]) SET_BANDIT_SETTING(new_settings_value, BS_ENABLE);
+        //else CLR_BANDIT_SETTING(new_settings_value, BS_ENABLE);
+//
+        //if(BS_RX_BF[USBBSRX_AUTORUN]) SET_BANDIT_SETTING(new_settings_value, BS_AUTO_RUN);
+        //else CLR_BANDIT_SETTING(new_settings_value, BS_AUTO_RUN);
+//
+        //if(BS_RX_BF[USBBSRX_AUTOSEND]) SET_BANDIT_SETTING(new_settings_value, BS_AUTO_SEND);
+        //else CLR_BANDIT_SETTING(new_settings_value, BS_AUTO_SEND);
+//
+        //if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) SET_BANDIT_SETTING(new_settings_value, BS_WGN_ON);
+        //else CLR_BANDIT_SETTING(new_settings_value, BS_WGN_ON);
 
         uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
 
         uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB]) << 8 | (BS_RX_BF[USBBSRX_TAPLEN_LSB]);
         uint16_t man_error_limit = (BS_RX_BF[USBBSRX_ERR_MSB]) << 8 | (BS_RX_BF[USBBSRX_ERR_LSB]);
 
+        //Global_Bandit_Settings.settings_bf = new_settings;
 
-        tud_cdc_n_write(CDC_CTRL_CHAN, BS_RX_BF, 10);
+        Global_Bandit_Settings.manual_freq_range = newfreq_range;
+
+        //Global_Bandit_Settings.manual_error_limit = man_error_limit;
+        Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
+
+        Global_Bandit_Settings.settings_bf = new_settings_value;
+
+        tud_cdc_n_write(CDC_CTRL_CHAN, BS_RX_BF, count);
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&Global_Bandit_Settings.settings_bf, 4);
         tud_cdc_n_write(CDC_CTRL_CHAN, &newfreq_range, 1);
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newtaplen, 2);
@@ -1118,12 +1194,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_write_flush(CDC_CTRL_CHAN);
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
 
-        //Global_Bandit_Settings.settings_bf = new_settings;
-
-        Global_Bandit_Settings.manual_freq_range = newfreq_range;
-
-        //Global_Bandit_Settings.manual_error_limit = man_error_limit;
-        Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
+        
 
         Global_Bandit_Settings.updated = true;
         // Do USB Settings application here!!
@@ -1131,7 +1202,9 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         //  have been changed
         //  set UPDATED = true if any bitfield settings have been altered
 
-        spin_unlock(SETTINGS_LOCK, spinlock_irq_status_E);
+        //spin_unlock(SETTINGS_LOCK, spinlock_irq_status_E);
+        //spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
+        Release_Lock(INTERCORE_SETTINGS_LOCK);
     } else {
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
         tud_task();

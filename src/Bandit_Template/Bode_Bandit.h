@@ -148,12 +148,12 @@ enum BANDIT_SETTINGS_BF {
 */
 
 struct BANDIT_SETTINGS {
-    uint8_t         updated;
-    uint32_t        settings_bf;
-    uint32_t        auto_freq_range;
-    uint16_t        manual_tap_len_setting;
-    uint32_t        manual_error_limit;
-    uint32_t        manual_freq_range;
+    volatile uint8_t         updated;
+    volatile uint32_t        settings_bf;
+    volatile uint32_t        auto_freq_range;
+    volatile uint16_t        manual_tap_len_setting;
+    volatile uint32_t        manual_error_limit;
+    volatile uint32_t        manual_freq_range;
 };
 
 #define CHK_BANDIT_SETTING(a, b)        (a & (1u << b))
@@ -170,6 +170,7 @@ struct BANDIT_SETTINGS {
 */
 enum BANDIT_CORE_1_DSP_STATES {
     CORE_1_IDLE,
+    CORE_1_SET_SETTINGS,
     CORE_1_APPLY_SETTINGS,
     CORE_1_SAMPLE,
     CORE_1_APPLY_DC_CORRECTION,

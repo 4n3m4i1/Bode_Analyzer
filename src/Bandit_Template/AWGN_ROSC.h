@@ -14,7 +14,7 @@
 #define DMA_ROSC_CHANNEL    0
 #define DMA_ROSC_PIN        0
 
-#define WGN_PROP_TIME_US    1000
+#define WGN_PROP_TIME_US    2500
 
 int dma_awgn_data_chan, dma_awgn_ctrl_chan;
 
@@ -75,8 +75,18 @@ void start_randombit_dma_chain(int dma_channel){
     dma_start_channel_mask(1 << dma_channel);
 }
 
+void start_wgn_dma_channels(){
+    dma_hw->ch[dma_awgn_ctrl_chan].ctrl_trig |= (1u);
+    dma_hw->ch[dma_awgn_data_chan].ctrl_trig |= (1u);
+}
+
 void stop_randombit_dma_chain(int dma_channel){
     dma_channel_abort(dma_channel);
+}
+
+void stop_wgn_dma_channels(){
+    dma_hw->ch[dma_awgn_ctrl_chan].ctrl_trig &= ~(1u);
+    dma_hw->ch[dma_awgn_data_chan].ctrl_trig &= ~(1u);
 }
 
 #endif

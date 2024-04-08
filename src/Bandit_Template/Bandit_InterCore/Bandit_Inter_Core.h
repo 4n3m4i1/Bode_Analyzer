@@ -10,5 +10,7 @@
 
 
 void Setup_Semaphores();
+bool Acquire_Lock_Blocking(uint32_t lock_num);
+void Release_Lock(uint32_t lock_num);
 
 #endif
