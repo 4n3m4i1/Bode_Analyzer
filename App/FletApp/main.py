@@ -1,9 +1,10 @@
 from generic_include import *
 from assets.ref import *
 import serial
-import serial.tools.list_ports_osx as list_ports_osx
+# import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
-import serial.tools.list_ports_linux as list_ports_linux
+# import serial.tools.list_ports_linux as list_ports_linux
+import serial.tools.list_ports as list_ports
 import platform
 import matplotlib
 matplotlib.use('agg')
@@ -34,17 +35,19 @@ class Port():
 
 NUM_VALUES = 128
 port_selections = []
-if os == MACOS_STR: 
-    for port in list_ports_osx.comports():
-        port_selections.append(ft.dropdown.Option(str(port).split(".")[1]))
-elif os == LINUX_STR:
-    for port in list_ports_linux.comports():
-        port_selections.append(ft.dropdown.Option(str(port)))
-# elif os == WINDOWS_STR:
-#     for port in list_ports_windows.comports():
+# if os == MACOS_STR: 
+#     for port in list_ports_osx.comports():
+#         port_selections.append(ft.dropdown.Option(str(port).split(".")[1]))
+# elif os == LINUX_STR:
+#     for port in list_ports_linux.comports():
 #         port_selections.append(ft.dropdown.Option(str(port)))
-else: pass
+# # elif os == WINDOWS_STR:
+# #     for port in list_ports_windows.comports():
+# #         port_selections.append(ft.dropdown.Option(str(port)))
+# else: pass
 
+for port in list_ports.comports():
+    port_selections.append(ft.dropdown.Option(str(port)))
 parametric_taps =[32,64,128,256, 512, 1024]
 taps_list =[]
 size = len(parametric_taps)
@@ -372,22 +375,20 @@ def main(page: ft.Page):
         page.update()
 
     def select_data_port(e): #handle data port selection
-        match os:
-            case "Darwin":
-                portName = data_select.value.split("-")[0].strip()
-                data_port.set(f"{MACOS_PORT_PREFIX}{portName}")
-            case "Linux":
-                portName = data_select.value
-                data_port.set(portName)
+        if os == MACOS_STR:
+            portName = data_select.value.split("-")[0].strip()
+            data_port.set(portName)
+        elif os == LINUX_STR:
+            portName = data_select.value
+            data_port.set(portName)
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
-        match os:
-            case "Darwin":
-                portName = ctrl_select.value.split("-")[0].strip()
-                ctrl_port.set(f"{MACOS_PORT_PREFIX}{portName}")
-            case "Linux":
-                portName = ctrl_select.value
-                ctrl_port.set(portName)
+        if os == MACOS_STR:
+            portName = data_select.value.split("-")[0].strip()
+            ctrl_port.set(portName)
+        elif os == LINUX_STR:
+            portName = data_select.value
+            ctrl_port.set(portName)
         page.update()
 
     data_select = ft.Dropdown(
