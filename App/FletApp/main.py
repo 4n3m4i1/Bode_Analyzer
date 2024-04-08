@@ -384,22 +384,36 @@ def main(page: ft.Page):
         page.update()
 
     def select_data_port(e): #handle data port selection
-        match os:
-            case "Darwin":
-                portName = data_select.value.split("-")[0].strip()
-                data_port.set(f"{MACOS_PORT_PREFIX}{portName}")
-            case "Linux":
-                portName = data_select.value
-                data_port.set(portName)
+        if(os == "Darwin"):
+            portName = data_select.value.split("-")[0].strip()
+            data_port.set(f"{MACOS_PORT_PREFIX}{portName}")
+        elif(os == "Linux"):
+            portName = data_select.value
+            data_port.set(portName)
+        
+        #match os:
+        #    case "Darwin":
+        #        portName = data_select.value.split("-")[0].strip()
+        #        data_port.set(f"{MACOS_PORT_PREFIX}{portName}")
+        #    case "Linux":
+        #        portName = data_select.value
+        #        data_port.set(portName)
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
-        match os:
-            case "Darwin":
-                portName = ctrl_select.value.split("-")[0].strip()
-                ctrl_port.set(f"{MACOS_PORT_PREFIX}{portName}")
-            case "Linux":
-                portName = ctrl_select.value
-                ctrl_port.set(portName)
+        if(os == "Darwin"):
+            portName = data_select.value.split("-")[0].strip()
+            ctrl_port.set(f"{MACOS_PORT_PREFIX}{portName}")
+        elif(os == "Linux"):
+            portName = data_select.value
+            ctrl_port.set(portName)
+        
+        #match os:
+        #    case "Darwin":
+        #        portName = ctrl_select.value.split("-")[0].strip()
+        #        ctrl_port.set(f"{MACOS_PORT_PREFIX}{portName}")
+        #    case "Linux":
+        #        portName = ctrl_select.value
+        #        ctrl_port.set(portName)
         page.update()
 
     data_select = ft.Dropdown(

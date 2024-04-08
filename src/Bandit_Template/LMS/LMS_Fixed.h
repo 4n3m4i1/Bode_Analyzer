@@ -23,12 +23,15 @@
             The last case is not possible, but is accounted for.
 */
 
-enum LMS_LOOPER_RETURNS {
-    LMS_OK,
-    LMS_FAIL_DFL,
-    LMS_FAIL_NO_CONVERGENCE,
-    LMS_FAIL_ERR_2_HI
-};
+//  enum LMS_LOOPER_RETURNS {
+//      LMS_OK,
+//      LMS_FAIL_DFL,
+//      LMS_FAIL_NO_CONVERGENCE,
+//      LMS_FAIL_ERR_2_HI
+//  };
+
+#define LMS_OK          0
+#define LMS_FAIL_DFL    1
 
 #define LMS_DFL_MAX_FAILURES    32
 
