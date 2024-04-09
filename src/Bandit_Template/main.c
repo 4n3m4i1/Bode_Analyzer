@@ -391,6 +391,8 @@ static void core_1_main(){
     LMS_FIR.size_true = TOTAL_ADAPTIVE_FIR_LEN;
     LMS_FIR.data = LMS_FIR_BANK;
     LMS_FIR.taps = LMS_H_HATS;
+    
+    LMS_Inst.max_convergence_attempts = 4;
 
     /*
         For Tap Length Update:
@@ -690,10 +692,14 @@ debug_no_adc_setup_label:
 
                     CORE_1_FRANGE = Global_Bandit_Settings.manual_freq_range;
                     LMS_Inst.max_error_allowed = Global_Bandit_Settings.manual_error_limit;
-                    LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
+                   // LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
+                    LMS_Inst.tap_len = 32;
+
+                    if(LMS_Inst.tap_len > MAX_TAPS) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
 
+                    LMS_FIR.curr_zero = 0;
 
                     Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
                     Global_Bandit_Settings.updated = false;
@@ -713,7 +719,7 @@ debug_no_adc_setup_label:
 
                 if(SET_STALL){
                     set_ULED_level(--Bandit_RGBU.U);
-                    busy_wait_ms(500);
+                    busy_wait_ms(250);
                     SET_STALL = 0;
                 }
 
@@ -748,6 +754,9 @@ debug_no_adc_setup_label:
                     start_wgn_dma_channels();
                     start_randombit_dma_chain(dma_awgn_ctrl_chan);
                     busy_wait_us(WGN_PROP_TIME_US);                     // Allow time to deal with RC time constants
+                
+                    // 5ms additional delay to ensure white noise settles
+                    busy_wait_us_32(5000);
                 }
 
                 CORE_1_STATE = CORE_1_SAMPLE;
@@ -823,7 +832,7 @@ debug_no_adc_setup_label:
 
                 // Go white for DC Cal done, Idle return
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 127);
-                busy_wait_ms(1000);
+               // busy_wait_ms(1000);
                 //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
 
                 CORE_1_STATE = CORE_1_IDLE;
@@ -853,6 +862,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 2;
+                        LMS_Inst.ddsmpl_shift = 1;
                     break;
                     case DOWNSAMPLE_4X_62K5_CUT:
                         torun = &CUT_62KHZ;
@@ -868,6 +878,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 4;
+                        LMS_Inst.ddsmpl_shift = 2;
                     break;
                     case DOWNSAMPLE_8X_32K2_CUT:
                         torun = &CUT_31KHZ;
@@ -883,12 +894,14 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 8;
+                        LMS_Inst.ddsmpl_shift = 3;
                     break;
 
                     case DOWNSAMPLE_1X_250K_CUT:
                     default:
                         LMS_Inst.fixed_offset = 0;
                         LMS_Inst.ddsmpl_stride = 1;
+                        LMS_Inst.ddsmpl_shift = 0;
                        // goto skip_downsampling_label;
                     break;
                 }
@@ -906,6 +919,8 @@ debug_no_adc_setup_label:
 //skip_downsampling_label:
                 CORE_1_STATE = CORE_1_LMS;
 
+                //busy_wait_ms(1000);
+
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
@@ -915,11 +930,61 @@ debug_no_adc_setup_label:
                 //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
                 set_ULED_level(Bandit_RGBU.U = 0);
 #endif
+                if(LMS_FIR.data == LMS_FIR_BANK)set_ULED_level(Bandit_RGBU.U = 127);
+
+                Q15 LMS_Error = LMS_FAIL_DFL;
+
+#define ICKY_EXPANDED_LMS
+#ifdef ICKY_EXPANDED_LMS
+                LMS_FIR.size = 32;
+                LMS_FIR.size_mask = 31;
+
+
+                if(error_attempts == 0) flush_FIR_buffer_and_taps(&LMS_FIR);
+
+                uint_fast16_t max_iters = (LMS_Inst.iteration_ct >> LMS_Inst.ddsmpl_shift);
+                uint_fast16_t stride = LMS_Inst.ddsmpl_stride;
+                uint_fast16_t n;
+                for(n = 0; n < 1024; ++n){
+                    Q15 wgnval = X_N_0[n];
+                    //add_sample_to_2n_FIR_I16_no_inc(&LMS_FIR, wgnval);
+                    LMS_FIR_BANK[LMS_FIR.curr_zero & 31] = wgnval;
+                    Q15 tmp = 0;
+                    for(uint_fast16_t m = 0; m < 32; ++m) tmp += mul_Q15(recall_sample_from_2n_FIR(&LMS_FIR, m), LMS_FIR.taps[m]);
+                    LMS_FIR.curr_zero++;
+
+                    //LMS_Error = LMS_Inst.d_n[n] - run_2n_FIR_cycle(&LMS_FIR, wgnval);
+                    LMS_Error = D_N_0[n] - tmp;
+                
+                    //LMS_Update_Taps(&LMS_Inst, &LMS_FIR, LMS_Error);
+
+                    for(uint_fast16_t m = 0; m < LMS_Inst.tap_len; ++m){
+                        tmp = mul_Q15(LMS_Error, LMS_FIR_BANK[m]);
+                        LMS_H_HATS[m] += mul_Q15(0x0020, tmp);
+                    }
+
+                    LMS_Inst.samples_processed++;
+
+                    if(LMS_Error < 0) LMS_Error = mul_Q15(LMS_Error, -1);
+                    if(LMS_Error <= 0x0666){
+                        LMS_Error = LMS_OK;
+                        break;
+                    }
+                }
+
+                if(n >= max_iters) if(LMS_Error > LMS_Inst.max_error_allowed) LMS_Error = LMS_FAIL_DFL;
+
+#else
+
                 // If first run: error_attempts = 0, thus we flush FIR buffer
                 //  else we should maintain results for more iterations
-                //Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR, (!error_attempts) ? true : false);
-
-                Q15 LMS_Error = LMS_OK;
+                LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR, (!error_attempts) ? true : false);
+                
+                //for(int n = 0; n < LMS_FIR.size; ++n){
+                //    add_sample_to_2n_FIR_I16_no_inc(&LMS_FIR, n);
+                //}
+                //LMS_Error = LMS_OK;
+#endif
 
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 255);
@@ -934,10 +999,17 @@ debug_no_adc_setup_label:
                     CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     CORE_1_STATE = CORE_1_POST_PROC;
+
+                    set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 255);
                 }
 
                 // If we've errored out too many times...
-                if(error_attempts > LMS_Inst.max_convergence_attempts) CORE_1_STATE = CORE_1_POST_PROC;
+                if(error_attempts > LMS_Inst.max_convergence_attempts){
+                    set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
+                    CORE_1_STATE = CORE_1_POST_PROC;
+                } 
+
+                //busy_wait_ms(2000);
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
@@ -1014,13 +1086,13 @@ debug_no_adc_setup_label:
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
 
 #ifndef NO_DEBUG_LED
-                busy_wait_ms(500);
+                busy_wait_ms(1000);
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
-                busy_wait_ms(500);
+                busy_wait_ms(1000);
                 set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-                busy_wait_ms(500);
+                busy_wait_ms(1000);
                 set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
-                busy_wait_ms(500);
+                busy_wait_ms(1000);
                 set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
 #endif
                 CORE_1_STATE = CORE_1_IDLE;

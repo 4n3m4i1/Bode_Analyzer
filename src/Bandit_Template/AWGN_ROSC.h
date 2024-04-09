@@ -87,6 +87,7 @@ void stop_randombit_dma_chain(int dma_channel){
 void stop_wgn_dma_channels(){
     dma_hw->ch[dma_awgn_ctrl_chan].ctrl_trig &= ~(1u);
     dma_hw->ch[dma_awgn_data_chan].ctrl_trig &= ~(1u);
+    pio0->txf[0] = 0;
 }
 
 #endif

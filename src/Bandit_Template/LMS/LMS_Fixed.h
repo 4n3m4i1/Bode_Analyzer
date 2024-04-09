@@ -40,6 +40,7 @@ struct LMS_Fixed_Inst {
     uint16_t    max_convergence_attempts;   // Maximum amount of retries before FAILURE
     uint16_t    iteration_ct;       // Max Samples to Run Thru System
     uint16_t    ddsmpl_stride;      // Downsampling stride if not handled in Digi downsampler itself
+    uint8_t     ddsmpl_shift;
     uint16_t    fixed_offset;       // Offset to both x[n] and d[n] due to downsampling FIR fillup time
     int16_t     d_n_offset;         // Offset in samples from 0th x[n] wgn sample. If <0 x[n] must be incremented.
                                     //  Synchronizes the sample banks in time, can be weird group delay thru DUT

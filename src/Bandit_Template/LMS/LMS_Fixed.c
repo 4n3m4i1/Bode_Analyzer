@@ -45,12 +45,38 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
 
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
     uint16_t n;
-    //uint16_t max_loops = LMS->iteration_ct - LMS->fixed_offset - LMS->d_n_offset;
     
-    for(n = 0; n < LMS->iteration_ct; n += LMS->ddsmpl_stride){
+    uint16_t max_iters = (LMS->iteration_ct >> LMS->ddsmpl_shift);
+
+    uint16_t stride = LMS->ddsmpl_stride;
+
+    for(n = LMS->fixed_offset; n < max_iters; n += stride){
+
         //retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
         //retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
-        retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
+        //retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
+
+        retval = LMS->d_n[n] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n]);
+        
+        //retval = LMS->d_n[n * stride] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n * stride]);
+        //retval = LMS->d_n[n * stride];
+        //retval = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n * stride]);
+        //retval = 0x8021;
+
+        retval = 0;
+        //add_sample_to_2n_FIR_I16_no_inc(WGN_FIR, LMS->x_n[n]);
+        //WGN_FIR->data[(n & WGN_FIR->size_mask)] = LMS->x_n[n];
+        
+        //uint16_t write_address = WGN_FIR->curr_zero++ & 0x001F;
+        //WGN_FIR->data[WGN_FIR->curr_zero++ & WGN_FIR->size_mask] = 2;
+        //WGN_FIR->data[0] = LMS->x_n[n];
+        
+
+        //for(uint_fast16_t m = 0; m < WGN_FIR->size; ++m){
+        //    retval += mul_Q15(recall_sample_from_2n_FIR(WGN_FIR, m), WGN_FIR->taps[m]);
+        //}
+
+
         LMS_Update_Taps(LMS, WGN_FIR, retval);
 
         LMS->samples_processed++;      
@@ -65,7 +91,9 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
         } 
     }
 
-    if(n >= LMS->iteration_ct){
+    WGN_FIR->curr_zero = 0;
+
+    if(n >= max_iters){
         if(retval > LMS->max_error_allowed) retval = LMS_FAIL_DFL;
     }
 
@@ -73,7 +101,7 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
     return retval;
 }
 
-void LMS_Update_Taps(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, Q15 error){
+inline void LMS_Update_Taps(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, Q15 error){
     for(uint16_t n = 0; n < LMS->tap_len; ++n){
         Q15 tmp = mul_Q15(error, WGN_FIR->data[n]);
         //WGN_FIR->taps[n] += (mul_Q15(LMS->learning_rate, mul_Q15(error, WGN_FIR->data[n])));

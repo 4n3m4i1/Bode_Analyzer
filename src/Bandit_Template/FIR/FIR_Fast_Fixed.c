@@ -74,6 +74,7 @@ void flush_FIR_taps(struct Q15_FIR_PARAMS *a){
 }
 
 void flush_FIR_buffer_and_taps(struct Q15_FIR_PARAMS *a){
+    a->curr_zero = 0;
     for(int n = 0; n < a->size; ++n){
         a->data[n] = 0;
         a->taps[n] = 0;
