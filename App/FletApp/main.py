@@ -324,6 +324,27 @@ def main(page: ft.Page):
         border_radius=20,
     )
 
+    # change bit at index 3
+    def toggle_wgn(e):
+        if wgn_switch.label == WGN_LABEL_ON:
+            temp_settings[3] = 0
+            #print("off")
+        else :
+            #print("on")
+            temp_settings[3] = 1
+
+        wgn_switch.label = (
+            WGN_LABEL_OFF if temp_settings[3] == 0 else WGN_LABEL_ON
+        )
+        print(wgn_switch.label)
+        print(temp_settings)
+
+        page.update()
+
+
+    wgn_switch = ft.Switch(label= WGN_LABEL_OFF, on_change=toggle_wgn)
+
+
 
 #######################################################
     config_table = ft.DataTable(
@@ -354,6 +375,12 @@ def main(page: ft.Page):
         ,stop_container,
         ] 
         )
+    
+    switches = ft.Row(
+        [ wgn_switch
+        ] 
+        )
+    
     
     
     def open_modal(e): # handle settings modal opening
@@ -392,7 +419,7 @@ def main(page: ft.Page):
             )
 
         page.controls.clear()
-        page.add(ft.Column([Controls]),updated_table,chart )
+        page.add(ft.Column([Controls]),updated_table,chart , ft.Row([switches]))
 
         page.update()
 
@@ -478,8 +505,8 @@ def main(page: ft.Page):
     )
 
     #page.add(ft.Column([Controls]) ,chart ) 
-    page.add(ft.Column([Controls]),config_table,chart )
-    
+    page.add(ft.Column([Controls]),config_table,chart , ft.Row([switches]))
+
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page))
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
