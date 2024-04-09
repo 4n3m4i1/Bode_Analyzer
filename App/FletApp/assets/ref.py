@@ -33,5 +33,8 @@ PLOT_YLABEL = "y-axis placeholder"
 PLOT_XUNIT = "log"
 PLOT_YUNIT = "linear"
 
+WGN_LABEL_ON = "WGN On"
+WGN_LABEL_OFF = "WGN Off"
+
 ## About us page components
 ABOUT_TITLE = "About Us"
