@@ -45,6 +45,7 @@
 //////////////////////////////////////////////////////////////////////
 // Core 1 -> 0 transfer buffers
 struct Transfer_Data {
+    bool        updated;
     uint16_t    len;
     Q15         data[TOTAL_ADAPTIVE_FIR_LEN];
 };
@@ -77,8 +78,8 @@ CORE_0_MEM Q15 FI_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 
 
-CORE_0_MEM uint16_t USB_STATE;
-CORE_0_MEM uint16_t USB_NEXT_STATE;
+volatile CORE_0_MEM uint16_t USB_STATE;
+volatile CORE_0_MEM uint16_t USB_NEXT_STATE;
 
 CORE_0_MEM uint8_t  BS_RX_BF[BS_BF_LEN];
   //////////////////////////////////////////////////////////////////////
@@ -267,6 +268,7 @@ static void core_0_main(){
             case USB_INIT: {
                 //need idle work until GUI is ready
                 tud_task();
+                USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break;
             
@@ -283,32 +285,42 @@ static void core_0_main(){
                 //while(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A));
                 //spin_lock_claim(INTERCORE_FFTMEM_LOCK_A);
                 //spinlock_irq_status_A = spin_lock_blocking(FFTMEMLOCK_A);
-                
+                set_ULED_level(255);
                 Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
-
                 data_src = &ICTXFR_A;
-
-
-                // Apply windowing here if needed!!!
-                for(uint16_t n = 0; n < data_src->len; ++n){
-                    cool_fft.fr[n] = data_src->data[n];
-                    cool_fft.fi[n] = 0;
-                }
-
-                fft_setup(&cool_fft, data_src->len);
+                if(!data_src->updated){
+                    Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+                    busy_wait_ms(500);
+                    set_ULED_level(0);
+                    USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
+                } else {
+                    data_src->updated = false;
                 
-                //// Free memory constraints
-                //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
+                    // Apply windowing here if needed!!!
+                    for(uint16_t n = 0; n < data_src->len; ++n){
+                        cool_fft.fr[n] = data_src->data[n];
+                        cool_fft.fi[n] = 0;
+                    }
 
-                USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
-                
+                    fft_setup(&cool_fft, data_src->len);
+
+                    //// Free memory constraints
+                    //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
+
+                    USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
                 }
+            }
             break;
             
             case USB_RUN_DMC_JK_RUN_FFT: {
+                set_ULED_level(0);
+                busy_wait_ms(500);
+                set_ULED_level(255);
+                busy_wait_ms(3000);
                 FFT_fixdpt(&cool_fft);
                 // Free memory constraints
-                
+                set_ULED_level(0);
+                busy_wait_ms(3000);
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                 //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
                 //spin_lock_unclaim(INTERCORE_FFTMEM_LOCK_A);
@@ -318,6 +330,8 @@ static void core_0_main(){
 
             case USB_SEND_TUSB: {
                 USB_Handler(&cool_fft); //send data to GUI through tusb
+                //set_ULED_level(0);
+                //busy_wait_ms(1000);
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break;
@@ -643,13 +657,13 @@ debug_no_adc_setup_label:
     CORE_1_STATE = CORE_1_DEBUG_HANDLER;
 #endif
 
-    set_ULED_level(Bandit_RGBU.U = 255);
-    busy_wait_ms(500);
-    set_ULED_level(Bandit_RGBU.U = 0);
-    busy_wait_ms(500);
-    set_ULED_level(Bandit_RGBU.U = 255);
-    busy_wait_ms(500);
-    set_ULED_level(Bandit_RGBU.U = 0);
+    //set_ULED_level(Bandit_RGBU.U = 255);
+    //busy_wait_ms(500);
+    //set_ULED_level(Bandit_RGBU.U = 0);
+    //busy_wait_ms(500);
+    //set_ULED_level(Bandit_RGBU.U = 255);
+    //busy_wait_ms(500);
+    //set_ULED_level(Bandit_RGBU.U = 0);
 
     while(1){
         switch(CORE_1_STATE){
@@ -679,10 +693,6 @@ debug_no_adc_setup_label:
 #endif
                 Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
 
-#ifndef NO_DEBUG_LED
-                set_ULED_level(Bandit_RGBU.U++);
-#endif
-
                 if(Global_Bandit_Settings.updated){
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
                         start_wgn_dma_channels();
@@ -692,8 +702,7 @@ debug_no_adc_setup_label:
 
                     CORE_1_FRANGE = Global_Bandit_Settings.manual_freq_range;
                     LMS_Inst.max_error_allowed = Global_Bandit_Settings.manual_error_limit;
-                   // LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
-                    LMS_Inst.tap_len = 32;
+                    LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
 
                     if(LMS_Inst.tap_len > MAX_TAPS) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
@@ -718,8 +727,7 @@ debug_no_adc_setup_label:
                 Release_Lock(INTERCORE_SETTINGS_LOCK);
 
                 if(SET_STALL){
-                    set_ULED_level(--Bandit_RGBU.U);
-                    busy_wait_ms(250);
+                    busy_wait_ms(50);
                     SET_STALL = 0;
                 }
 
@@ -730,7 +738,6 @@ debug_no_adc_setup_label:
             case CORE_1_APPLY_SETTINGS: {
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 255);
-                set_ULED_level(0);
 #endif
                 if(Bandit_Calibration_State == BANDIT_CAL_AA_TXFR_FUNC_IN_PROG){
                     // if settings changed:
@@ -768,7 +775,6 @@ debug_no_adc_setup_label:
             case CORE_1_SAMPLE: {
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 255, Bandit_RGBU.B = 255);
-                set_ULED_level(Bandit_RGBU.U = 0);
 #endif
                 tmp_arr[0] = 0;
                 uint32_t NVIC_ISR_EN = nvic_hw->icer;
@@ -854,10 +860,10 @@ debug_no_adc_setup_label:
                         flush_FIR_buffer(&CUT_125KHZ);
 
                         for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                             D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                            D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
                         }
                         for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                             X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                            X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
                         }
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
@@ -870,10 +876,10 @@ debug_no_adc_setup_label:
                         flush_FIR_buffer(&CUT_62KHZ);
                         
                         for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                             D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                            D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
                         }
                         for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                             X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                            X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
                         }
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
@@ -886,10 +892,10 @@ debug_no_adc_setup_label:
                         flush_FIR_buffer(&CUT_31KHZ);
 
                         for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                             D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                            D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
                         }
                         for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                             X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                            X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
                         }
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
@@ -906,20 +912,7 @@ debug_no_adc_setup_label:
                     break;
                 }
                 
-                //flush_FIR_buffer(torun);
-
-                //for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                //     D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
-                //}
-                //for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                //     X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
-                //}
-                //LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
-
-//skip_downsampling_label:
                 CORE_1_STATE = CORE_1_LMS;
-
-                //busy_wait_ms(1000);
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
@@ -928,13 +921,11 @@ debug_no_adc_setup_label:
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
                 //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
-                set_ULED_level(Bandit_RGBU.U = 0);
 #endif
-                if(LMS_FIR.data == LMS_FIR_BANK)set_ULED_level(Bandit_RGBU.U = 127);
 
                 Q15 LMS_Error = LMS_FAIL_DFL;
 
-#define ICKY_EXPANDED_LMS
+//#define ICKY_EXPANDED_LMS
 #ifdef ICKY_EXPANDED_LMS
                 LMS_FIR.size = 32;
                 LMS_FIR.size_mask = 31;
@@ -975,6 +966,24 @@ debug_no_adc_setup_label:
                 if(n >= max_iters) if(LMS_Error > LMS_Inst.max_error_allowed) LMS_Error = LMS_FAIL_DFL;
 
 #else
+                LMS_Inst.tap_len = 32;
+                LMS_Inst.iteration_ct = 1024;
+                LMS_Inst.ddsmpl_stride = 1;
+                LMS_Inst.fixed_offset = 0;
+                LMS_Inst.d_n = D_N_0;
+                LMS_Inst.x_n = X_N_0;
+                LMS_Inst.learning_rate = 0x0020;
+                LMS_Inst.max_convergence_attempts = 4;
+                LMS_Inst.target_error = 0x0666;
+                LMS_Inst.max_error_allowed = 0x1000;
+                LMS_Inst.ddsmpl_shift = 0;
+
+                LMS_FIR.curr_zero = 0;
+                LMS_FIR.data = LMS_FIR_BANK;
+                LMS_FIR.taps = LMS_H_HATS;
+                LMS_FIR.size_true = 1024;
+                LMS_FIR.size_mask = 31;
+                LMS_FIR.size = 1024;
 
                 // If first run: error_attempts = 0, thus we flush FIR buffer
                 //  else we should maintain results for more iterations
@@ -1281,9 +1290,9 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
         tud_task();
     }
-    if (USB_STATE < USB_FFT_DATA_COLLECT) {
-        USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
-    } 
+    //if (USB_STATE < USB_FFT_DATA_COLLECT) {
+    //    USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
+    //} 
     
 }
 
@@ -1317,6 +1326,7 @@ static void transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, ui
     for(uint16_t n = 0; n < len; ++n){
         dst->data[n] = *src++;
     }
+    dst->updated = true;
 }
 
 static void clear_adc_read_buffers(){
