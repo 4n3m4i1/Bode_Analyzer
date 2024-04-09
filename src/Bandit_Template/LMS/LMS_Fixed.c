@@ -46,7 +46,9 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
     uint16_t n;
     
-    uint16_t max_iters = (LMS->iteration_ct >> LMS->ddsmpl_shift);
+   // uint16_t max_iters = (LMS->iteration_ct >> LMS->ddsmpl_shift);
+
+    uint16_t max_iters = LMS->iteration_ct;
 
     uint16_t stride = LMS->ddsmpl_stride;
 
@@ -63,7 +65,7 @@ Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool 
         //retval = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n * stride]);
         //retval = 0x8021;
 
-        retval = 0;
+        //retval = 0;
         //add_sample_to_2n_FIR_I16_no_inc(WGN_FIR, LMS->x_n[n]);
         //WGN_FIR->data[(n & WGN_FIR->size_mask)] = LMS->x_n[n];
         
