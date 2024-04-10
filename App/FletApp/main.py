@@ -139,22 +139,25 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                     settings_event.clear()
                 else:
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
+                        start = time.time()
                         header_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
                         # print(header_data)
                         # print(len(header_data))
-                        start = time.time()
                         count = 0
+                        num_samples = (header_data[3] * 256 + header_data[2]) * BYTES_PER_NUMBER
                         CTRLCHANNEL.write(b'a')
-                        num_samples = header_data[1] * BYTES_PER_NUMBER
+
+                        print(num_samples)
+                        print(DATACHANNEL.in_waiting)
+                        # print(num_samples)
+                        # print(header_data[2])
+                        # print(header_data[3])
+                        
                         while DATACHANNEL.in_waiting < num_samples:
                             count = count + 1
                         end = time.time()
                         f_data = DATACHANNEL.read(num_samples)
-                        print(end - start)
-                        print(count)
-                        # print(f_data)
-                        # print(f_data)
-                        print(len(f_data))
+                        # print(end - start)
                         data_Queue.put(f_data)
         except serial.SerialException:
             page.banner = ft.Banner(
@@ -177,7 +180,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
-            print(len(converted_graph_data))
+            # print(len(converted_graph_data))
             data_out_Queue.put(converted_graph_data, block=False)
 
         except Empty:
@@ -190,7 +193,7 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             if data_Queue.empty():
                 raise Empty
             data = data_Queue.get()
-            print(len(data))
+            # print(len(data))
             line.set_data(np.arange(len(data)), data)
             if data:
 
