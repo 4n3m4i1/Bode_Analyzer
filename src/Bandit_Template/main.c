@@ -1172,7 +1172,7 @@ static void send_header_packet(uint16_t *h_data){
 
 //sends fft data through data chan to GUI interface
 static void send_f_packets(Q15 *data, uint16_t num_samples){
-    uint16_t NUM_PACKET_PER_BUF = num_samples / CDC_PACKET_LEN;
+    uint16_t NUM_PACKET_PER_BUF = (num_samples * sizeof(Q15)) / CDC_PACKET_LEN;
     
     for(uint16_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
         while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){

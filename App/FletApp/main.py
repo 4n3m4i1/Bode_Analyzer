@@ -145,7 +145,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         start = time.time()
                         count = 0
                         CTRLCHANNEL.write(b'a')
-                        num_samples = header_data[1]
+                        num_samples = header_data[1] * BYTES_PER_NUMBER
                         while DATACHANNEL.in_waiting < num_samples:
                             count = count + 1
                         end = time.time()
