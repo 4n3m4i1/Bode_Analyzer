@@ -104,19 +104,19 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             #send initial settings
             CTRLCHANNEL.write(b'~')
             print('start')
-            # CTRLCHANNEL.write(bytes(INIT_SETTINGS))
+            CTRLCHANNEL.write(bytes(INIT_SETTINGS))
             # # print(bytes(INIT_SETTINGS))
             # #print(CTRLCHANNEL.read(64))
-            # setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
-            # rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
-            # rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
-            # rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-            # rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-            # print(setting)
-            # print(rest)
-            # print(rest2)
-            # print(rest3)
-            # print(rest4)
+            setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
+            rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
+            rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
+            rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+            rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+            print(setting)
+            print(rest)
+            print(rest2)
+            print(rest3)
+            print(rest4)
             # print(thing.bin)
             # CTRLCHANNEL.flush()
             while True:
@@ -157,6 +157,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                             count = count + 1
                         end = time.time()
                         f_data = DATACHANNEL.read(num_samples)
+                        print(f_data)
                         # print(end - start)
                         data_Queue.put(f_data)
         except serial.SerialException:
@@ -180,7 +181,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
-            # print(len(converted_graph_data))
+            # print(converted_graph_data)
             data_out_Queue.put(converted_graph_data, block=False)
 
         except Empty:
@@ -193,19 +194,25 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             if data_Queue.empty():
                 raise Empty
             data = data_Queue.get()
+            print(data)
             # print(len(data))
             line.set_data(np.arange(len(data)), data)
-            if data:
 
-                plt.ylim(0, max(data))
+            if data:
+                if max(data) != 0:
+                    print(line.get_data())
+                    plt.ylim(0, max(data))
+                else:
+                    print("Data All Zero!!")
                 
             else:
                 raise Empty
             axis.draw_artist(line)
             fig.canvas.blit(fig.bbox)
             fig.canvas.flush_events()
-
+            print('step')
             chart.update()
+            print('step2')
 
         except Empty:
             continue

@@ -45,9 +45,9 @@
 //////////////////////////////////////////////////////////////////////
 // Core 1 -> 0 transfer buffers
 struct Transfer_Data {
-    bool        updated;
-    uint16_t    len;
-    Q15         data[TOTAL_ADAPTIVE_FIR_LEN];
+    volatile bool        updated;
+    volatile uint16_t    len;
+    volatile Q15         data[TOTAL_ADAPTIVE_FIR_LEN];
 };
 
 struct Transfer_Data ICTXFR_A;
@@ -290,8 +290,8 @@ static void core_0_main(){
                 data_src = &ICTXFR_A;
                 if(!data_src->updated){
                     Release_Lock(INTERCORE_FFTMEM_LOCK_A);
-                    busy_wait_ms(500);
-                    set_ULED_level(0);
+                    //busy_wait_ms(500);
+                    //set_ULED_level(0);
                     USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
                 } else {
                     data_src->updated = false;
@@ -313,14 +313,14 @@ static void core_0_main(){
             break;
             
             case USB_RUN_DMC_JK_RUN_FFT: {
-                set_ULED_level(0);
-                busy_wait_ms(500);
-                set_ULED_level(255);
-                busy_wait_ms(3000);
+                //set_ULED_level(0);
+                //busy_wait_ms(500);
+                //set_ULED_level(255);
+                //busy_wait_ms(3000);
                 FFT_fixdpt(&cool_fft);
                 // Free memory constraints
                 set_ULED_level(0);
-                busy_wait_ms(3000);
+                //busy_wait_ms(3000);
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                 //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
                 //spin_lock_unclaim(INTERCORE_FFTMEM_LOCK_A);
@@ -1172,7 +1172,7 @@ static void send_header_packet(uint16_t *h_data){
 
 //sends fft data through data chan to GUI interface
 static void send_f_packets(Q15 *data, uint16_t num_samples){
-    uint16_t NUM_PACKET_PER_BUF = (num_samples * sizeof(Q15)) / CDC_PACKET_LEN;
+    uint16_t NUM_PACKET_PER_BUF = (num_samples * (uint16_t)sizeof(Q15)) / CDC_PACKET_LEN;
     
     for(uint16_t n = 0; n < NUM_PACKET_PER_BUF; ++n){
         while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
