@@ -17,9 +17,9 @@ from flet import RouteChangeEvent, ViewPopEvent
 from multiprocess import Process, Queue, Event
 from threading import Thread
 from queue import Empty
-
+import time
 from bitstring import BitArray
-
+import numpy as np
 os = platform.system()
 
 # dataPort = None
@@ -103,19 +103,20 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             x = x + 1
             #send initial settings
             CTRLCHANNEL.write(b'~')
-            CTRLCHANNEL.write(bytes(INIT_SETTINGS))
-            # print(bytes(INIT_SETTINGS))
-            #print(CTRLCHANNEL.read(64))
-            setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
-            rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
-            rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
-            rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-            rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-            print(setting)
-            print(rest)
-            print(rest2)
-            print(rest3)
-            print(rest4)
+            print('start')
+            # CTRLCHANNEL.write(bytes(INIT_SETTINGS))
+            # # print(bytes(INIT_SETTINGS))
+            # #print(CTRLCHANNEL.read(64))
+            # setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
+            # rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
+            # rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
+            # rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+            # rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+            # print(setting)
+            # print(rest)
+            # print(rest2)
+            # print(rest3)
+            # print(rest4)
             # print(thing.bin)
             # CTRLCHANNEL.flush()
             while True:
@@ -137,14 +138,23 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                     print(rest4)
                     settings_event.clear()
                 else:
-                    if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH * BYTES_PER_NUMBER:
+                    if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
                         header_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
                         # print(header_data)
+                        # print(len(header_data))
+                        start = time.time()
+                        count = 0
                         CTRLCHANNEL.write(b'a')
-
-                        num_samples = header_data[3] * 256 + header_data[4]
-                        f_data = DATACHANNEL.read(CDC_PACKET_LENGTH * num_samples * BYTES_PER_NUMBER)
+                        num_samples = header_data[1]
+                        while DATACHANNEL.in_waiting < num_samples:
+                            count = count + 1
+                        end = time.time()
+                        f_data = DATACHANNEL.read(num_samples)
+                        print(end - start)
+                        print(count)
                         # print(f_data)
+                        # print(f_data)
+                        print(len(f_data))
                         data_Queue.put(f_data)
         except serial.SerialException:
             page.banner = ft.Banner(
@@ -167,24 +177,27 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
+            print(len(converted_graph_data))
             data_out_Queue.put(converted_graph_data, block=False)
 
         except Empty:
             continue
 ##########################################################################################UPDATEGRAPH
-def update_graph(data_Queue: Queue, chart: MatplotlibChart, line, axis, fig):
+def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, axis, fig):
     while True:
         is_set = GraphEvent.wait()
         try: 
             if data_Queue.empty():
                 raise Empty
             data = data_Queue.get()
-            line.set_ydata(data)
+            print(len(data))
+            line.set_data(np.arange(len(data)), data)
             if data:
-                plt.ylim(0, max(data)) 
+
+                plt.ylim(0, max(data))
+                
             else:
                 raise Empty
-
             axis.draw_artist(line)
             fig.canvas.blit(fig.bbox)
             fig.canvas.flush_events()
