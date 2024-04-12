@@ -20,6 +20,7 @@ from queue import Empty
 import time
 from bitstring import BitArray
 import numpy as np
+from scipy.interpolate import BSpline, make_interp_spline
 os = platform.system()
 
 # dataPort = None
@@ -139,10 +140,11 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                     print(rest4)
                     settings_event.clear()
                 else:
+                    # print(DATACHANNEL.in_waiting)
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
                         start = time.time()
                         header_data = DATACHANNEL.read(CDC_PACKET_LENGTH)
-                        # print(header_data)
+                        print(header_data)
                         # print(len(header_data))
                         count = 0
                         CTRLCHANNEL.write(b'a')
@@ -182,8 +184,10 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             if data_in_Queue.empty():
                 raise Empty
             graph_data_raw = data_in_Queue.get(block=False)
+            print(len(graph_data_raw))
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
+            print(len(listed_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
             # print(converted_graph_data)
             data_out_Queue.put(converted_graph_data, block=False)
@@ -202,15 +206,17 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             # print(len(data))
             line.set_data(np.arange(len(data)), data)
 
+
             if data:
                 if max(data) != 0:
                     # print(line.get_data())
-                    plt.ylim(0, max(data))
+                    plt.ylim(1e-15, max(data) + 0.01)
                 else:
                     print("Data All Zero!!")
                 
             else:
                 raise Empty
+            # axis.set_xbound
             axis.draw_artist(line)
             fig.canvas.blit(fig.bbox)
             fig.canvas.flush_events()
@@ -280,7 +286,6 @@ def main(page: ft.Page):
     chart = MatplotlibChart(figure, expand=True,)
     #ax.set_facecolor('#e3e3e3')
     figure.set_facecolor('#e3e3e3')
-
     ax.set_xscale(PLOT_XUNIT)
     ax.set_yscale(PLOT_YUNIT)
     ax.set_title(PLOT_TITLE, fontsize = 18)

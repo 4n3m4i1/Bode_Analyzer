@@ -27,11 +27,11 @@ INVALID_PORTS_WARNING = "Invalid Port Selection"
 SR_ACK = b"a"
 
 PLOT_TITLE = "BANDIT Output"
-PLOT_XLABEL = "x-axis placeholder"
-PLOT_YLABEL = "y-axis placeholder"
+PLOT_XLABEL = "FREQUENCY"
+PLOT_YLABEL = "dB"
 
 PLOT_XUNIT = "log"
-PLOT_YUNIT = "linear"
+PLOT_YUNIT = "log"
 
 WGN_LABEL_ON = "WGN On"
 WGN_LABEL_OFF = "WGN Off"
