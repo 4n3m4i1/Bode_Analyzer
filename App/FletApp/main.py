@@ -1,4 +1,5 @@
 from generic_include import *
+from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
 import serial
 # import serial.tools.list_ports_osx as list_ports_osx
@@ -249,7 +250,7 @@ def main(page: ft.Page):
         primary=ft.colors.BLACK,   
     )
 )
-    
+    temp_settings = INIT_SETTINGS
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
             page.views.append(
@@ -384,12 +385,31 @@ def main(page: ft.Page):
         print(temp_settings)
 
         page.update()
+    def toggle_single_shot(e):
+        temp_settings[12] = int(single_shot_switch.value)
+        temp_settings[1] = int(not temp_settings[12])
+
+    def toggle_auto_run(e):
+        temp_settings[1] = int(auto_run_switch.value)
+        temp_settings[12] = int(not temp_settings[1])
+
+    def toggle_raw_request(e):
+        temp_settings[10] = int(raw_requect_switch.value)
+    
+
+    def toggle_time_d(e):
+        temp_settings[11] = int(time_domain_switch.value)
 
 
     wgn_switch = ft.Switch(label= WGN_LABEL_OFF, on_change=toggle_wgn)
 
+    single_shot_switch = ft.Switch(label = SINGLE_SHOT_LABEL, on_change=toggle_single_shot)
 
+    auto_run_switch = ft.Switch(label = AUTO_RUN_LABEL, on_change=toggle_auto_run)
 
+    raw_requect_switch = ft.Switch(label = RAW_REQUEST_LABEL, on_change=toggle_raw_request)
+
+    time_domain_switch = ft.Switch(label = TIME_DOMAIN_REQUEST_LABEL, on_change=toggle_time_d)
 #######################################################
     config_table = ft.DataTable(
         border=ft.border.all(1, "black"),
@@ -420,10 +440,10 @@ def main(page: ft.Page):
         ] 
         )
     
-    switches = ft.Row(
-        [ wgn_switch
-        ] 
-        )
+    # switches = ft.Row(
+    #     [ wgn_switch
+    #     ] 
+    #     )
     
     
     
@@ -463,7 +483,7 @@ def main(page: ft.Page):
             )
 
         page.controls.clear()
-        page.add(ft.Column([Controls]),updated_table,chart , ft.Row([switches]))
+        page.add(ft.Column([Controls]),updated_table,chart)
 
         page.update()
 
@@ -494,7 +514,7 @@ def main(page: ft.Page):
             options=port_selections,
             on_change=select_ctrl_port
         )
-    temp_settings = INIT_SETTINGS
+    
 
     def select_tap_length(e):
         bytes_tmp = int(tap_select.value).to_bytes(2, 'little')
@@ -520,21 +540,29 @@ def main(page: ft.Page):
 
         )
     
-    ConfigDisplay = ft.Column([
+    ConfigDisplay = ft.Column(controls=[
         ft.Text(CONFIG_INSTR),
         data_select,
         ctrl_select,
         tap_select,
-        freq_range_select
+        freq_range_select,
+        wgn_switch,
+        single_shot_switch,
+        auto_run_switch,
+        raw_requect_switch,
+        time_domain_switch
 
-        ]
+
+        ],
+        scroll=ft.ScrollMode.ALWAYS
+
     )
 
     SettingsSelection = ft.AlertDialog(
         modal=True,
         title=ft.Text(CONFIG_STR),
         content=ConfigDisplay,
-        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)]
+        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
     )
     page.appbar = ft.AppBar(
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
@@ -551,7 +579,7 @@ def main(page: ft.Page):
     )
 
     #page.add(ft.Column([Controls]) ,chart ) 
-    page.add(ft.Column([Controls]),config_table,chart , ft.Row([switches]))
+    page.add(ft.Column([Controls]),config_table,chart)
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page))
     serial_reader.daemon = True

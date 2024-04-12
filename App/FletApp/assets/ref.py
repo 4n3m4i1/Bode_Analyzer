@@ -36,5 +36,12 @@ PLOT_YUNIT = "log"
 WGN_LABEL_ON = "WGN On"
 WGN_LABEL_OFF = "WGN Off"
 
+SINGLE_SHOT_LABEL = "Toggle Single Shot Mode"
+
+AUTO_RUN_LABEL = "Toggle Auto Run Mode"
+
+RAW_REQUEST_LABEL = "Toggle Raw Data Mode"
+
+TIME_DOMAIN_REQUEST_LABEL = "Toggle Time Domain Mode"
 ## About us page components
 ABOUT_TITLE = "About Us"
