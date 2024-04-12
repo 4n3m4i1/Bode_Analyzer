@@ -16,7 +16,7 @@ from flet.matplotlib_chart import MatplotlibChart
 from flet import RouteChangeEvent, ViewPopEvent
 from multiprocess import Process, Queue, Event
 from threading import Thread
-from queue import Empty
+# from queue import Empty
 import time
 from bitstring import BitArray
 import numpy as np
@@ -66,13 +66,13 @@ for index1 in range(size1):
 data_port = Port()
 ctrl_port = Port()
 
-init_graph = [0 for i in range(NUM_VALUES)]
+# init_graph = [0 for i in range(NUM_VALUES)]
 
 FFT_real_queue = Queue()
 FFT_converted_queue = Queue()
 Settings_Queue = Queue()
 GraphEvent = Event()
-
+FRANGE_queue = Queue()
 ##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page):
     BYTES_PER_NUMBER = 2
@@ -124,27 +124,30 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                 # print(DATACHANNEL.in_waiting)
                 #if settings have been changed                
                 if settings_event.is_set():
-                    CTRLCHANNEL.write(b'~')
-                    settings = settings_Queue.get(block=False)
-                    # print(settings)
-                    CTRLCHANNEL.write(bytes(settings))
-                    setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
-                    rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
-                    rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
-                    rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-                    rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-                    print(setting)
-                    print(rest)
-                    print(rest2)
-                    print(rest3)
-                    print(rest4)
-                    settings_event.clear()
+                    if settings_Queue.empty():
+                        pass
+                    else:
+                        CTRLCHANNEL.write(b'~')
+                        settings = settings_Queue.get(block=False)
+                        # print(settings)
+                        CTRLCHANNEL.write(bytes(settings))
+                        setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
+                        rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
+                        rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
+                        rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+                        rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+                        print(setting)
+                        print(rest)
+                        print(rest2)
+                        print(rest3)
+                        print(rest4)
+                        settings_event.clear()
                 else:
                     # print(DATACHANNEL.in_waiting)
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
                         start = time.time()
                         header_data = DATACHANNEL.read(CDC_PACKET_LENGTH)
-                        print(header_data)
+                        # print(header_data)
                         # print(len(header_data))
                         count = 0
                         CTRLCHANNEL.write(b'a')
@@ -163,7 +166,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         
                         f_data = DATACHANNEL.read(num_samples)
                         end = time.time()
-                        print(f_data)
+                        # print(f_data)
                         print(f'{end - start} second transmition')
                         data_Queue.put(f_data)
         except serial.SerialException:
@@ -178,54 +181,63 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             page.update()
 ##########################################################################################DATACONVERTER
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
+    # is_set = GraphEvent.wait()
     while True:
         is_set = GraphEvent.wait()
-        try:
-            if data_in_Queue.empty():
-                raise Empty
+        if data_in_Queue.empty():
+            pass
+            
+        else:
             graph_data_raw = data_in_Queue.get(block=False)
-            print(len(graph_data_raw))
+            # print(len(graph_data_raw))
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
-            print(len(listed_graph_data))
+            # print(len(listed_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
             # print(converted_graph_data)
             data_out_Queue.put(converted_graph_data, block=False)
-
-        except Empty:
-            continue
 ##########################################################################################UPDATEGRAPH
-def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, axis, fig):
+def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis, fig):
+    # is_set = GraphEvent.wait()
+    frange = 0
     while True:
+        # print(frange)
         is_set = GraphEvent.wait()
-        try: 
-            if data_Queue.empty():
-                raise Empty
+        if data_Queue.empty():
+            pass
+        else:
             data = data_Queue.get()
             # print(data)
             # print(len(data))
             line.set_data(np.arange(len(data)), data)
+            if frange_queue.empty():
+                if frange == 0:
+                    frange = 250e3
+                else:
+                    pass
+            else:
 
+                frange = frange_queue.get()
 
             if data:
                 if max(data) != 0:
                     # print(line.get_data())
+                    plt.xlim(1e-15, frange)
                     plt.ylim(1e-15, max(data) + 0.01)
+                    # plt.xlim(min(float), le)
+                    # axis.set_xbound
+                    axis.draw_artist(line)
+                    fig.canvas.blit(fig.bbox)
+                    fig.canvas.flush_events()
+            # print('step')
+                    chart.update()
+            # print('step2')
                 else:
                     print("Data All Zero!!")
                 
             else:
-                raise Empty
-            # axis.set_xbound
-            axis.draw_artist(line)
-            fig.canvas.blit(fig.bbox)
-            fig.canvas.flush_events()
-            # print('step')
-            chart.update()
-            # print('step2')
-
-        except Empty:
-            continue
+                pass
+            
 ##########################################################################################MAIN
 def main(page: ft.Page):
     page.title = PAGE_TITLE
@@ -490,7 +502,9 @@ def main(page: ft.Page):
         temp_settings[8] = bytes_tmp[1]
         print(temp_settings)
     def select_frange(e):
-        temp_settings[9] = int(freq_range_select.value)
+        tmp = int(freq_range_select.value)
+        temp_settings[9] = tmp
+        FRANGE_queue.put(FRANGE_VAL[tmp])
         print(temp_settings)
 
     tap_select = ft.Dropdown(
@@ -543,7 +557,7 @@ def main(page: ft.Page):
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
     data_converter_process.daemon = True
-    update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, ax, figure))
+    update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
     update_graph_thread.daemon = True
     serial_reader.start()
     data_converter_process.start()
