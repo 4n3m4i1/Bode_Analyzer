@@ -11,6 +11,7 @@ void LMS_Struct_Equate(struct LMS_Fixed_Inst *src, struct LMS_Fixed_Inst *dst){
     dst->target_error = src->target_error;
     dst->learning_rate = src->learning_rate;
     dst->d_n = src->d_n;
+    dst->x_n = src->x_n;
     dst->samples_processed = src->samples_processed;
 }
 
@@ -26,7 +27,7 @@ void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable
 }
 
 
-inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, bool flush_FIR){
+inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR){
     Q15 retval = LMS_FAIL_DFL;
     //Q15 *desired = LMS->d_n + LMS->fixed_offset;
     //Q15 *white_noise = LMS->x_n + LMS->fixed_offset;
@@ -39,12 +40,6 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
     //        white_noise -= LMS->d_n_offset;
     //    }
     //}
-
-    // If new run, flush the FIR buffer
-    if(flush_FIR){
-        flush_FIR_buffer_and_taps(WGN_FIR);
-        LMS->samples_processed = 0;
-    } 
 
     //run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data)
     uint16_t n;

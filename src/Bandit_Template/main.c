@@ -17,6 +17,7 @@
     DO NOT UNCOMMENT UNLESS YOU KNOW EXACTLY WHAT YOU'RE DOING!!!!!!
 */
 //#define FORCE_SAMPLING_4_TESTING
+#define NO_DEBUG_LED
 
   //////////////////////////////////////////////////////////////////////
  //////////////////   GLOBAL PREALLOC BUFFERS   ///////////////////////
@@ -168,10 +169,6 @@ int main(){
 
     Setup_Semaphores();
 
-    //FFTMEMLOCK_A        = spin_lock_init(INTERCORE_FFTMEM_LOCK_A);
-    //SETTINGS_LOCK       = spin_lock_init(INTERCORE_SETTINGS_LOCK);
-    //DEBUG_REPORT_LOCK   = spin_lock_init(INTERCORE_CORE_1_DBG_LOCK);
-
     // Init h_hat core transfer register lengths to any known value.
     ICTXFR_A.len = 0;
     
@@ -233,9 +230,10 @@ static void core_0_main(){
     // Claim lock on settings until Core 0 can deal with initialization
     //  prevents Core 1 from starting any processing without settings
     //  in place.
-    //spin_lock_claim(INTERCORE_SETTINGS_LOCK);
+    
     Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
-    //Global_Bandit_Settings.updated = true;
+    
+    // Do not start updated to prevent useless DSP cycling
     Global_Bandit_Settings.updated = false;
     Global_Bandit_Settings.settings_bf = BANDIT_DFL_SETTINGS;
     Global_Bandit_Settings.manual_tap_len_setting = 0;
@@ -243,7 +241,7 @@ static void core_0_main(){
     Global_Bandit_Settings.manual_freq_range = 0;
     CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
     SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
-    //spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
+
     Release_Lock(INTERCORE_SETTINGS_LOCK);
 
     // Setup Structs and Default Parameters for FFT
@@ -251,8 +249,6 @@ static void core_0_main(){
     fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
 
     // Initialize tinyUSB with board and start listening for start char from GUI
-    //board_init();
-    //tud_init(BOARD_TUD_RHPORT);
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
     USB_NEXT_STATE = USB_INIT;
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
@@ -282,72 +278,72 @@ static void core_0_main(){
                 
                 struct Transfer_Data *data_src;
 
-                //while(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A));
-                //spin_lock_claim(INTERCORE_FFTMEM_LOCK_A);
-                //spinlock_irq_status_A = spin_lock_blocking(FFTMEMLOCK_A);
                 set_ULED_level(255);
                 Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
+                set_ULED_level(0);
                 data_src = &ICTXFR_A;
+
+                
                 if(!data_src->updated){
+                    // FFT Data wasn't updated, shouldn't happen given semaphore
+                    //  pacing structure
                     Release_Lock(INTERCORE_FFTMEM_LOCK_A);
-                    //busy_wait_ms(500);
-                    //set_ULED_level(0);
                     USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
                 } else {
+                    // If there is new FFT data to be had
                     data_src->updated = false;
-                    fft_setup(&cool_fft, data_src->len);
-                    // Apply windowing here if needed!!!
-                    for(uint16_t n = 0; n < data_src->len; ++n){
-                        cool_fft.fr[n] = data_src->data[n];
-                        cool_fft.fi[n] = 0;
+                    // If data is all zeros (Core 1 probably gave up on convergence)
+                    //  or the length is zero (P R O B L E M)
+                    //  then don't run the FFT
+                    bool allzeros = true;
+
+                    if(data_src->len){
+                        // Apply windowing here if needed!!!
+                        fft_setup(&cool_fft, data_src->len);
+
+                        for(uint16_t n = 0; n < data_src->len; ++n){
+                            if((cool_fft.fr[n] = data_src->data[n])) allzeros = false;
+                            cool_fft.fi[n] = 0;
+                        }
                     }
-
                     
-
-                    //// Free memory constraints
-                    //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
-
-                    USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
+                    if(allzeros){
+                        Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+                        USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
+                    } else {
+                        USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
+                    } 
                 }
             }
             break;
             
             case USB_RUN_DMC_JK_RUN_FFT: {
-                //set_ULED_level(0);
-                //busy_wait_ms(500);
-                //set_ULED_level(255);
-                //busy_wait_ms(3000);
                 FFT_fixdpt(&cool_fft);
+                FFT_mag(&cool_fft);
+
+                // Data bypass to see raw output from Core 1
+                //for(uint16_t n = 0; n < ICTXFR_A.len; ++n){
+                //    cool_fft.fr[n] = ICTXFR_A.data[n];
+                //}
+
                 // Free memory constraints
-                set_ULED_level(0);
-                //busy_wait_ms(3000);
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
-                //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);
-                //spin_lock_unclaim(INTERCORE_FFTMEM_LOCK_A);
                 USB_NEXT_STATE = USB_SEND_TUSB;
             }
             break;
 
             case USB_SEND_TUSB: {
                 USB_Handler(&cool_fft); //send data to GUI through tusb
-                //set_ULED_level(0);
-                //busy_wait_ms(1000);
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
             break;
 
             case USB_SEND_CORE_DEBUG: {
                 // indicate to CORE 1 debug report is wanted
-                //while(spin_lock_is_claimed(INTERCORE_CORE_1_DBG_LOCK));
-                //spin_lock_claim(INTERCORE_CORE_1_DBG_LOCK);
-                //volatile uint32_t spinlock_irq_status_F = spin_lock_blocking(DEBUG_REPORT_LOCK);
-
                 Acquire_Lock_Blocking(INTERCORE_CORE_1_DBG_LOCK);
 
                 // idk yet
 
-                //spin_unlock(DEBUG_REPORT_LOCK, spinlock_irq_status_F);
-                //spin_lock_unclaim(INTERCORE_CORE_1_DBG_LOCK);
                 Release_Lock(INTERCORE_CORE_1_DBG_LOCK);
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
@@ -376,7 +372,7 @@ static void core_1_main(){
     
     
     DFL_LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
-    DFL_LMS_Inst.max_convergence_attempts = 4;
+    DFL_LMS_Inst.max_convergence_attempts = 256;
 
     // Setup LMS controller and buffering
     struct LMS_Fixed_Inst LMS_Inst;
@@ -393,8 +389,9 @@ static void core_1_main(){
     DFL_LMS_Inst.x_n = X_N_0;
     DFL_LMS_Inst.iteration_ct = STD_MAX_SAMPLES;
     DFL_LMS_Inst.d_n_offset = 0;
-    DFL_LMS_Inst.learning_rate = 0x0020;    // 0.001
+    //DFL_LMS_Inst.learning_rate = 0x0020;    // 0.001
     //DFL_LMS_Inst.learning_rate = 0x0003;    // 0.0001
+    DFL_LMS_Inst.learning_rate = 0x0008;    // 0.00025
 
     // Set default settings to local struct copy
     LMS_Struct_Equate(&DFL_LMS_Inst, &LMS_Inst);
@@ -530,6 +527,7 @@ start_adc_setup:
 
     // Limit of how many times a calibration approaching an exact value can be done.
     const uint16_t DAC_CAL_EXACT_LIMIT = 128;
+    const uint16_t DAC_CAL_MAX_ATTEMPTS = 1024;
     uint16_t DAC_CAL_ATTEMPTS = 0;
 
     // Refdac init at 0x1FF -> 2.5V, we want some fraction of this estimated at 0x108 (2.19V)
@@ -581,13 +579,14 @@ start_refdac_cal:
             else if(ADC_REFDAC_CAL_ACCUM > ADS_MID_CODE_BINARY) ADC_REFDACVAL++;
             goto start_refdac_cal;
     } else
-    if(ADC_REFDAC_CAL_ACCUM < (ADS_MID_CODE_BINARY - 1)){  // If we can't hit exact fallback to +/-1 of exact
+    if(ADC_REFDAC_CAL_ACCUM < (ADS_MID_CODE_BINARY - 1) &&
+        (DAC_CAL_ATTEMPTS++ < DAC_CAL_MAX_ATTEMPTS)){  // If we can't hit exact fallback to +/-1 of exact
             // ADC Reference is HIGH
-            DAC_CAL_ATTEMPTS++;
             ADC_REFDACVAL--;
             goto start_refdac_cal;
     } else
-    if(ADC_REFDAC_CAL_ACCUM > (ADS_MID_CODE_BINARY + 1)){
+    if(ADC_REFDAC_CAL_ACCUM > (ADS_MID_CODE_BINARY + 1) &&
+        (DAC_CAL_ATTEMPTS++ < DAC_CAL_MAX_ATTEMPTS)){
             // ADC Reference is LOW
             ADC_REFDACVAL++;
             goto start_refdac_cal;
@@ -621,10 +620,11 @@ start_refdac_cal:
 
     // Setup Sampling Pace Flags
     //  fs in khz
-    Sampling_Setup(500);
+    // Don't use this actually, lol
+    //Sampling_Setup(500);
 
     bool SET_STALL          = false;
-    uint16_t CORE_1_STATE   = CORE_1_IDLE;
+    volatile uint16_t CORE_1_STATE   = CORE_1_IDLE;
     uint16_t error_attempts = 0;                // How many times the LMS algorithm has failed to converge
     bool CORE_1_DBG_MODE    = false;            // Are we in debug mode?
     bool CORE_1_WGN_STATE   = false;            // Is WGN always on?
@@ -657,13 +657,6 @@ debug_no_adc_setup_label:
     CORE_1_STATE = CORE_1_DEBUG_HANDLER;
 #endif
 
-    //set_ULED_level(Bandit_RGBU.U = 255);
-    //busy_wait_ms(500);
-    //set_ULED_level(Bandit_RGBU.U = 0);
-    //busy_wait_ms(500);
-    //set_ULED_level(Bandit_RGBU.U = 255);
-    //busy_wait_ms(500);
-    //set_ULED_level(Bandit_RGBU.U = 0);
 
     while(1){
         switch(CORE_1_STATE){
@@ -677,6 +670,7 @@ debug_no_adc_setup_label:
                     CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     error_attempts = 0;
+                    flush_FIR_buffer_and_taps(&LMS_FIR);
                     
                     LMS_Inst.samples_processed = 0;
 
@@ -688,9 +682,9 @@ debug_no_adc_setup_label:
             break;
 
             case CORE_1_SET_SETTINGS: {
-#ifndef NO_DEBUG_LED
+//#ifndef NO_DEBUG_LED
                 set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
-#endif
+//#endif
                 Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
 
                 if(Global_Bandit_Settings.updated){
@@ -716,7 +710,6 @@ debug_no_adc_setup_label:
                 } else {
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
                         CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN)){
-                            
                             CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN);
                             CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                     } else {
@@ -755,7 +748,6 @@ debug_no_adc_setup_label:
                 if(!CORE_1_WGN_STATE){
                     // Start white noise for loopback testing
                     //stop_randombit_dma_chain(dma_awgn_data_chan);
-                    //stop_randombit_dma_chain(dma_awgn_ctrl_chan);
                     stop_wgn_dma_channels();
                     busy_wait_us(1);
                     start_wgn_dma_channels();
@@ -922,85 +914,13 @@ debug_no_adc_setup_label:
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
                 //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
 #endif
-
-                Q15 LMS_Error = LMS_FAIL_DFL;
-
-//#define ICKY_EXPANDED_LMS
-#ifdef ICKY_EXPANDED_LMS
-                LMS_FIR.size = 32;
-                LMS_FIR.size_mask = 31;
-
-
-                if(error_attempts == 0) flush_FIR_buffer_and_taps(&LMS_FIR);
-
-                uint_fast16_t max_iters = (LMS_Inst.iteration_ct >> LMS_Inst.ddsmpl_shift);
-                uint_fast16_t stride = LMS_Inst.ddsmpl_stride;
-                uint_fast16_t n;
-                for(n = 0; n < 1024; ++n){
-                    Q15 wgnval = X_N_0[n];
-                    //add_sample_to_2n_FIR_I16_no_inc(&LMS_FIR, wgnval);
-                    LMS_FIR_BANK[LMS_FIR.curr_zero & 31] = wgnval;
-                    Q15 tmp = 0;
-                    for(uint_fast16_t m = 0; m < 32; ++m) tmp += mul_Q15(recall_sample_from_2n_FIR(&LMS_FIR, m), LMS_FIR.taps[m]);
-                    LMS_FIR.curr_zero++;
-
-                    //LMS_Error = LMS_Inst.d_n[n] - run_2n_FIR_cycle(&LMS_FIR, wgnval);
-                    LMS_Error = D_N_0[n] - tmp;
-                
-                    //LMS_Update_Taps(&LMS_Inst, &LMS_FIR, LMS_Error);
-
-                    for(uint_fast16_t m = 0; m < LMS_Inst.tap_len; ++m){
-                        tmp = mul_Q15(LMS_Error, LMS_FIR_BANK[m]);
-                        LMS_H_HATS[m] += mul_Q15(0x0020, tmp);
-                    }
-
-                    LMS_Inst.samples_processed++;
-
-                    if(LMS_Error < 0) LMS_Error = mul_Q15(LMS_Error, -1);
-                    if(LMS_Error <= 0x0666){
-                        LMS_Error = LMS_OK;
-                        break;
-                    }
-                }
-
-                if(n >= max_iters) if(LMS_Error > LMS_Inst.max_error_allowed) LMS_Error = LMS_FAIL_DFL;
-
-#else
-                LMS_Inst.tap_len = 32;
-                LMS_Inst.iteration_ct = 1024;
-                LMS_Inst.ddsmpl_stride = 1;
-                LMS_Inst.fixed_offset = 0;
-                LMS_Inst.d_n = D_N_0;
-                LMS_Inst.x_n = X_N_0;
-                LMS_Inst.learning_rate = 0x0020;
-                LMS_Inst.max_convergence_attempts = 4;
-                LMS_Inst.target_error = 0x0666;
-                LMS_Inst.max_error_allowed = 0x1000;
-                LMS_Inst.ddsmpl_shift = 0;
-
-                LMS_FIR.curr_zero = 0;
-                LMS_FIR.data = LMS_FIR_BANK;
-                LMS_FIR.taps = LMS_H_HATS;
-                LMS_FIR.size_true = 1024;
-                LMS_FIR.size_mask = 31;
-                LMS_FIR.size = 1024;
-
                 // If first run: error_attempts = 0, thus we flush FIR buffer
                 //  else we should maintain results for more iterations
-                LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR, (!error_attempts) ? true : false);
-                
-                //for(int n = 0; n < LMS_FIR.size; ++n){
-                //    add_sample_to_2n_FIR_I16_no_inc(&LMS_FIR, n);
-                //}
-                //LMS_Error = LMS_OK;
-#endif
+                Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
 
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 255);
-                //set_ULED_level(++Bandit_RGBU.U);
 #endif
-                //CORE_1_STATE = CORE_1_POST_PROC;
-
                 if(LMS_Error != LMS_OK){
                     // Handle the error
                     //  Sample again and try again
@@ -1017,8 +937,6 @@ debug_no_adc_setup_label:
                     set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
                     CORE_1_STATE = CORE_1_POST_PROC;
                 } 
-
-                //busy_wait_ms(2000);
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
@@ -1052,16 +970,19 @@ debug_no_adc_setup_label:
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
                     // Move on with a normal run
+                   // LMS_Inst.tap_len = 1024;
                     for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
                         LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                        // Deboog only
+                        //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
+                        //LMS_FIR.taps[n] = Bandit_DC_Offset_Cal;
+                        
                     }
                     CORE_1_STATE = CORE_1_SHIP_RESULTS;
                 }
 
                 // Turn off WGN if always on is disabled
                 if(!CORE_1_WGN_STATE){
-                    //stop_randombit_dma_chain(dma_awgn_data_chan);
-                    //stop_randombit_dma_chain(dma_awgn_ctrl_chan);
                     stop_wgn_dma_channels();
                 }
 
@@ -1080,18 +1001,11 @@ debug_no_adc_setup_label:
                 //  1000% could be better tho
                 //volatile uint32_t spinlock_irq_status_D;
                 //spin_lock_t *used_lock;
-
-                //while(spin_lock_is_claimed(INTERCORE_FFTMEM_LOCK_A));
-                //spin_lock_claim(INTERCORE_FFTMEM_LOCK_A);
-                //spinlock_irq_status_D = spin_lock_blocking(FFTMEMLOCK_A);
-                //used_lock = FFTMEMLOCK_A;
                 
                 Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
 
                 transfer_results_to_safe_mem(LMS_FIR.taps, &ICTXFR_A, LMS_Inst.tap_len);
 
-                //spin_lock_unclaim(INTERCORE_FFTMEM_LOCK_A);                
-                //spin_unlock(used_lock, spinlock_irq_status_D);
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
 
 #ifndef NO_DEBUG_LED
@@ -1155,7 +1069,7 @@ static void USB_Handler(struct FFT_PARAMS *fft){
         header_data[n] = 0;
     }
     header_data[31] = 0xAA40;
-
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
     send_header_packet(header_data);
     while (tud_cdc_n_read_char(CDC_CTRL_CHAN) != 'a') {
         tud_task(); // wait for ACK from GUI
@@ -1184,9 +1098,10 @@ static void send_f_packets(Q15 *data, uint16_t num_samples){
 }
 
 //triggered when wanted_char is recieved thru ctrl channel
+//  Cool ISR that will set configurations for the next LMS Cycle on Core 1
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) { 
     if(itf != CDC_CTRL_CHAN) itf = CDC_CTRL_CHAN;
-//    / if(wanted_char != START_CHAR) wanted_char == START_CHAR;
+
     if (tud_cdc_n_read_char(itf) == wanted_char) {
         while (tud_cdc_n_available(itf) < BS_BF_LEN) {
             tud_task();    
@@ -1196,15 +1111,6 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_write_flush(CDC_DATA_CHAN);
         tud_cdc_n_write_flush(CDC_CTRL_CHAN);
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
-        //if (count != BS_BF_LEN) {
-        //    // removed break idk
-        //    BS_RX_BF[USBBSRX_EN] = true;
-        //    BS_RX_BF[USBBSRX_AUTORUN] = true;
-        //    BS_RX_BF[USBBSRX_AUTOSEND] = true;
-        //    BS_RX_BF[USBBSRX_TAPLEN_LSB] = 32;
-        //    BS_RX_BF[USBBSRX_TAPLEN_MSB] = 0;
-        //    BS_RX_BF[USBBSRX_F_FRANGE] = 0;
-        //}
         
         // Settings come in as byte stream for future compatibility w ASCII control modes
         //  Byte[0] If Enabled
@@ -1235,6 +1141,8 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         else new_settings_value &= ~(1u << BS_AUTO_SEND);
         if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) new_settings_value |= (1u << BS_WGN_ON);
         else new_settings_value &= ~(1u << BS_WGN_ON);
+
+        new_settings_value |= (1u << BS_AUTO_RUN);
 
 
         // WHY DOESN"T THIS WORK
@@ -1275,7 +1183,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_write_flush(CDC_CTRL_CHAN);
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
 
-        
+        Global_Bandit_Settings.settings_bf = new_settings_value;
 
         Global_Bandit_Settings.updated = true;
         // Do USB Settings application here!!
@@ -1283,8 +1191,6 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         //  have been changed
         //  set UPDATED = true if any bitfield settings have been altered
 
-        //spin_unlock(SETTINGS_LOCK, spinlock_irq_status_E);
-        //spin_lock_unclaim(INTERCORE_SETTINGS_LOCK);
         Release_Lock(INTERCORE_SETTINGS_LOCK);
     } else {
         tud_cdc_n_read_flush(CDC_CTRL_CHAN);
@@ -1293,7 +1199,6 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
     //if (USB_STATE < USB_FFT_DATA_COLLECT) {
     //    USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
     //} 
-    
 }
 
 
