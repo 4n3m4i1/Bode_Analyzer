@@ -105,8 +105,8 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             CTRLCHANNEL.write(b'~')
             print('start')
             CTRLCHANNEL.write(bytes(INIT_SETTINGS))
-            # # print(bytes(INIT_SETTINGS))
-            # #print(CTRLCHANNEL.read(64))
+            # # # print(bytes(INIT_SETTINGS))
+            # # #print(CTRLCHANNEL.read(64))
             setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
             rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
             rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
@@ -120,7 +120,8 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             # print(thing.bin)
             # CTRLCHANNEL.flush()
             while True:
-                #if settings have been changed
+                # print(DATACHANNEL.in_waiting)
+                #if settings have been changed                
                 if settings_event.is_set():
                     CTRLCHANNEL.write(b'~')
                     settings = settings_Queue.get(block=False)
@@ -140,25 +141,28 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                 else:
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
                         start = time.time()
-                        header_data = DATACHANNEL.read(CDC_PACKET_LENGTH * BYTES_PER_NUMBER)
+                        header_data = DATACHANNEL.read(CDC_PACKET_LENGTH)
                         # print(header_data)
                         # print(len(header_data))
                         count = 0
-                        num_samples = (header_data[3] * 256 + header_data[2]) * BYTES_PER_NUMBER
                         CTRLCHANNEL.write(b'a')
+                        num_samples = (header_data[3] * 256 + header_data[2]) * BYTES_PER_NUMBER
+                        
 
-                        print(num_samples)
-                        print(DATACHANNEL.in_waiting)
+                        # print(num_samples)
+                        # print(DATACHANNEL.in_waiting)
                         # print(num_samples)
                         # print(header_data[2])
                         # print(header_data[3])
-                        
-                        while DATACHANNEL.in_waiting < num_samples:
+                        # print('while')
+                        while DATACHANNEL.in_waiting < num_samples and count < 1000:
                             count = count + 1
-                        end = time.time()
+                            # print(DATACHANNEL.in_waiting)
+                        
                         f_data = DATACHANNEL.read(num_samples)
+                        end = time.time()
                         print(f_data)
-                        # print(end - start)
+                        print(f'{end - start} second transmition')
                         data_Queue.put(f_data)
         except serial.SerialException:
             page.banner = ft.Banner(
@@ -194,13 +198,13 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             if data_Queue.empty():
                 raise Empty
             data = data_Queue.get()
-            print(data)
+            # print(data)
             # print(len(data))
             line.set_data(np.arange(len(data)), data)
 
             if data:
                 if max(data) != 0:
-                    print(line.get_data())
+                    # print(line.get_data())
                     plt.ylim(0, max(data))
                 else:
                     print("Data All Zero!!")
@@ -210,9 +214,9 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             axis.draw_artist(line)
             fig.canvas.blit(fig.bbox)
             fig.canvas.flush_events()
-            print('step')
+            # print('step')
             chart.update()
-            print('step2')
+            # print('step2')
 
         except Empty:
             continue

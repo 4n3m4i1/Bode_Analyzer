@@ -295,14 +295,14 @@ static void core_0_main(){
                     USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
                 } else {
                     data_src->updated = false;
-                
+                    fft_setup(&cool_fft, data_src->len);
                     // Apply windowing here if needed!!!
                     for(uint16_t n = 0; n < data_src->len; ++n){
                         cool_fft.fr[n] = data_src->data[n];
                         cool_fft.fi[n] = 0;
                     }
 
-                    fft_setup(&cool_fft, data_src->len);
+                    
 
                     //// Free memory constraints
                     //spin_unlock(FFTMEMLOCK_A, spinlock_irq_status_A);

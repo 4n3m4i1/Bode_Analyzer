@@ -61,20 +61,23 @@ int main(){
     // header_data[CDC_PACKET_LEN - 1] = 0x1F;
     // Q15 test_data = 0x01;
     while(1){
+        tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, WANTED_CHAR);
         STATE = NEXT_STATE;
         tud_task(); //tinyusb task
         // if (tud_cdc_n_available(CDC_CTRL_CHAN) >= 1) {
             switch (STATE)
             {
-            case HEADER_STATE:
+            case HEADER_STATE: {
                 USB_Handler(fft_r_fake);
                 NEXT_STATE = IDLE;
                 tud_task();
+            }
                 break;
-            case IDLE:
+            case IDLE: {
 
-                    idle_work();
+                idle_work();
                 NEXT_STATE = HEADER_STATE;
+            }
                 break;
             default:
                 break;
@@ -89,7 +92,7 @@ static void send_header_packet(uint16_t *h_data){
     tud_cdc_n_write_flush(CDC_DATA_CHAN);
 }
 static void send_f_packets(Q15 *f_data, uint16_t ns){
-    uint16_t PACKET_PER_BUF = ns / CDC_PACKET_LEN;
+    uint16_t PACKET_PER_BUF = (ns * (uint16_t)sizeof(Q15)) / CDC_PACKET_LEN;
     
     for(uint16_t n = 0; n < PACKET_PER_BUF; ++n){
         while((uint16_t)tud_cdc_n_write_available(CDC_DATA_CHAN) < CDC_PACKET_LEN){
@@ -110,14 +113,15 @@ static void USB_Handler(Q15 *f_data){
 
     //setup header data
     header_data[0] = 0x4242;
-    header_data[1] = 0x011;
+    header_data[1] = 0x200;
     header_data[2] = 0x018;
     header_data[3] = 0x66;
     for(uint16_t n = 4; n < 31; ++n){
         header_data[n] = 0;
     }
     header_data[31] = 0xAA40;
-
+    tud_cdc_n_read_flush(CDC_CTRL_CHAN);
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
     send_header_packet(header_data);
     while (tud_cdc_n_read_char(CDC_CTRL_CHAN) != 'a') {
         tud_task(); // wait for ACK from GUI
@@ -128,7 +132,8 @@ static void USB_Handler(Q15 *f_data){
 static void idle_work(void){
     // Q15 tmp[CDC_PACKET_LEN] = {0x00};
     tud_cdc_n_read_flush(CDC_CTRL_CHAN);
-    busy_wait_us_32(1000);
+    tud_cdc_n_write_flush(CDC_DATA_CHAN);
+    busy_wait_us_32(100);
 }
 // static int32_t recieve_ack(void){
 //     int32_t byte = tud_cdc_n_read_char(CDC_CTRL_CHAN);
@@ -138,7 +143,7 @@ static void idle_work(void){
 //         return 1;
 //     }
 // }
-
+dfguyasgkdhaghsdukhadkhvgsyjhdgiuyasdkash
 void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
     if (wanted_char == '~' && itf == CDC_CTRL_CHAN) {
         NEXT_STATE = IDLE; 
