@@ -25,7 +25,15 @@
 #define ADS_WRITE_DAC_COUNT 3
 
 #define ADS_MAX_CODE_BINARY 4095
-#define ADS_MID_CODE_BINARY 2047
+
+//#define BIG_NUMS
+
+#ifdef BIG_NUMS
+#define ADS_MID_CODE_BINARY (2047 << 2)
+#else
+#define ADS_MID_CODE_BINARY (2047)
+#endif
+
 #define ADS_MIN_CODE_BINARY 0
 
 enum ADS7253_REGISTER_ADDRESSES {

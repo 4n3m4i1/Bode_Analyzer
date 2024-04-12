@@ -104,8 +104,13 @@ void __time_critical_func(ADS7253_Dual_Sampling)(const PIO pio, uint16_t *src, u
 }
 
 void __time_critical_func(ADS7253_Read_Dual_Data)(const PIO pio, uint16_t *dst_A, uint16_t *dst_B){
+#ifdef BIG_NUMS
+    *dst_A = *((io_rw_16 *)&pio->rxf[ADS_PIO_SDOA_SM]);
+    *dst_B = *((io_rw_16 *)&pio->rxf[ADS_PIO_SDOB_SM]);
+#else
     *dst_A = *((io_rw_16 *)&pio->rxf[ADS_PIO_SDOA_SM]) >> 2;
     *dst_B = *((io_rw_16 *)&pio->rxf[ADS_PIO_SDOB_SM]) >> 2;
+#endif
 }
 
 uint32_t __time_critical_func(ADS7253_read_RX_buffer)(const PIO pio){

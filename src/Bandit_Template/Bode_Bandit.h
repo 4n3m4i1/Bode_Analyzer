@@ -24,6 +24,9 @@
 #include "Bandit_InterCore/Bandit_Inter_Core.h"
 #include "Downsampling/Fixed_Filters.h"
 
+
+#include "dummy_taps.h"
+
 /*
     Remember:
         e = d[n] - y[n]
@@ -111,7 +114,6 @@
         125k    2
         62.5k   4
         31.25k  8
-        25k     10
 */
 enum DDSAMP_FREQ_RANGE_IDX {
     DDSAMP_250K,
@@ -158,7 +160,7 @@ struct BANDIT_SETTINGS {
 
 #define CHK_BANDIT_SETTING(a, b)        (a & (1u << b))
 #define SET_BANDIT_SETTING(a, b)        (a |= (1u << b))
-#define CLR_BANDIT_SETTING(a, b)        (a &= (1u << b))
+#define CLR_BANDIT_SETTING(a, b)        (a &= ~(1u << b))
 
 #define BANDIT_DFL_SETTINGS     (1 << BS_ENABLE) | \
                                 (1 << BS_AUTO_SEND)
@@ -236,7 +238,7 @@ enum USB_BS_RX_BUF_BYTES {
 //    DOWNSAMPLE_1X_250K_CUT,
 //    DOWNSAMPLE_2X_125K_CUT,
 //    DOWNSAMPLE_4X_62K5_CUT,
-//    DOWNSAMPLE_8X_32K2_CUT
+//    DOWNSAMPLE_8X_31K25_CUT
 //};
 
 enum BANDIT_CALIBRATION_STATES {
