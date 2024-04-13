@@ -16,7 +16,7 @@
     Testing Defines
     DO NOT UNCOMMENT UNLESS YOU KNOW EXACTLY WHAT YOU'RE DOING!!!!!!
 */
-#define FORCE_SAMPLING_4_TESTING
+//#define FORCE_SAMPLING_4_TESTING
 #define NO_DEBUG_LED
 
   //////////////////////////////////////////////////////////////////////
@@ -278,9 +278,7 @@ static void core_0_main(){
                 
                 struct Transfer_Data *data_src;
 
-                set_ULED_level(255);
                 Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
-                set_ULED_level(0);
                 data_src = &ICTXFR_A;
 
                 
@@ -620,7 +618,7 @@ start_refdac_cal:
 
     // Go Purple for DAC cal complete
     set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
-    set_ULED_level(Bandit_RGBU.U = 0);
+    set_ULED_level(Bandit_RGBU.U = 64);
     
 
     // Setup Sampling Pace Flags
@@ -836,7 +834,7 @@ debug_no_adc_setup_label:
                 // Go white for DC Cal done, Idle return
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 127);
                // busy_wait_ms(1000);
-                //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
+                set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
 
                 CORE_1_STATE = CORE_1_IDLE;
             }
@@ -969,7 +967,7 @@ debug_no_adc_setup_label:
 
                     // Indicate full CAL with green LEDs
                     set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-                    //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
+                    set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
                     
                     // Calibration Acquired, go back to do first run
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;

@@ -7,7 +7,7 @@
 // #define LOG2_N_WAVE 10
 
 
-CORE_0_MEM Q15 sin_table_table[1024] = {
+CORE_0_MEM Q15 sin_table_table[SINTABLESIZE] = {
 		0xFFFF,
 		0x00C8,
 		0x0191,
