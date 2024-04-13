@@ -16,7 +16,7 @@
     Testing Defines
     DO NOT UNCOMMENT UNLESS YOU KNOW EXACTLY WHAT YOU'RE DOING!!!!!!
 */
-//#define FORCE_SAMPLING_4_TESTING
+#define FORCE_SAMPLING_4_TESTING
 #define NO_DEBUG_LED
 
   //////////////////////////////////////////////////////////////////////
@@ -328,11 +328,16 @@ static void core_0_main(){
 
                 // Free memory constraints
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+
+                // Fix FFT scaling for graphing
+
                 USB_NEXT_STATE = USB_SEND_TUSB;
             }
             break;
 
             case USB_SEND_TUSB: {
+                // For sending non reflected FFT magnitudes
+                cool_fft.num_samples >>= 1;
                 USB_Handler(&cool_fft); //send data to GUI through tusb
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
@@ -1007,6 +1012,8 @@ debug_no_adc_setup_label:
                 transfer_results_to_safe_mem(LMS_FIR.taps, &ICTXFR_A, LMS_Inst.tap_len);
 
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+
+                busy_wait_us_32(100);
 
 #ifndef NO_DEBUG_LED
                 busy_wait_ms(1000);
