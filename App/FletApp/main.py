@@ -1,4 +1,5 @@
 from generic_include import *
+from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
 import serial
 # import serial.tools.list_ports_osx as list_ports_osx
@@ -16,7 +17,7 @@ from flet.matplotlib_chart import MatplotlibChart
 from flet import RouteChangeEvent, ViewPopEvent
 from multiprocess import Process, Queue, Event
 from threading import Thread
-from queue import Empty
+# from queue import Empty
 import time
 from bitstring import BitArray
 import numpy as np
@@ -66,13 +67,13 @@ for index1 in range(size1):
 data_port = Port()
 ctrl_port = Port()
 
-init_graph = [0 for i in range(NUM_VALUES)]
+# init_graph = [0 for i in range(NUM_VALUES)]
 
 FFT_real_queue = Queue()
 FFT_converted_queue = Queue()
 Settings_Queue = Queue()
 GraphEvent = Event()
-
+FRANGE_queue = Queue()
 ##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page):
     BYTES_PER_NUMBER = 2
@@ -124,27 +125,30 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                 # print(DATACHANNEL.in_waiting)
                 #if settings have been changed                
                 if settings_event.is_set():
-                    CTRLCHANNEL.write(b'~')
-                    settings = settings_Queue.get(block=False)
-                    # print(settings)
-                    CTRLCHANNEL.write(bytes(settings))
-                    setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
-                    rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
-                    rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
-                    rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-                    rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
-                    print(setting)
-                    print(rest)
-                    print(rest2)
-                    print(rest3)
-                    print(rest4)
-                    settings_event.clear()
+                    if settings_Queue.empty():
+                        pass
+                    else:
+                        CTRLCHANNEL.write(b'~')
+                        settings = settings_Queue.get(block=False)
+                        # print(settings)
+                        CTRLCHANNEL.write(bytes(settings))
+                        setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
+                        rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
+                        rest2 = BitArray(hex=CTRLCHANNEL.read(1).hex())
+                        rest3 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+                        rest4 = BitArray(hex=CTRLCHANNEL.read(2).hex())
+                        print(setting)
+                        print(rest)
+                        print(rest2)
+                        print(rest3)
+                        print(rest4)
+                        settings_event.clear()
                 else:
                     # print(DATACHANNEL.in_waiting)
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
                         start = time.time()
                         header_data = DATACHANNEL.read(CDC_PACKET_LENGTH)
-                        print(header_data)
+                        # print(header_data)
                         # print(len(header_data))
                         count = 0
                         CTRLCHANNEL.write(b'a')
@@ -163,7 +167,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         
                         f_data = DATACHANNEL.read(num_samples)
                         end = time.time()
-                        print(f_data)
+                        # print(f_data)
                         print(f'{end - start} second transmition')
                         data_Queue.put(f_data)
         except serial.SerialException:
@@ -178,54 +182,63 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             page.update()
 ##########################################################################################DATACONVERTER
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
+    # is_set = GraphEvent.wait()
     while True:
         is_set = GraphEvent.wait()
-        try:
-            if data_in_Queue.empty():
-                raise Empty
+        if data_in_Queue.empty():
+            pass
+            
+        else:
             graph_data_raw = data_in_Queue.get(block=False)
-            print(len(graph_data_raw))
+            # print(len(graph_data_raw))
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
-            print(len(listed_graph_data))
+            # print(len(listed_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
             # print(converted_graph_data)
             data_out_Queue.put(converted_graph_data, block=False)
-
-        except Empty:
-            continue
 ##########################################################################################UPDATEGRAPH
-def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, axis, fig):
+def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis, fig):
+    # is_set = GraphEvent.wait()
+    frange = 0
     while True:
+        # print(frange)
         is_set = GraphEvent.wait()
-        try: 
-            if data_Queue.empty():
-                raise Empty
+        if data_Queue.empty():
+            pass
+        else:
             data = data_Queue.get()
             # print(data)
             # print(len(data))
             line.set_data(np.arange(len(data)), data)
+            if frange_queue.empty():
+                if frange == 0:
+                    frange = 250e3
+                else:
+                    pass
+            else:
 
+                frange = frange_queue.get()
 
             if data:
                 if max(data) != 0:
                     # print(line.get_data())
+                    plt.xlim(1e-15, frange)
                     plt.ylim(1e-15, max(data) + 0.01)
+                    # plt.xlim(min(float), le)
+                    # axis.set_xbound
+                    axis.draw_artist(line)
+                    fig.canvas.blit(fig.bbox)
+                    fig.canvas.flush_events()
+            # print('step')
+                    chart.update()
+            # print('step2')
                 else:
                     print("Data All Zero!!")
                 
             else:
-                raise Empty
-            # axis.set_xbound
-            axis.draw_artist(line)
-            fig.canvas.blit(fig.bbox)
-            fig.canvas.flush_events()
-            # print('step')
-            chart.update()
-            # print('step2')
-
-        except Empty:
-            continue
+                pass
+            
 ##########################################################################################MAIN
 def main(page: ft.Page):
     page.title = PAGE_TITLE
@@ -237,7 +250,7 @@ def main(page: ft.Page):
         primary=ft.colors.BLACK,   
     )
 )
-    
+    temp_settings = INIT_SETTINGS
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
             page.views.append(
@@ -372,12 +385,31 @@ def main(page: ft.Page):
         print(temp_settings)
 
         page.update()
+    def toggle_single_shot(e):
+        temp_settings[12] = int(single_shot_switch.value)
+        temp_settings[1] = int(not temp_settings[12])
+
+    def toggle_auto_run(e):
+        temp_settings[1] = int(auto_run_switch.value)
+        temp_settings[12] = int(not temp_settings[1])
+
+    def toggle_raw_request(e):
+        temp_settings[10] = int(raw_requect_switch.value)
+    
+
+    def toggle_time_d(e):
+        temp_settings[11] = int(time_domain_switch.value)
 
 
     wgn_switch = ft.Switch(label= WGN_LABEL_OFF, on_change=toggle_wgn)
 
+    single_shot_switch = ft.Switch(label = SINGLE_SHOT_LABEL, on_change=toggle_single_shot)
 
+    auto_run_switch = ft.Switch(label = AUTO_RUN_LABEL, on_change=toggle_auto_run)
 
+    raw_requect_switch = ft.Switch(label = RAW_REQUEST_LABEL, on_change=toggle_raw_request)
+
+    time_domain_switch = ft.Switch(label = TIME_DOMAIN_REQUEST_LABEL, on_change=toggle_time_d)
 #######################################################
     config_table = ft.DataTable(
         border=ft.border.all(1, "black"),
@@ -408,10 +440,10 @@ def main(page: ft.Page):
         ] 
         )
     
-    switches = ft.Row(
-        [ wgn_switch
-        ] 
-        )
+    # switches = ft.Row(
+    #     [ wgn_switch
+    #     ] 
+    #     )
     
     
     
@@ -451,7 +483,7 @@ def main(page: ft.Page):
             )
 
         page.controls.clear()
-        page.add(ft.Column([Controls]),updated_table,chart , ft.Row([switches]))
+        page.add(ft.Column([Controls]),updated_table,chart)
 
         page.update()
 
@@ -482,7 +514,7 @@ def main(page: ft.Page):
             options=port_selections,
             on_change=select_ctrl_port
         )
-    temp_settings = INIT_SETTINGS
+    
 
     def select_tap_length(e):
         bytes_tmp = int(tap_select.value).to_bytes(2, 'little')
@@ -490,7 +522,9 @@ def main(page: ft.Page):
         temp_settings[8] = bytes_tmp[1]
         print(temp_settings)
     def select_frange(e):
-        temp_settings[9] = int(freq_range_select.value)
+        tmp = int(freq_range_select.value)
+        temp_settings[9] = tmp
+        FRANGE_queue.put(FRANGE_VAL[tmp])
         print(temp_settings)
 
     tap_select = ft.Dropdown(
@@ -506,21 +540,29 @@ def main(page: ft.Page):
 
         )
     
-    ConfigDisplay = ft.Column([
+    ConfigDisplay = ft.Column(controls=[
         ft.Text(CONFIG_INSTR),
         data_select,
         ctrl_select,
         tap_select,
-        freq_range_select
+        freq_range_select,
+        wgn_switch,
+        single_shot_switch,
+        auto_run_switch,
+        raw_requect_switch,
+        time_domain_switch
 
-        ]
+
+        ],
+        scroll=ft.ScrollMode.ALWAYS
+
     )
 
     SettingsSelection = ft.AlertDialog(
         modal=True,
         title=ft.Text(CONFIG_STR),
         content=ConfigDisplay,
-        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)]
+        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
     )
     page.appbar = ft.AppBar(
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
@@ -537,13 +579,13 @@ def main(page: ft.Page):
     )
 
     #page.add(ft.Column([Controls]) ,chart ) 
-    page.add(ft.Column([Controls]),config_table,chart , ft.Row([switches]))
+    page.add(ft.Column([Controls]),config_table,chart)
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page))
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
     data_converter_process.daemon = True
-    update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, ax, figure))
+    update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
     update_graph_thread.daemon = True
     serial_reader.start()
     data_converter_process.start()
