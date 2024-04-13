@@ -7,6 +7,7 @@
 //#include "Q15_cos_table.h"
 
 #define TABLE_SIZE_2N       10
+#define SINTABLESIZE        1024
 
 #define max_fft(a,b)        ((a > b) ? a : b)
 #define min_fft(a,b)        ((a < b) ? a : b)

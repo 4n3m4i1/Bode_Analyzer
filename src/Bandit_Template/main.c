@@ -123,7 +123,7 @@ static void USB_Handler(struct FFT_PARAMS *fft);
 static void send_header_packet(uint16_t *h_data);
 static void send_f_packets(Q15 *data, uint16_t num_samples);
 
-static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len);
+static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len, uint16_t maxtablesize);
 static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 
 
@@ -246,7 +246,7 @@ static void core_0_main(){
 
     // Setup Structs and Default Parameters for FFT
     struct FFT_PARAMS cool_fft;
-    fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
+    fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN, (uint16_t)SINTABLESIZE);
 
     // Initialize tinyUSB with board and start listening for start char from GUI
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
@@ -299,7 +299,7 @@ static void core_0_main(){
 
                     if(data_src->len){
                         // Apply windowing here if needed!!!
-                        fft_setup(&cool_fft, data_src->len);
+                        fft_setup(&cool_fft, data_src->len, (uint16_t)SINTABLESIZE);
 
                         for(uint16_t n = 0; n < data_src->len; ++n){
                             if((cool_fft.fr[n] = data_src->data[n])) allzeros = false;
@@ -1210,11 +1210,12 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
 
 
 
-static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len){
+static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len, uint16_t maxtablesize){
     cool_fft->num_samples = len;
     cool_fft->log2_num_samples = get_log_2(len);
     cool_fft->shift_amount = get_shift_amt(cool_fft->log2_num_samples);
-    get_table_offset_shift(cool_fft, len);
+    cool_fft->true_max = maxtablesize;
+    get_table_offset_shift(cool_fft, maxtablesize);
     cool_fft->fr = FR_BUFF;
     cool_fft->fi = FI_BUFF;
 }
