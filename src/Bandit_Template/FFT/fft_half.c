@@ -1,11 +1,6 @@
 #include "fft_half.h"
 
-//#define NUM_SAMPLES         64
-//#define NUM_SAMPLES_M_1     64
-//#define LOG2_NUM_SAMPLES    6
-//#define SHIFT_AMOUNT        ((sizeof(Q15) * 8) - LOG2_NUM_SAMPLES)
-// #define LOG2_N_WAVE 10
-
+CORE_0_MEM Q15 zero_point_4 = 0x3333;
 
 CORE_0_MEM Q15 sin_table_table[SINTABLESIZE] = {
 		0xFFFF,
@@ -1039,10 +1034,7 @@ CORE_0_MEM Q15 sin_table_table[SINTABLESIZE] = {
 #define max(a,b) ((a>b)?a:b)
 #define min(a,b) ((a<b)?a:b)
 
-//#define FIX_2_FLOAT
 
-//Q15 zero_point_4 = float_2_Q15(0.4) ;
-Q15 zero_point_4 = 0x3333;
 
 uint16_t get_log_2(uint16_t num_samples){
     for(uint16_t n = 0; n < 16; n++){

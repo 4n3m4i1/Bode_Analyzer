@@ -222,16 +222,20 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
 
             if data:
                 if max(data) != 0:
-                    # print(line.get_data())
+                    print("Valid Data Print!!")
+                    #print(line.get_data())
                     plt.xlim(1e-15, frange)
                     plt.ylim(1e-15, max(data) + 0.01)
                     # plt.xlim(min(float), le)
                     # axis.set_xbound
                     axis.draw_artist(line)
                     fig.canvas.blit(fig.bbox)
+
+                    fig.canvas.draw()       # I added this
                     fig.canvas.flush_events()
             # print('step')
                     chart.update()
+                    
             # print('step2')
                 else:
                     print("Data All Zero!!")
@@ -291,7 +295,7 @@ def main(page: ft.Page):
     ## Graph configurations
     #figure = plt.figure()
     figure = plt.figure(figsize=(15,7))
-    ax = figure.add_subplot()
+    ax = figure.add_subplot(111)
     line, = ax.plot(init_graph, animated=True,)
     ax.grid()
 

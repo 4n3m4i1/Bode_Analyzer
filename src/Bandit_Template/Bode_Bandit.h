@@ -1,6 +1,9 @@
 #ifndef BODE_BANDIT_h
 #define BODE_BANDIT_h
 
+// Desperate times...
+//#define LONGFIXED
+
 #include "Bandit_Pins.h"
 #include "fixedpt_include.h"
 #include "Memory_Management.h"
@@ -25,6 +28,7 @@
 #include "Downsampling/Fixed_Filters.h"
 
 
+// For debug only
 #include "dummy_taps.h"
 
 /*
@@ -144,7 +148,7 @@ enum BANDIT_SETTINGS_BF {
     BS_RES4,
     BS_DEBUG_REPORT_RQ
 };
-#define BS_BF_LEN               10
+
 /*
     Bandit Main Settings
 */
@@ -191,6 +195,7 @@ enum BANDIT_CORE_1_DSP_STATES {
 #define CDC_DATA_CHAN           0
 #define CDC_CTRL_CHAN           1
 #define CDC_PACKET_LEN          64
+#define LOG2_CDC_PACKET_LEN     6
 
 //core0 state machine init
 //#define STATE             // variables?
@@ -206,7 +211,7 @@ enum USB_STATE_MACHINEEEEE {
     USB_SEND_CORE_DEBUG
 };    
 
-
+#define BS_BF_LEN               10
     //  Byte[0] If Enabled
     //  Byte[1] Auto run
     //  Byte[2] Auto send
@@ -228,9 +233,9 @@ enum USB_BS_RX_BUF_BYTES {
     USBBSRX_TAPLEN_LSB,
     USBBSRX_TAPLEN_MSB,
     USBBSRX_F_FRANGE,
-    USBBSRX_RES_1,
-    USBBSRX_RES_2,
-    USBBSRX_RES_3,
+    USBBSRX_RAW_RQ,
+    USBBSRX_TIME_DOMAIN_DATA,
+    USBBSRX_SINGLE_SHOT,
     USBBSRX_CORE_1_DBG_RQ
 };
 

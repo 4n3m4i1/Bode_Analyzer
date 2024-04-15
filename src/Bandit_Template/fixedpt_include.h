@@ -4,10 +4,18 @@
 #include <inttypes.h>
 // Macros for Q15 fixed point
 
+
+#ifdef LONGFIXED
+#define SHAMT       15  // initially 15
+typedef int32_t     Q15;
+typedef int64_t     _sn2xFix;
+typedef uint64_t    _uns2xFix;
+#else
 #define SHAMT       15  // initially 15
 typedef int16_t     Q15;
 typedef int32_t     _sn2xFix;
 typedef uint32_t    _uns2xFix;
+#endif
 //#define multfix14_16(a,b) ((fix14_16)((((signed long long)(a))*((signed long long)(b)))>>15)) //multiply two fixed 16.15
 #define add_Q15(a,b)        (a + b)
 #define sub_Q15(a,b)        (a - b)

@@ -13,6 +13,7 @@ void LMS_Struct_Equate(struct LMS_Fixed_Inst *src, struct LMS_Fixed_Inst *dst){
     dst->d_n = src->d_n;
     dst->x_n = src->x_n;
     dst->samples_processed = src->samples_processed;
+    dst->error = src->error;
 }
 
 void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable_error, int16_t samples_offset, uint16_t max_runtime, uint16_t start_offset){
@@ -24,6 +25,7 @@ void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable
     LMS->fixed_offset = start_offset;
     LMS->samples_processed = 0;
     LMS->max_convergence_attempts = LMS_DFL_MAX_FAILURES;
+    LMS->error = 0;
 }
 
 
@@ -46,7 +48,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
     
    // uint16_t max_iters = (LMS->iteration_ct >> LMS->ddsmpl_shift);
 
-    uint16_t max_iters = LMS->iteration_ct;
+    uint16_t max_iters = LMS->iteration_ct - LMS->fixed_offset;
 
     uint16_t stride = LMS->ddsmpl_stride;
 
@@ -56,7 +58,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
         //retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
         //retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
 
-        retval = LMS->d_n[n] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n]);
+        LMS->error = LMS->d_n[n + LMS->ddsmpl_shift] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n]);
         
         //retval = LMS->d_n[n * stride] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n * stride]);
         //retval = LMS->d_n[n * stride];
@@ -77,14 +79,16 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
         //}
 
 
-        LMS_Update_Taps(LMS, WGN_FIR, retval);
+        LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
 
         LMS->samples_processed++;      
 
         // Error processing Stuff goes here!!!!!!!!!!!
         //  break if avg < min err
         // Cheap abs
-        if(retval < 0) retval = mul_Q15(retval, -1); 
+        if(LMS->error < 0) retval = mul_Q15(LMS->error, -1);
+        else retval = LMS->error;
+
         if(retval <= LMS->target_error){
             retval = LMS_OK;
             break;

@@ -29,6 +29,6 @@ class FRANGE_ENUM(Enum):
     FRANGE_62K5 = 2
     FRANGE_31K25 = 3
 FRANGE_VAL = [250e3, 125e3, 62.5e3, 31.25e3]
-SETTINGS_BF_LEN = 10
+SETTINGS_BF_LEN = 14
 INIT_SETTINGS = [0x1, 0x1, 0x1, 0x0, 0x00, 0x66, 0x06, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 init_graph = [1e-15 for _ in range(128)]

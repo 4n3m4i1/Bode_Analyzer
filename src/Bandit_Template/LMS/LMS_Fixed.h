@@ -56,6 +56,7 @@ struct LMS_Fixed_Inst {
     Q15         *x_n;               // White Noise Source data. Manually allocate pointer
 
     uint32_t    samples_processed;  // Number of samples run until convergence
+    Q15         error;              // Current error of the run
 };
 
 void LMS_Struct_Equate(struct LMS_Fixed_Inst *src, struct LMS_Fixed_Inst *dst);
