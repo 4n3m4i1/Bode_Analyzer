@@ -1,3 +1,19 @@
+/*
+    Testing Defines
+    DO NOT UNCOMMENT UNLESS YOU KNOW EXACTLY WHAT YOU'RE DOING!!!!!!
+*/
+//#define FORCE_SAMPLING_4_TESTING
+#define NO_DEBUG_LED
+#define FORCESEND_TESTING
+//#define FORCESEND_FAKETAPS
+//#define FORCESEND_NOFFT
+//#define FORCESEND_USE_REALDATA
+
+#ifdef FORCESEND_USE_REALDATA
+#include "realdata.h"
+#endif
+
+
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
@@ -12,15 +28,6 @@
 
 #include "Bode_Bandit.h"
 
-/*
-    Testing Defines
-    DO NOT UNCOMMENT UNLESS YOU KNOW EXACTLY WHAT YOU'RE DOING!!!!!!
-*/
-//#define FORCE_SAMPLING_4_TESTING
-#define NO_DEBUG_LED
-#define FORCESEND_TESTING
-//#define FORCESEND_FAKETAPS
-#define FORCESEND_NOFFT
 
   //////////////////////////////////////////////////////////////////////
  //////////////////   GLOBAL PREALLOC BUFFERS   ///////////////////////
@@ -49,9 +56,13 @@
 //////////////////////////////////////////////////////////////////////
 // Core 1 -> 0 transfer buffers
 struct Transfer_Data {
-    volatile bool        updated;
-    volatile uint16_t    len;
-    volatile Q15         data[TOTAL_ADAPTIVE_FIR_LEN];
+    volatile bool       updated;
+    volatile uint16_t   len;
+    volatile Q15        data[TOTAL_ADAPTIVE_FIR_LEN];
+
+    volatile uint32_t   lms_samples_processed;
+    volatile Q15        lms_error;
+    volatile uint16_t   lms_error_attempts;
 };
 
 struct Transfer_Data ICTXFR_A;
@@ -133,16 +144,6 @@ static void     core_1_main();
 static void     transfer_results_to_safe_mem(Q15 *src, struct Transfer_Data *dst, uint16_t len);
 static void     clear_adc_read_buffers();
 
-/*
-    Spinlocks for mututally exclusive access to shared memory resources.
-
-    When a lock is held no other core can access that memory location, and by
-        extention in most cases the entire RAM bank, due to how accesses
-        are shared. (see: CORE_0_MEM and CORE_1_MEM)
-*/
-spin_lock_t *FFTMEMLOCK_A;
-spin_lock_t *SETTINGS_LOCK;
-spin_lock_t *DEBUG_REPORT_LOCK;
 
   //////////////////////////////////////////////////////////////////////
  ////////////////////////////    Code!    /////////////////////////////
@@ -306,6 +307,16 @@ static void core_0_main(){
                     }
                     allzeros = false;
 #else
+#ifdef FORCESEND_USE_REALDATA
+                    fft_setup(&cool_fft, REALDSIZE, (uint16_t)SINTABLESIZE);
+
+                    cool_fft.num_samples = REALDSIZE;
+                    for(uint16_t n = 0; n < REALDSIZE; ++n){
+                        cool_fft.fr[n] = REALD[n];
+                        cool_fft.fi[n] = 0;
+                    }
+                    allzeros = false;
+#else
                     if(data_src->len){
                         // Apply windowing here if needed!!!
                         
@@ -316,6 +327,7 @@ static void core_0_main(){
                             cool_fft.fi[n] = 0;
                         }
                     }
+#endif
 #endif
 
 #ifdef FORCESEND_TESTING 
@@ -334,12 +346,6 @@ static void core_0_main(){
             
             case USB_RUN_DMC_JK_RUN_FFT: {
                 tud_task();
-                cool_fft.log2_num_samples = 10;
-                cool_fft.num_samples = 1024;
-                cool_fft.shift_amount = 6;
-                cool_fft.table_scalar_offset = 0;
-                cool_fft.true_max = 1024;
-                
                 FFT_fixdpt(&cool_fft);      // Run FFT
                 FFT_mag(&cool_fft);         // Extract magnitude, output in fft.fr
 
@@ -349,6 +355,7 @@ static void core_0_main(){
                 }
 #else
                 cool_fft.num_samples >>= 1;
+                
                 // Raw Core 1 data bypass
                 //if(CORE_0_SKIP_FFT){
                 //    for(uint16_t n = 0; n < ICTXFR_A.len; ++n){
@@ -369,7 +376,17 @@ static void core_0_main(){
                 // Transmit FFT Data to computer
                 tud_task();
 #ifdef FORCESEND_TESTING  
+                cool_fft.fr[0] = cool_fft.fr[8];
+                cool_fft.fr[1] = cool_fft.fr[8];
+                cool_fft.fr[2] = cool_fft.fr[8];
+                cool_fft.fr[3] = cool_fft.fr[8];
+                cool_fft.fr[4] = cool_fft.fr[8];
+                cool_fft.fr[5] = cool_fft.fr[8];
+                cool_fft.fr[6] = cool_fft.fr[8];
+                cool_fft.fr[7] = cool_fft.fr[8];
                 send_f_packets(cool_fft.fr, cool_fft.num_samples);
+                tud_task();
+                busy_wait_ms(5000);
 #else
                 USB_Handler(&cool_fft);     //send data to GUI through tusb
 #endif
@@ -578,6 +595,12 @@ start_refdac_cal:
     // ADS7253 Section 7.8: t_refon = 8ms settling time for REFDAC
     //  go 10ms just to be sure
     busy_wait_us_32(10000);
+
+    // Sample a lot to reach steady state
+    for(uint16_t n = 0; n < 128; ++n){
+        ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, (uint16_t *)&D_N_0[n], (uint16_t *)&X_N_0[n], 1);
+        busy_wait_us_32(5);
+    }
 
     // Clear any read values
     clear_adc_read_buffers();
@@ -848,8 +871,8 @@ debug_no_adc_setup_label:
                     asm("nop"); asm("nop"); asm("nop");
                     ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, (uint16_t *)&D_N_0[n], (uint16_t *)&X_N_0[n], 1);
                     X_N_0[n] -= Bandit_DC_Offset_Cal;
-                    X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;
-                    D_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;
+                    X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
+                    D_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
                 }
 
                 //Stop_Sampling();
@@ -889,22 +912,14 @@ debug_no_adc_setup_label:
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 127);
 #endif
-                struct Q15_FIR_PARAMS *torun ;
+                struct Q15_FIR_PARAMS *torun = 0;
                 // FIR go here
-                
-                
                 switch(CORE_1_FRANGE){
                     case DOWNSAMPLE_2X_125K_CUT:
                         torun = &CUT_125KHZ;
 
                         flush_FIR_buffer(&CUT_125KHZ);
 
-                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                            D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
-                        }
-                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                            X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
-                        }
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 2;
@@ -915,12 +930,6 @@ debug_no_adc_setup_label:
 
                         flush_FIR_buffer(&CUT_62KHZ);
                         
-                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                            D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
-                        }
-                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                            X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
-                        }
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 4;
@@ -931,12 +940,6 @@ debug_no_adc_setup_label:
                         
                         flush_FIR_buffer(&CUT_31KHZ);
 
-                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                            D_N_0[n] = run_2n_FIR_cycle(torun, D_N_0[n]);
-                        }
-                        for(uint_fast16_t n = 0; n < STD_MAX_SAMPLES; ++n){
-                            X_N_0[n] = run_2n_FIR_cycle(torun, X_N_0[n]);
-                        }
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 8;
@@ -945,27 +948,47 @@ debug_no_adc_setup_label:
 
                     case DOWNSAMPLE_1X_250K_CUT:
                     default:
+                        torun = 0;
                         LMS_Inst.fixed_offset = 0;
                         LMS_Inst.ddsmpl_stride = 1;
                         LMS_Inst.ddsmpl_shift = 0;
+                        LMS_Inst.d_n = D_N_0;
+                        LMS_Inst.x_n = X_N_0;
                        // goto skip_downsampling_label;
                     break;
                 }
                 
+                if(torun){
+                    uint16_t n;
+                    torun->curr_zero = 0;
+                    for(n = 0; n < DOWNSAMPLE_LEN; ++n){
+                        run_2n_FIR_cycle(torun, D_N_0[n]);
+                    }
+                    for(n; n < STD_MAX_SAMPLES; ++n){
+                        D_N_0[n - DOWNSAMPLE_LEN] = run_2n_FIR_cycle(torun, D_N_0[n]);
+                    }
+
+                    torun->curr_zero = 0;
+                    for(n = 0; n < DOWNSAMPLE_LEN; ++n){
+                        run_2n_FIR_cycle(torun, X_N_0[n]);
+                    }
+                    for(n; n < STD_MAX_SAMPLES; ++n){
+                        X_N_0[n - DOWNSAMPLE_LEN] = run_2n_FIR_cycle(torun, X_N_0[n]);
+                    }
+                }
+
                 CORE_1_STATE = CORE_1_LMS;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
-            
+
             case CORE_1_LMS: {
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
                 //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
 #endif
-                // If first run: error_attempts = 0, thus we flush FIR buffer
-                //  else we should maintain results for more iterations
                 LMS_Inst.ddsmpl_shift = 0;
                 Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
 
@@ -992,6 +1015,7 @@ debug_no_adc_setup_label:
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
+
             case CORE_1_POST_PROC: {
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 32, Bandit_RGBU.B = 255);
@@ -1020,14 +1044,15 @@ debug_no_adc_setup_label:
                     // Calibration Acquired, go back to do first run
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
+                    // Finish processing H HAT buffer that'll get sent to Core 0
                     // Move on with a normal run
                    // LMS_Inst.tap_len = 1024;
                     for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-                        LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                        //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
                         // Deboog only
                         //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
                         //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
-                        //LMS_FIR.taps[n] = D_N_0[n];
+                        LMS_FIR.taps[n] = D_N_0[n] << 2;
                         //LMS_FIR.taps[n] = Bandit_DC_Offset_Cal;
                         //LMS_H_HATS[n] = 0xAB;
                         //LMS_FIR.taps[n] = 0xBC;
@@ -1044,10 +1069,11 @@ debug_no_adc_setup_label:
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
             break;
+
             case CORE_1_SHIP_RESULTS: {
-#ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
-#endif
+//#ifndef NO_DEBUG_LED
+                set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
+//#endif
                 // Transfer results from LMS to memory accessible by both cores
                 //  only like this to improve speed someday with DMA...
                 //      but not today :)
@@ -1061,7 +1087,10 @@ debug_no_adc_setup_label:
                 //Q15 *srcdata_start = LMS_FIR.taps + 64u;
                 //Q15 *srcdata_start = LMS_FIR.taps;
 
-                transfer_results_to_safe_mem(LMS_H_HATS, &ICTXFR_A, LMS_Inst.tap_len);
+                transfer_results_to_safe_mem(LMS_FIR.taps, &ICTXFR_A, LMS_Inst.tap_len);
+                ICTXFR_A.lms_error = LMS_Inst.error;
+                ICTXFR_A.lms_samples_processed = LMS_Inst.samples_processed;
+                ICTXFR_A.lms_error_attempts = error_attempts;
 
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
 

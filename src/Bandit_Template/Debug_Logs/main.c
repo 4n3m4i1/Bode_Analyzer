@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-#define LONGFIX
+//#define LONGFIX
 
 #ifdef LONGFIX
 typedef int32_t FT;

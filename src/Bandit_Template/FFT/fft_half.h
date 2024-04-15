@@ -3,8 +3,7 @@
 
 #include <pico/stdlib.h>
 #include "fixedpt_include.h"
-#include "Q15_sin_table.h"
-//#include "Q15_cos_table.h"
+
 
 #define TABLE_SIZE_2N       10
 #define SINTABLESIZE        1024
