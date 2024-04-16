@@ -25,7 +25,7 @@
 #include "Downsampling/Fixed_Filters.h"
 
 
-#include "dummy_taps.h"
+// #include "dummy_taps.h"
 
 /*
     Remember:
@@ -142,7 +142,9 @@ enum BANDIT_SETTINGS_BF {
     BS_RES2,
     BS_RES3,
     BS_RES4,
-    BS_DEBUG_REPORT_RQ
+    BS_DEBUG_REPORT_RQ,
+    BS_RAW_RQ,
+    BS_TIME_DOMAIN_RQ
 };
 #define BS_BF_LEN               10
 /*
@@ -228,10 +230,11 @@ enum USB_BS_RX_BUF_BYTES {
     USBBSRX_TAPLEN_LSB,
     USBBSRX_TAPLEN_MSB,
     USBBSRX_F_FRANGE,
-    USBBSRX_RES_1,
-    USBBSRX_RES_2,
-    USBBSRX_RES_3,
-    USBBSRX_CORE_1_DBG_RQ
+    USBBSRX_RAW_RQ,
+    USBBSRX_TIMEDOMAIN_RQ,
+    USBBSRX_SINGLE_SHOT,
+    USBBSRX_CORE_1_DBG_RQ,
+
 };
 
 //enum BANDIT_FRANGE {

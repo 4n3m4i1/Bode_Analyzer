@@ -1141,6 +1141,12 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         else new_settings_value &= ~(1u << BS_AUTO_SEND);
         if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) new_settings_value |= (1u << BS_WGN_ON);
         else new_settings_value &= ~(1u << BS_WGN_ON);
+        if(BS_RX_BF[USBBSRX_RAW_RQ]) new_settings_value |= (1u << BS_RAW_RQ);
+        else new_settings_value &= ~(1u << BS_ENABLE); 
+        if(BS_RX_BF[USBBSRX_TIMEDOMAIN_RQ]) new_settings_value |= (1u << BS_TIME_DOMAIN_RQ);
+        else new_settings_value &= ~(1u << BS_AUTO_RUN);
+        if(BS_RX_BF[USBBSRX_SINGLE_SHOT]) new_settings_value |= (1u << BS_SINGLE_SHOT_RUN);
+        else new_settings_value &= ~(1u << BS_AUTO_SEND);
 
         new_settings_value |= (1u << BS_AUTO_RUN);
 
