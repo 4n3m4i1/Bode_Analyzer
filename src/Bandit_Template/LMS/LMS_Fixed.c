@@ -58,27 +58,10 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
         //retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
         //retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
 
-        LMS->error = LMS->d_n[n + LMS->ddsmpl_shift] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n]);
+        Q15 Y_HAT = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n]);
+
+        LMS->error = LMS->d_n[n + LMS->ddsmpl_shift] - Y_HAT;
         
-        //retval = LMS->d_n[n * stride] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n * stride]);
-        //retval = LMS->d_n[n * stride];
-        //retval = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n * stride]);
-        //retval = 0x8021;
-
-        //retval = 0;
-        //add_sample_to_2n_FIR_I16_no_inc(WGN_FIR, LMS->x_n[n]);
-        //WGN_FIR->data[(n & WGN_FIR->size_mask)] = LMS->x_n[n];
-        
-        //uint16_t write_address = WGN_FIR->curr_zero++ & 0x001F;
-        //WGN_FIR->data[WGN_FIR->curr_zero++ & WGN_FIR->size_mask] = 2;
-        //WGN_FIR->data[0] = LMS->x_n[n];
-        
-
-        //for(uint_fast16_t m = 0; m < WGN_FIR->size; ++m){
-        //    retval += mul_Q15(recall_sample_from_2n_FIR(WGN_FIR, m), WGN_FIR->taps[m]);
-        //}
-
-
         LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
 
         LMS->samples_processed++;      
@@ -91,7 +74,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 
         if(retval <= LMS->target_error){
             retval = LMS_OK;
-            break;
+            //break;
         } 
     }
 
@@ -107,8 +90,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 
 inline void LMS_Update_Taps(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, Q15 error){
     for(uint16_t n = 0; n < LMS->tap_len; ++n){
-        Q15 tmp = mul_Q15(error, WGN_FIR->data[n]);
         //WGN_FIR->taps[n] += (mul_Q15(LMS->learning_rate, mul_Q15(error, WGN_FIR->data[n])));
-        WGN_FIR->taps[n] += mul_Q15(LMS->learning_rate, tmp);
+        WGN_FIR->taps[n] += mul_Q15(LMS->learning_rate, (mul_Q15(error, WGN_FIR->data[n])));
     }
 }

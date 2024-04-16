@@ -6,8 +6,9 @@
 #define NO_DEBUG_LED
 #define FORCESEND_TESTING
 //#define FORCESEND_FAKETAPS
-//#define FORCESEND_NOFFT
+#define FORCESEND_NOFFT
 //#define FORCESEND_USE_REALDATA
+#define SEND_RAW_2_OUTPUT
 
 #ifdef FORCESEND_USE_REALDATA
 #include "realdata.h"
@@ -376,6 +377,7 @@ static void core_0_main(){
                 // Transmit FFT Data to computer
                 tud_task();
 #ifdef FORCESEND_TESTING  
+                // knock down giant DC peak...
                 cool_fft.fr[0] = cool_fft.fr[8];
                 cool_fft.fr[1] = cool_fft.fr[8];
                 cool_fft.fr[2] = cool_fft.fr[8];
@@ -386,7 +388,7 @@ static void core_0_main(){
                 cool_fft.fr[7] = cool_fft.fr[8];
                 send_f_packets(cool_fft.fr, cool_fft.num_samples);
                 tud_task();
-                busy_wait_ms(5000);
+                busy_wait_ms(1000);
 #else
                 USB_Handler(&cool_fft);     //send data to GUI through tusb
 #endif
@@ -989,22 +991,22 @@ debug_no_adc_setup_label:
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
                 //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
 #endif
-                LMS_Inst.ddsmpl_shift = 0;
+                LMS_Inst.fixed_offset = 32;
                 Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
 
 #ifndef NO_DEBUG_LED
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 255);
 #endif
-                if(LMS_Error != LMS_OK){
+                //if(LMS_Error != LMS_OK){
                     // Handle the error
                     //  Sample again and try again
                     error_attempts++;
                     CORE_1_STATE = CORE_1_SAMPLE;
-                } else {
-                    CORE_1_STATE = CORE_1_POST_PROC;
+                //} else {
+                //    CORE_1_STATE = CORE_1_POST_PROC;
 
-                    set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 255);
-                }
+                //    set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 255);
+                //}
 
                 // If we've errored out too many times...
                 if(error_attempts > LMS_Inst.max_convergence_attempts){
@@ -1047,17 +1049,31 @@ debug_no_adc_setup_label:
                     // Finish processing H HAT buffer that'll get sent to Core 0
                     // Move on with a normal run
                    // LMS_Inst.tap_len = 1024;
-                    for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                    //for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+#ifdef SEND_RAW_2_OUTPUT
+                    for(uint16_t n = 0; n < LMS_Inst.tap_len >> 1; ++n){
+                        LMS_FIR.taps[n] = D_N_0[n];
+                    }
+                    for(uint16_t n = LMS_Inst.tap_len >> 1; n < LMS_Inst.tap_len; ++n){
+                        LMS_FIR.taps[n] = X_N_0[n - (LMS_Inst.tap_len >> 1)];
+                    }
+#else
+                    for(uint16_t n = 0; n < LMS_Inst.tap_len >> 1; ++n){
                         //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
                         // Deboog only
                         //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
                         //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
-                        LMS_FIR.taps[n] = D_N_0[n] << 2;
+                        //LMS_FIR.taps[n] = D_N_0[n];
                         //LMS_FIR.taps[n] = Bandit_DC_Offset_Cal;
                         //LMS_H_HATS[n] = 0xAB;
                         //LMS_FIR.taps[n] = 0xBC;
-                        
+                    //    LMS_FIR.taps[n] = LMS_Inst.error;
+                    //    LMS_FIR.taps[n + 1] = LMS_Inst.samples_processed;
                     }
+#endif
+                    //for(uint16_t n = LMS_Inst.tap_len >> 1; n < LMS_Inst.tap_len; ++n){
+                    //    LMS_FIR.taps[n] = X_N_0[n - (LMS_Inst.tap_len >> 1)];
+                    //}
                     CORE_1_STATE = CORE_1_SHIP_RESULTS;
                 }
 
