@@ -7,7 +7,7 @@
 // #define LOG2_N_WAVE 10
 
 
-CORE_0_MEM Q15 sin_table_table[1024] = {
+CORE_0_MEM Q15 sin_table_table[SINTABLESIZE] = {
 		0xFFFF,
 		0x00C8,
 		0x0191,
@@ -1058,15 +1058,14 @@ uint16_t get_shift_amt(uint16_t log2ns){
 
 // Requires both to be 2**n!!!!
 void get_table_offset_shift(struct FFT_PARAMS *fft, uint16_t table_max_size){
-    uint16_t table_size_2n = get_log_2(table_max_size);
-    fft->table_scalar_offset = get_log_2(table_size_2n - get_log_2(fft->num_samples));
+    fft->table_scalar_offset = get_log_2(table_max_size) - get_log_2(fft->num_samples);
 }
 
 
 void FFT_fixdpt(struct FFT_PARAMS *fft) {
 
-    unsigned short m;   // one of the indices being swapped
-    unsigned short mr ; // the other index being swapped (r for reversed)
+    uint16_t m;   // one of the indices being swapped
+    uint16_t mr ; // the other index being swapped (r for reversed)
     Q15 tr, ti ; // for temporary storage while swapping, and during iteration
 
     int i, j ; // indices being combined in Danielson-Lanczos part of the algorithm
@@ -1084,7 +1083,7 @@ void FFT_fixdpt(struct FFT_PARAMS *fft) {
     // Bit reversal code below based on that found here: 
     // https://graphics.stanford.edu/~seander/bithacks.html#BitReverseObvious
 
-    for (m = 1; m < fft->num_samples - 1; ++m) {
+    for (m = 1; m < (fft->num_samples - 1); ++m) {
         // swap odd and even bits
         mr = ((m >> 1) & 0x5555) | ((m & 0x5555) << 1);
         // swap consecutive pairs

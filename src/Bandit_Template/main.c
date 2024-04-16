@@ -123,7 +123,7 @@ static void USB_Handler(struct FFT_PARAMS *fft);
 static void send_header_packet(uint16_t *h_data);
 static void send_f_packets(Q15 *data, uint16_t num_samples);
 
-static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len);
+static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len, uint16_t maxtablesize);
 static inline void fft_clear_fi(struct FFT_PARAMS *cool_fft);
 
 
@@ -246,7 +246,7 @@ static void core_0_main(){
 
     // Setup Structs and Default Parameters for FFT
     struct FFT_PARAMS cool_fft;
-    fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN);
+    fft_setup(&cool_fft, DEFAULT_LMS_TAP_LEN, (uint16_t)SINTABLESIZE);
 
     // Initialize tinyUSB with board and start listening for start char from GUI
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
@@ -278,9 +278,7 @@ static void core_0_main(){
                 
                 struct Transfer_Data *data_src;
 
-                set_ULED_level(255);
                 Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
-                set_ULED_level(0);
                 data_src = &ICTXFR_A;
 
                 
@@ -299,7 +297,7 @@ static void core_0_main(){
 
                     if(data_src->len){
                         // Apply windowing here if needed!!!
-                        fft_setup(&cool_fft, data_src->len);
+                        fft_setup(&cool_fft, data_src->len, (uint16_t)SINTABLESIZE);
 
                         for(uint16_t n = 0; n < data_src->len; ++n){
                             if((cool_fft.fr[n] = data_src->data[n])) allzeros = false;
@@ -328,11 +326,16 @@ static void core_0_main(){
 
                 // Free memory constraints
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+
+                // Fix FFT scaling for graphing
+
                 USB_NEXT_STATE = USB_SEND_TUSB;
             }
             break;
 
             case USB_SEND_TUSB: {
+                // For sending non reflected FFT magnitudes
+                cool_fft.num_samples >>= 1;
                 USB_Handler(&cool_fft); //send data to GUI through tusb
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
             }
@@ -615,7 +618,7 @@ start_refdac_cal:
 
     // Go Purple for DAC cal complete
     set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
-    set_ULED_level(Bandit_RGBU.U = 0);
+    set_ULED_level(Bandit_RGBU.U = 64);
     
 
     // Setup Sampling Pace Flags
@@ -831,7 +834,7 @@ debug_no_adc_setup_label:
                 // Go white for DC Cal done, Idle return
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 127);
                // busy_wait_ms(1000);
-                //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
+                set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
 
                 CORE_1_STATE = CORE_1_IDLE;
             }
@@ -964,7 +967,7 @@ debug_no_adc_setup_label:
 
                     // Indicate full CAL with green LEDs
                     set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-                    //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
+                    set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
                     
                     // Calibration Acquired, go back to do first run
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
@@ -1007,6 +1010,8 @@ debug_no_adc_setup_label:
                 transfer_results_to_safe_mem(LMS_FIR.taps, &ICTXFR_A, LMS_Inst.tap_len);
 
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+
+                busy_wait_us_32(100);
 
 #ifndef NO_DEBUG_LED
                 busy_wait_ms(1000);
@@ -1209,11 +1214,12 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
 
 
 
-static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len){
+static inline void fft_setup(struct FFT_PARAMS *cool_fft, uint16_t len, uint16_t maxtablesize){
     cool_fft->num_samples = len;
     cool_fft->log2_num_samples = get_log_2(len);
     cool_fft->shift_amount = get_shift_amt(cool_fft->log2_num_samples);
-    get_table_offset_shift(cool_fft, len);
+    cool_fft->true_max = maxtablesize;
+    get_table_offset_shift(cool_fft, maxtablesize);
     cool_fft->fr = FR_BUFF;
     cool_fft->fi = FI_BUFF;
 }
