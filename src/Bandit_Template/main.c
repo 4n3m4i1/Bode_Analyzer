@@ -12,6 +12,8 @@
 
 #ifdef FORCESEND_USE_REALDATA
 #include "realdata.h"
+// For debug only
+#include "dummy_taps.h"
 #endif
 
 
@@ -241,6 +243,7 @@ static void core_0_main(){
     Global_Bandit_Settings.manual_tap_len_setting = 0;
     Global_Bandit_Settings.manual_error_limit = 0;
     Global_Bandit_Settings.manual_freq_range = 0;
+    Global_Bandit_Settings.manual_lms_offset = 0;
     CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
     SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
 
@@ -377,15 +380,20 @@ static void core_0_main(){
                 // Transmit FFT Data to computer
                 tud_task();
 #ifdef FORCESEND_TESTING  
+#ifndef FORCESEND_NOFFT
                 // knock down giant DC peak...
-                cool_fft.fr[0] = cool_fft.fr[8];
-                cool_fft.fr[1] = cool_fft.fr[8];
-                cool_fft.fr[2] = cool_fft.fr[8];
-                cool_fft.fr[3] = cool_fft.fr[8];
-                cool_fft.fr[4] = cool_fft.fr[8];
-                cool_fft.fr[5] = cool_fft.fr[8];
-                cool_fft.fr[6] = cool_fft.fr[8];
-                cool_fft.fr[7] = cool_fft.fr[8];
+                for(uint16_t n = 0; n < cool_fft.log2_num_samples - 3; ++n){
+                    cool_fft.fr[n] = cool_fft.fr[cool_fft.log2_num_samples - 1];
+                }
+                //cool_fft.fr[0] = cool_fft.fr[8];
+                //cool_fft.fr[1] = cool_fft.fr[8];
+                //cool_fft.fr[2] = cool_fft.fr[8];
+                //cool_fft.fr[3] = cool_fft.fr[8];
+                //cool_fft.fr[4] = cool_fft.fr[8];
+                //cool_fft.fr[5] = cool_fft.fr[8];
+                //cool_fft.fr[6] = cool_fft.fr[8];
+                //cool_fft.fr[7] = cool_fft.fr[8];
+#endif                
                 send_f_packets(cool_fft.fr, cool_fft.num_samples);
                 tud_task();
                 busy_wait_ms(1000);
@@ -447,9 +455,9 @@ static void core_1_main(){
     DFL_LMS_Inst.x_n = X_N_0;
     DFL_LMS_Inst.iteration_ct = STD_MAX_SAMPLES;
     DFL_LMS_Inst.d_n_offset = 0;
-    //DFL_LMS_Inst.learning_rate = 0x0020;    // 0.001
+    DFL_LMS_Inst.learning_rate = 0x0020;    // 0.001
     //DFL_LMS_Inst.learning_rate = 0x0003;    // 0.0001
-    DFL_LMS_Inst.learning_rate = 0x0008;    // 0.00025
+    //DFL_LMS_Inst.learning_rate = 0x0008;    // 0.00025
 
     // Set default settings to local struct copy
     LMS_Struct_Equate(&DFL_LMS_Inst, &LMS_Inst);
@@ -461,7 +469,7 @@ static void core_1_main(){
     LMS_FIR.data = LMS_FIR_BANK;
     LMS_FIR.taps = LMS_H_HATS;
     
-    LMS_Inst.max_convergence_attempts = 32;
+    LMS_Inst.max_convergence_attempts = 4;
 
     /*
         For Tap Length Update:
@@ -762,6 +770,10 @@ debug_no_adc_setup_label:
 
                     if(LMS_Inst.tap_len > MAX_TAPS) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
+                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset;
+
+                    LMS_Inst.max_convergence_attempts = Global_Bandit_Settings.manual_lms_attempts;
+
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
 
                     LMS_FIR.curr_zero = 0;
@@ -925,7 +937,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 2;
-                        LMS_Inst.ddsmpl_shift = 1;
+                        
                     break;
                     case DOWNSAMPLE_4X_62K5_CUT:
                         torun = &CUT_62KHZ;
@@ -935,7 +947,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 4;
-                        LMS_Inst.ddsmpl_shift = 2;
+                        
                     break;
                     case DOWNSAMPLE_8X_32K2_CUT:
                         torun = &CUT_31KHZ;
@@ -945,7 +957,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 8;
-                        LMS_Inst.ddsmpl_shift = 3;
+                        
                     break;
 
                     case DOWNSAMPLE_1X_250K_CUT:
@@ -953,7 +965,7 @@ debug_no_adc_setup_label:
                         torun = 0;
                         LMS_Inst.fixed_offset = 0;
                         LMS_Inst.ddsmpl_stride = 1;
-                        LMS_Inst.ddsmpl_shift = 0;
+                        
                         LMS_Inst.d_n = D_N_0;
                         LMS_Inst.x_n = X_N_0;
                        // goto skip_downsampling_label;
@@ -991,7 +1003,6 @@ debug_no_adc_setup_label:
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
                 //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
 #endif
-                LMS_Inst.fixed_offset = 32;
                 Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
 
 #ifndef NO_DEBUG_LED
@@ -1278,13 +1289,16 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
 
         // see Bode_Bandit.h for enum settings map defineds
         uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
-        uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB]) << 8 | (BS_RX_BF[USBBSRX_TAPLEN_LSB]);
-        uint16_t man_error_limit = (BS_RX_BF[USBBSRX_ERR_MSB]) << 8 | (BS_RX_BF[USBBSRX_ERR_LSB]);
+        uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB] << 8) | (BS_RX_BF[USBBSRX_TAPLEN_LSB]);
+        uint16_t man_error_limit = (BS_RX_BF[USBBSRX_ERR_MSB] << 8) | (BS_RX_BF[USBBSRX_ERR_LSB]);
+        uint8_t newlmsoffset = BS_RX_BF[USBBSRX_OFFSET_LSB];
+        uint16_t newlmsmaxattempts = (BS_RX_BF[USBBSRX_ATTEMPTS_MSB] << 8) | BS_RX_BF[USBBSRX_ATTEMPTS_LSB];
 
         Global_Bandit_Settings.manual_freq_range = newfreq_range;
         Global_Bandit_Settings.manual_error_limit = man_error_limit;
         Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
-
+        Global_Bandit_Settings.manual_lms_offset = newlmsoffset;
+        Global_Bandit_Settings.manual_lms_attempts = newlmsmaxattempts;
         //new_settings_value |= (1u << BS_AUTO_RUN);
 
         Global_Bandit_Settings.settings_bf = new_settings_value;
@@ -1297,7 +1311,9 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&Global_Bandit_Settings.settings_bf, 4);  // Updated Settings bitfield
         tud_cdc_n_write(CDC_CTRL_CHAN, &newfreq_range, 1);                                  // Decoded frequency range
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newtaplen, 2);                           // Decoded tap length
-        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&man_error_limit, 2);                     // Decoded manual error limit
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&man_error_limit, 2);
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsoffset, 1);   
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsmaxattempts, 2);                  // Decoded manual error limit
 
         // Flush outgoing transmissions
         tud_cdc_n_write_flush(CDC_DATA_CHAN);

@@ -8,7 +8,7 @@
 //#define LONGFIXED
 
 #ifdef LONGFIXED
-#define SHAMT       15  // initially 15
+#define SHAMT       31  // initially 15
 typedef int32_t     Q15;
 typedef int64_t     _sn2xFix;
 typedef uint64_t    _uns2xFix;

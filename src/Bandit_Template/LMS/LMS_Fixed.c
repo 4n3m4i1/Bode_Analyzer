@@ -52,15 +52,16 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 
     uint16_t stride = LMS->ddsmpl_stride;
 
-    for(n = LMS->fixed_offset; n < max_iters; n += stride){
+    //for(n = LMS->fixed_offset; n < max_iters; n += stride){
+    for(n = 0; n < 2048; ++n){
 
         //retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
         //retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
         //retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
 
-        Q15 Y_HAT = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n]);
+        Q15 Y_HAT = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->d_n_offset]);
 
-        LMS->error = LMS->d_n[n + LMS->ddsmpl_shift] - Y_HAT;
+        LMS->error = LMS->d_n[n] - Y_HAT;
         
         LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
 

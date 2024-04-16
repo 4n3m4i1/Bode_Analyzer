@@ -28,8 +28,7 @@
 #include "Downsampling/Fixed_Filters.h"
 
 
-// For debug only
-#include "dummy_taps.h"
+
 
 
 /*
@@ -161,6 +160,8 @@ struct BANDIT_SETTINGS {
     volatile uint16_t        manual_tap_len_setting;
     volatile uint32_t        manual_error_limit;
     volatile uint32_t        manual_freq_range;
+    volatile uint8_t        manual_lms_offset;
+    volatile uint16_t       manual_lms_attempts;
 };
 
 #define CHK_BANDIT_SETTING(a, b)        (a & (1u << b))
@@ -212,7 +213,7 @@ enum USB_STATE_MACHINEEEEE {
     USB_SEND_CORE_DEBUG
 };    
 
-#define BS_BF_LEN               10
+#define BS_BF_LEN               13
     //  Byte[0] If Enabled
     //  Byte[1] Auto run
     //  Byte[2] Auto send
@@ -223,6 +224,9 @@ enum USB_STATE_MACHINEEEEE {
     //  Byte[7] Manual Tap Length (LSB)
     //  Byte[8] Manual Tap Length (MSB)
     //  Byte[9] F Range (ENUM)
+    //  Byte[10]    LSB Offset in Samples
+    //  Byte[11]    LSB Attempts
+    //  Byte[12]    MSB Attempts
 enum USB_BS_RX_BUF_BYTES {
     USBBSRX_EN,
     USBBSRX_AUTORUN,
@@ -234,6 +238,9 @@ enum USB_BS_RX_BUF_BYTES {
     USBBSRX_TAPLEN_LSB,
     USBBSRX_TAPLEN_MSB,
     USBBSRX_F_FRANGE,
+    USBBSRX_OFFSET_LSB,
+    USBBSRX_ATTEMPTS_LSB,
+    USBBSRX_ATTEMPTS_MSB,
     USBBSRX_RAW_RQ,
     USBBSRX_TIME_DOMAIN_DATA,
     USBBSRX_SINGLE_SHOT,
