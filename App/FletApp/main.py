@@ -243,6 +243,10 @@ def main(page: ft.Page):
     page.route = "/"
     page.bgcolor = '#e3e3e3'
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER ## test
+
+    page.window_width = 1000     
+    #page.window_height = 1000  
+
     page.theme = ft.Theme(
     color_scheme=ft.ColorScheme(
         primary=ft.colors.BLACK,   
@@ -252,6 +256,7 @@ def main(page: ft.Page):
             ## Graph configurations
     #figure = plt.figure()
     figure = plt.figure(figsize=(15,7))
+    #figure = plt.figure(figsize=(30,7))
     ax = figure.add_subplot()
     line, = ax.plot(init_graph, animated=True,)
     ax.grid()
@@ -434,6 +439,7 @@ def main(page: ft.Page):
     config_table = ft.DataTable(
         border=ft.border.all(1, "black"),
         bgcolor = 'white',
+        # width = 700,
 
             columns=[
                 ft.DataColumn(ft.Text("Control Port")),
@@ -448,6 +454,50 @@ def main(page: ft.Page):
                         ft.DataCell(ft.Text("Not Selected")),
                         ft.DataCell(ft.Text("Not Selected")),
                         ft.DataCell(ft.Text("Not Selected")),
+                    ],
+            ),
+            ],
+        )
+    
+    config_table2 = ft.DataTable(
+        border=ft.border.all(1, "black"),
+        bgcolor = 'white',
+        column_spacing=0,
+
+            columns=[
+                ft.DataColumn(ft.Text("Setting")),
+                ft.DataColumn(ft.Text("Status")),
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("WGN")),
+                        ft.DataCell(ft.Text("OFF")),
+                    ],
+            ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Single Shot")),
+                        ft.DataCell(ft.Text("OFF")),
+                        
+                    ],
+            ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Auto Run")),
+                        ft.DataCell(ft.Text("OFF")),
+                    ],
+            ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Raw Data")),
+                        ft.DataCell(ft.Text("OFF")),
+                    ],
+            ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Time Domain ")),
+                        ft.DataCell(ft.Text("OFF")),
                     ],
             ),
             ],
@@ -502,8 +552,53 @@ def main(page: ft.Page):
                 ],
             )
 
+        updated_table2 = ft.DataTable(
+            border=ft.border.all(1, "black"),
+            bgcolor = 'white',
+            column_spacing=0,
+
+                columns=[
+                    ft.DataColumn(ft.Text("Setting")),
+                    ft.DataColumn(ft.Text("Status")),
+                ],
+                rows=[
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text("WGN")),
+                            ft.DataCell(ft.Text("OFF")),
+                        ],
+                ),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text("Single Shot")),
+                            ft.DataCell(ft.Text(single_shot_switch.value)),
+                            
+                        ],
+                ),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text("Auto Run")),
+                            ft.DataCell(ft.Text("OFF")),
+                        ],
+                ),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text("Raw Data")),
+                            ft.DataCell(ft.Text("OFF")),
+                        ],
+                ),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text("Time Domain ")),
+                            ft.DataCell(ft.Text("OFF")),
+                        ],
+                ),
+                ],
+            )
+
         page.controls.clear()
-        page.add(ft.Column([Controls]),updated_table,chart)
+        #page.add(ft.Column([Controls]),updated_table,chart)
+        page.add(ft.Column([Controls]),updated_table,ft.Row([chart, updated_table2]))
 
         page.update()
 
@@ -605,7 +700,9 @@ def main(page: ft.Page):
     )
 
     #page.add(ft.Column([Controls]) ,chart ) 
-    page.add(ft.Column([Controls]),config_table,chart)
+    # page.add(ft.Column([Controls]),config_table,chart)
+    page.add(ft.Column([Controls]),config_table,ft.Row([chart, config_table2]))
+    
 
 
 
