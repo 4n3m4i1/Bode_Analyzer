@@ -382,9 +382,10 @@ static void core_0_main(){
 #ifdef FORCESEND_TESTING  
 #ifndef FORCESEND_NOFFT
                 // knock down giant DC peak...
-                for(uint16_t n = 0; n < cool_fft.log2_num_samples - 3; ++n){
-                    cool_fft.fr[n] = cool_fft.fr[cool_fft.log2_num_samples - 1];
-                }
+                //for(uint16_t n = 0; n < cool_fft.log2_num_samples - 3; ++n){
+                //    cool_fft.fr[n] = cool_fft.fr[cool_fft.log2_num_samples - 1];
+                //}
+                cool_fft.fr[0] = cool_fft.fr[1];
                 //cool_fft.fr[0] = cool_fft.fr[8];
                 //cool_fft.fr[1] = cool_fft.fr[8];
                 //cool_fft.fr[2] = cool_fft.fr[8];
@@ -887,6 +888,9 @@ debug_no_adc_setup_label:
                     X_N_0[n] -= Bandit_DC_Offset_Cal;
                     X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
                     D_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
+
+                    X_N_0[n] *= 4;
+                    D_N_0[n] *= 4;
                 }
 
                 //Stop_Sampling();

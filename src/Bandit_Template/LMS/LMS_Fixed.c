@@ -92,6 +92,6 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 inline void LMS_Update_Taps(const struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR, Q15 error){
     for(uint16_t n = 0; n < LMS->tap_len; ++n){
         //WGN_FIR->taps[n] += (mul_Q15(LMS->learning_rate, mul_Q15(error, WGN_FIR->data[n])));
-        WGN_FIR->taps[n] += mul_Q15(LMS->learning_rate, (mul_Q15(error, WGN_FIR->data[n])));
+        WGN_FIR->taps[n] += mul_Q15(LMS->learning_rate, (mul_Q15(error, recall_sample_from_2n_FIR(WGN_FIR, n - 1))));
     }
 }

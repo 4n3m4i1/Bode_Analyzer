@@ -16,6 +16,8 @@
 #define false   0u
 #endif
 
+#define NLMS
+
 
 Q15 D_N_0[1024];
 Q15 X_N_0[1024];
@@ -31,13 +33,16 @@ uint16_t numtaps;
 struct GlobalSettings {
     uint8_t     print_sample_data;
     uint8_t     output_float;
+    uint8_t     save_error;
     char        *filepath;
     Q15         LMS_LEARNING_RATE;
-    uint16_t    ITER_CTS;
+    uint32_t    ITER_CTS;
 
-    uint16_t    D_N_Delay;
+    uint32_t    D_N_Delay;
 
-    uint16_t    manlen;
+    uint32_t    manlen;
+
+    uint32_t    manruntime;
 };
 
 uint8_t printedlearningratemessage = false;
@@ -66,10 +71,16 @@ void main(int argc, char **argv){
     TSA_PreCheck.print_sample_data = false;
     TSA_PreCheck.output_float = false;
     TSA_PreCheck.filepath = 0;
+#ifdef FLOATFIXED
+    TSA_PreCheck.LMS_LEARNING_RATE = 0.001;
+#else
     TSA_PreCheck.LMS_LEARNING_RATE = 0x0003;
+#endif
     TSA_PreCheck.ITER_CTS = 32;
     TSA_PreCheck.D_N_Delay = 0;
     TSA_PreCheck.manlen = 0;
+    TSA_PreCheck.save_error = true;
+    
     
     
     if(argc > 1){
@@ -133,6 +144,13 @@ void main(int argc, char **argv){
                         TSA_PreCheck.output_float = true;
                     }
                     break;
+
+                    case 'Q':
+                    case 'q': {
+                        printf("Not saving data!\n");
+                        TSA_PreCheck.save_error = false;
+                    }
+                    break;
                 }
             }
         }
@@ -152,7 +170,7 @@ void main(int argc, char **argv){
 
 
     char rvalz[32];
-    uint16_t numsamples = 0;
+    uint32_t numsamples = 0;
     while(fgets(rvalz, sizeof(rvalz), datafp)){
         numsamples++;
     }
@@ -161,26 +179,33 @@ void main(int argc, char **argv){
 
     numsamples >>= 1;
 
+    FILE *xnfp = fopen("../X_N.txt", "w");
+    FILE *dnfp = fopen("../D_N.txt", "w");
+
     for(uint16_t n = 0; n < numsamples; ++n){
         fscanf(datafp, "%d\n", &D_N_0[n]);
+        fprintf(dnfp, "%lf\n", Q15_2_float(D_N_0[n]));
     }
 
     for(uint16_t n = 0; n < numsamples; ++n){
         fscanf(datafp, "%d\n", &X_N_0[n]);
+        fprintf(xnfp, "%lf\n", Q15_2_float(X_N_0[n]));
     }
 
+    fclose(xnfp);
+    fclose(dnfp);
     fclose(datafp);
 
 
+    printf("Read %4u Samples\n", numsamples);
     if(TSA_PreCheck.print_sample_data){
-        printf("Read %4u Samples\n", numsamples);
         printf("Num\tDesired\t\tInput Data\n");
         for(uint16_t n = 0; n < numsamples; ++n){
 #ifdef LONGFIXED
             D_N_0[n] *= 32768;
             X_N_0[n] *= 32768;
 #endif
-            printf("%4u\t%10d (%lf)\t%10d (%lf)\n", n, D_N_0[n], Q15_2_float(D_N_0[n]), X_N_0[n], Q15_2_float(X_N_0[n]));
+            //printf("%4u\t%10d (%lf)\t%10d (%lf)\n", n, D_N_0[n], Q15_2_float(D_N_0[n]), X_N_0[n], Q15_2_float(X_N_0[n]));
         }
     }
 
@@ -193,10 +218,16 @@ void main(int argc, char **argv){
     LMS_FIR.taps = malloc(sizeof(Q15) * LMS_FIR.len);
 
     uint32_t    countoferrorplot = (numsamples - TSA_PreCheck.D_N_Delay) * TSA_PreCheck.ITER_CTS;
-    Q15 *errorplot = malloc(countoferrorplot * sizeof(Q15));
-    Q15 *y_n_plot = malloc(countoferrorplot * sizeof(Q15));
+    Q15 *errorplot = (Q15 *)1lu;
+    Q15 *y_n_plot = (Q15 *)1lu;
 
-    for(uint16_t n = 0; n < LMS_FIR.len; ++n){
+    if(TSA_PreCheck.save_error == true){
+        printf("Allocating error buffers.\n");
+        errorplot = malloc(countoferrorplot * sizeof(Q15));
+        y_n_plot = malloc(countoferrorplot * sizeof(Q15));
+    }
+
+    for(uint32_t n = 0; n < LMS_FIR.len; ++n){
         LMS_FIR.data[n] = 0;
         LMS_FIR.taps[n] = 0;
     }
@@ -205,21 +236,32 @@ void main(int argc, char **argv){
         printf("Couldn't allocate memory :(\n");
         return;
     } else {
-        printf("Saving %u error samples\n", countoferrorplot);
+        if(TSA_PreCheck.save_error == true) printf("Saving %llu error samples\n", countoferrorplot);
+        else printf("Not saving error plot!\n");
     }
 
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
     uint32_t ctr = 0;
 
-    for(uint16_t iter = 0; iter < TSA_PreCheck.ITER_CTS; ++iter){
+    // MAIN LOOP
+
+    for(uint32_t iter = 0; iter < TSA_PreCheck.ITER_CTS; ++iter){
         for(uint16_t n = 0; n < (numsamples - TSA_PreCheck.D_N_Delay); ++n){
-            Q15 Y_N = y_n_plot[ctr] = run_2n_fir_cycle(&LMS_FIR, X_N_0[n + TSA_PreCheck.D_N_Delay]);
-            printf("Y_N[%3u] = %d (%lf)\n", n, Y_N, Q15_2_float(Y_N));
-            Q15 error = errorplot[ctr++] = D_N_0[n] - Y_N;
+            //Q15 Y_N = run_2n_fir_cycle(&LMS_FIR, X_N_0[(numsamples - 1) - n]);
+            Q15 Y_N = run_2n_fir_cycle(&LMS_FIR, X_N_0[n]);
+            //printf("Y_N[%3u] = %d (%lf)\n", n, Y_N, Q15_2_float(Y_N));
+            Q15 error = D_N_0[n] - Y_N;
+            if(TSA_PreCheck.save_error == true){
+                y_n_plot[ctr] = Y_N;
+                errorplot[ctr++] = error;
+            }
             update_LMS_taps(&LMS_FIR, error, TSA_PreCheck.LMS_LEARNING_RATE);
+            LMS_FIR.current_zero--;
         }
     }
+
+    // MAIN LOOP
 
     clock_gettime(CLOCK_MONOTONIC, &end_time);
 
@@ -230,18 +272,22 @@ void main(int argc, char **argv){
     errfp = fopen("../errorplot.txt", "w");
 
     if(TSA_PreCheck.output_float){
-        for(uint16_t n = 0; n < LMS_FIR.len; ++n){
+        for(uint32_t n = 0; n < LMS_FIR.len; ++n){
             fprintf(outfp, "%.10lf\n", Q15_2_float(LMS_FIR.taps[n]));
         }
-        for(uint32_t n = 0; n < countoferrorplot; ++n){
-            fprintf(errfp, "%.10f\t%.10lf\n", Q15_2_float(errorplot[n]), Q15_2_float(y_n_plot[n]));
+        if(TSA_PreCheck.save_error == true){
+            for(uint32_t n = 0; n < countoferrorplot; ++n){
+                fprintf(errfp, "%.10f\t%.10lf\n", Q15_2_float(errorplot[n]), Q15_2_float(y_n_plot[n]));
+            }
         }
     } else {
-        for(uint16_t n = 0; n < LMS_FIR.len; ++n){
+        for(uint32_t n = 0; n < LMS_FIR.len; ++n){
             fprintf(outfp, "%d\n", LMS_FIR.taps[n]);
         }
-        for(uint32_t n = 0; n < countoferrorplot; ++n){
-            fprintf(errfp, "%d\t%d\n", errorplot[n], y_n_plot[n]);
+        if(TSA_PreCheck.save_error == true){
+            for(uint32_t n = 0; n < countoferrorplot; ++n){
+                fprintf(errfp, "%d\t%d\n", errorplot[n], y_n_plot[n]);
+            }
         }
     }
     
@@ -253,29 +299,57 @@ void main(int argc, char **argv){
 
     printf("Done in %.8lf seconds (%.2lf minutes)!\n", execution_time, execution_time / 60.0);
 
-    free(y_n_plot);
-    free(errorplot);
+    if(TSA_PreCheck.save_error == true){
+        free(y_n_plot);
+        free(errorplot);
+    }
     free(LMS_FIR.data);
     free(LMS_FIR.taps);
     
 }
 
 Q15 run_2n_fir_cycle(struct FIR_Parameters *fir, Q15 new_data){
-    fir->data[fir->current_zero & fir->address_mask] = new_data;
     Q15 retval = 0;
-    for(uint16_t n = 0; n < fir->len; ++n){
-        Q15 mulval = fir->data[(fir->current_zero + n) & fir->address_mask];
-        retval += mul_Q15(mulval, fir->taps[n]);
-    }
-    fir->current_zero--;
+    
+    //fir->data[fir->current_zero & fir->address_mask] = new_data;
+    //
+    //for(uint16_t n = 0; n < fir->len; ++n){
+    //    Q15 mulval = fir->data[(fir->current_zero + n) & fir->address_mask];
+    //    retval += mul_Q15(mulval, fir->taps[n]);
+    //}
+    ////fir->current_zero--;
+    //
+
+    fir->data[0] = new_data;
+    for(uint32_t n = 0; n < fir->len; ++n) retval += mul_Q15(fir->taps[n] , fir->data[n]);
+    for(uint32_t n = fir->len - 1; n > 0; --n) fir->data[n] = fir->data[n - 1];
+
+    //printf("FIR: data[0] = %d (%lf)\t->\t%d (%lf)\n", new_data, Q15_2_float(new_data), retval, Q15_2_float(retval));
+
     return retval;
 }
 
+
+
 void update_LMS_taps(struct FIR_Parameters *fir, Q15 error, Q15 learning_rate){
+#ifdef NLMS
+    Q15 data_dot_prod = 0;
+    for(uint32_t m = 0; m < fir->len; ++m){
+        data_dot_prod += mul_Q15(fir->data[m], fir->data[m]);
+    }
+    //printf("DORPROD: %d (%lf)\n", data_dot_prod, Q15_2_float(data_dot_prod));
+    if(!data_dot_prod) data_dot_prod = 1;
+#endif
+    
     for(uint16_t n = 0; n < fir->len; ++n){
-        Q15 tap_error = mul_Q15(fir->data[(n + fir->current_zero) & fir->address_mask], error);
+        Q15 dataval = fir->data[(n + fir->current_zero) & fir->address_mask];
+        Q15 tap_error = mul_Q15(dataval, error);
         //printf("Data %0.14lf Err: 0x%04X\t%.14lf\n", Q15_2_float(fir->data[n]), tap_error, Q15_2_float(tap_error));
-        fir->taps[n] += mul_Q15(learning_rate, tap_error);
+        Q15 std_lms_update = mul_Q15(learning_rate, tap_error);
+#ifdef NLMS
+        std_lms_update = div_Q15(std_lms_update, data_dot_prod);
+#endif
+        fir->taps[n] += std_lms_update;
     }
 }
 
