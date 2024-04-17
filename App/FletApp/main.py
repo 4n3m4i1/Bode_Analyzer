@@ -2,10 +2,11 @@ from generic_include import *
 from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
 import serial
+import serial.tools.list_ports
 # import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
 # import serial.tools.list_ports_linux as list_ports_linux
-import serial.tools.list_ports as list_ports
+# import serial.tools.list_ports as list_ports
 import platform
 import matplotlib
 matplotlib.use('agg')
@@ -15,7 +16,9 @@ import struct
 import flet as ft
 from flet.matplotlib_chart import MatplotlibChart
 from flet import RouteChangeEvent, ViewPopEvent
-from multiprocess import Process, Queue, Event
+from multiprocess import Process, Event
+from multiprocessing import Queue
+import multiprocessing
 from threading import Thread
 # from queue import Empty
 import time
@@ -28,9 +31,8 @@ os = platform.system()
 # ctrlPort = None
 
 start_event = Event()
-
+GraphEvent = Event()
 settings_event = Event()
-
 class Port():
     def __init__(self, portString = None):
         self.name = portString
@@ -50,7 +52,8 @@ port_selections = []
 # #         port_selections.append(ft.dropdown.Option(str(port)))
 # else: pass
 
-for port in list_ports.comports():
+for port in serial.tools.list_ports.comports():
+    print(port)
     port_selections.append(ft.dropdown.Option(str(port)))
 parametric_taps =[32,64,128,256, 512, 1024]
 taps_list =[]
@@ -69,11 +72,6 @@ ctrl_port = Port()
 
 # init_graph = [0 for i in range(NUM_VALUES)]
 
-FFT_real_queue = Queue()
-FFT_converted_queue = Queue()
-Settings_Queue = Queue()
-GraphEvent = Event()
-FRANGE_queue = Queue()
 ##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page):
     BYTES_PER_NUMBER = 2
@@ -250,9 +248,46 @@ def main(page: ft.Page):
         primary=ft.colors.BLACK,   
     )
 )
+    
+            ## Graph configurations
+    #figure = plt.figure()
+    figure = plt.figure(figsize=(15,7))
+    ax = figure.add_subplot()
+    line, = ax.plot(init_graph, animated=True,)
+    ax.grid()
+
+    line.set_color('#F55BB0')
+    chart = MatplotlibChart(figure, expand=True,)
+    #ax.set_facecolor('#e3e3e3')
+    figure.set_facecolor('#e3e3e3')
+    ax.set_xscale(PLOT_XUNIT)
+    ax.set_yscale(PLOT_YUNIT)
+    ax.set_title(PLOT_TITLE, fontsize = 18)
+    ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
+    ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
+
+    pool = multiprocessing.Pool(processes=1)
+    m = multiprocessing.Manager()
+    FFT_real_queue = m.Queue()
+    FFT_converted_queue = m.Queue()
+    Settings_Queue = m.Queue()
+
+    FRANGE_queue = m.Queue()
+
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page))
+    serial_reader.daemon = True
+    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
+    data_converter_process.daemon = True
+    update_graph_thread = pool.apply_async(update_graph, (FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
+    update_graph_thread.daemon = True
+    serial_reader.start()
+    data_converter_process.start()
+    # update_graph_thread.start()
     temp_settings = INIT_SETTINGS
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
+          
+          
             page.views.append(
                 ft.View(
                     route = "/about",
@@ -288,22 +323,7 @@ def main(page: ft.Page):
 
     
         
-    ## Graph configurations
-    #figure = plt.figure()
-    figure = plt.figure(figsize=(15,7))
-    ax = figure.add_subplot()
-    line, = ax.plot(init_graph, animated=True,)
-    ax.grid()
 
-    line.set_color('#F55BB0')
-    chart = MatplotlibChart(figure, expand=True,)
-    #ax.set_facecolor('#e3e3e3')
-    figure.set_facecolor('#e3e3e3')
-    ax.set_xscale(PLOT_XUNIT)
-    ax.set_yscale(PLOT_YUNIT)
-    ax.set_title(PLOT_TITLE, fontsize = 18)
-    ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
-    ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
     
     
     def is_connected():
@@ -494,6 +514,9 @@ def main(page: ft.Page):
         elif os == LINUX_STR:
             portName = data_select.value.split("-")[0].strip()
             data_port.set(portName)
+        elif os == WINDOWS_STR:
+            portName = data_select.value
+            data_port.set(portName)
         page.update()
     def select_ctrl_port(e): #handle ctrl port selection
         if os == MACOS_STR:
@@ -501,6 +524,9 @@ def main(page: ft.Page):
             ctrl_port.set(portName)
         elif os == LINUX_STR:
             portName = ctrl_select.value.split("-")[0].strip()
+            ctrl_port.set(portName)
+        elif os == WINDOWS_STR:
+            portName = ctrl_select.value
             ctrl_port.set(portName)
         page.update()
 
@@ -581,18 +607,11 @@ def main(page: ft.Page):
     #page.add(ft.Column([Controls]) ,chart ) 
     page.add(ft.Column([Controls]),config_table,chart)
 
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page))
-    serial_reader.daemon = True
-    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
-    data_converter_process.daemon = True
-    update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
-    update_graph_thread.daemon = True
-    serial_reader.start()
-    data_converter_process.start()
-    update_graph_thread.start()
+
 
     
 if __name__ == '__main__':
     ft.app(
         target=main,
         assets_dir='assets')
+    
