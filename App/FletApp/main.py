@@ -241,7 +241,7 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
 def main(page: ft.Page):
     page.title = PAGE_TITLE
     page.route = "/"
-    page.bgcolor = '#e3e3e3'
+    page.bgcolor = PAGE_BG_COLOR
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER ## test
 
     page.window_width = 1000     
@@ -379,7 +379,7 @@ def main(page: ft.Page):
         width=150,
         on_click = handle_start_button_clicked,
     ),
-        bgcolor='#ecd4df',
+        bgcolor= START_BUTTON_COLOR,
         border_radius=20,
     )
 
@@ -390,22 +390,24 @@ def main(page: ft.Page):
         on_click = handle_stop_button_clicked,
     ),
         #bgcolor='#e895c0',
-        bgcolor='#c27ba0',
+        bgcolor= STOP_BUTTON_COLOR,
         border_radius=20,
     )
 
     # change bit at index 3
     def toggle_wgn(e):
-        if wgn_switch.label == WGN_LABEL_ON:
-            temp_settings[3] = 0
-            #print("off")
-        else :
-            #print("on")
-            temp_settings[3] = 1
+        # if wgn_switch.label == WGN_LABEL_ON:
+        #     temp_settings[3] = 0
+        #     #print("off")
+        # else :
+        #     #print("on")
+        #     temp_settings[3] = 1
 
-        wgn_switch.label = (
-            WGN_LABEL_OFF if temp_settings[3] == 0 else WGN_LABEL_ON
-        )
+        # wgn_switch.label = (
+        #     WGN_LABEL_OFF if temp_settings[3] == 0 else WGN_LABEL_ON
+        # )
+
+        temp_settings[3] = 1 if wgn_switch.value == 1 else 0
         print(wgn_switch.label)
         print(temp_settings)
 
@@ -426,7 +428,7 @@ def main(page: ft.Page):
         temp_settings[11] = int(time_domain_switch.value)
 
 
-    wgn_switch = ft.Switch(label= WGN_LABEL_OFF, on_change=toggle_wgn)
+    wgn_switch = ft.Switch(label= WGN_LABEL, on_change=toggle_wgn)
 
     single_shot_switch = ft.Switch(label = SINGLE_SHOT_LABEL, on_change=toggle_single_shot)
 
@@ -442,20 +444,19 @@ def main(page: ft.Page):
         # width = 700,
 
             columns=[
-                ft.DataColumn(ft.Text("Control Port")),
-                ft.DataColumn(ft.Text("Data Port")),
-                ft.DataColumn(ft.Text("Taps")),
-                ft.DataColumn(ft.Text("Frequency Range")),
+                ft.DataColumn(ft.Text(CONTROL_PORT_STR, color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(DATA_PORT_STR,color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(TAPS_STR, color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(FREQ_RANGE_STR, color = ft.colors.BLACK)),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("Not Selected")),
-                        ft.DataCell(ft.Text("Not Selected")),
-                        ft.DataCell(ft.Text("Not Selected")),
-                        ft.DataCell(ft.Text("Not Selected")),
-                    ],
-            ),
+                        ft.DataCell(ft.Text(" ")),
+                        ft.DataCell(ft.Text(" ")),
+                        ft.DataCell(ft.Text(" ")),
+                        ft.DataCell(ft.Text(" ")),
+                    ],),
             ],
         )
     
@@ -465,41 +466,36 @@ def main(page: ft.Page):
         column_spacing=0,
 
             columns=[
-                ft.DataColumn(ft.Text("Setting")),
-                ft.DataColumn(ft.Text("Status")),
+                ft.DataColumn(ft.Text(SETTING_STR, color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(STATUS_STR, color = ft.colors.BLACK)),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("WGN")),
-                        ft.DataCell(ft.Text("OFF")),
-                    ],
-            ),
+                        ft.DataCell(ft.Text(WGN_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("Single Shot")),
-                        ft.DataCell(ft.Text("OFF")),
+                        ft.DataCell(ft.Text(SINGLE_SHOT_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
                         
-                    ],
-            ),
+                    ],),
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("Auto Run")),
-                        ft.DataCell(ft.Text("OFF")),
-                    ],
-            ),
+                        ft.DataCell(ft.Text(AUTO_RUN_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("Raw Data")),
-                        ft.DataCell(ft.Text("OFF")),
-                    ],
-            ),
+                        ft.DataCell(ft.Text(RAW_DATA_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("Time Domain ")),
-                        ft.DataCell(ft.Text("OFF")),
-                    ],
-            ),
+                        ft.DataCell(ft.Text(TD_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
             ],
         )
     
@@ -530,25 +526,22 @@ def main(page: ft.Page):
         updated_table = ft.DataTable(
             border=ft.border.all(1, "black"),
             bgcolor = 'white',
-
                 columns=[
-                    ft.DataColumn(ft.Text("Control Port")),
-                    ft.DataColumn(ft.Text("Data Port")),
-                    ft.DataColumn(ft.Text("Taps")),
-                    ft.DataColumn(ft.Text("Frequency Range")),
+                    ft.DataColumn(ft.Text(CONTROL_PORT_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(DATA_PORT_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(TAPS_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(FREQ_RANGE_STR, color = ft.colors.BLACK)),
                 ],
                 rows=[
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text(data_select.value)),
-                            ft.DataCell(ft.Text(ctrl_select.value)),
-                            ft.DataCell(ft.Text(tap_select.value)) if tap_select.value else ft.DataCell(ft.Text(parametric_taps[0])),
-                            ft.DataCell(ft.Text(frequency_ranges[int(freq_range_select.value)]))
+                            ft.DataCell(ft.Text(data_select.value, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ctrl_select.value, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(tap_select.value, color = ft.colors.BLACK)) if tap_select.value else ft.DataCell(ft.Text(parametric_taps[0], color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(frequency_ranges[int(freq_range_select.value)], color = ft.colors.BLACK))
                                 if freq_range_select.value
-                                else ft.DataCell(ft.Text(frequency_ranges[0]))
-                        ],
-                        
-                ),
+                                else ft.DataCell(ft.Text(frequency_ranges[0], color = ft.colors.BLACK))
+                        ],),
                 ],
             )
 
@@ -556,43 +549,36 @@ def main(page: ft.Page):
             border=ft.border.all(1, "black"),
             bgcolor = 'white',
             column_spacing=0,
-
                 columns=[
-                    ft.DataColumn(ft.Text("Setting")),
-                    ft.DataColumn(ft.Text("Status")),
-                ],
+                    ft.DataColumn(ft.Text(SETTING_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(STATUS_STR, color = ft.colors.BLACK)),
+                    ],
                 rows=[
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text("WGN")),
-                            ft.DataCell(ft.Text("OFF")),
-                        ],
-                ),
+                            ft.DataCell(ft.Text(WGN_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR if wgn_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if wgn_switch.value == 1 else ft.colors.RED)),
+                        ],),
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text("Single Shot")),
-                            ft.DataCell(ft.Text(single_shot_switch.value)),
-                            
-                        ],
-                ),
+                            ft.DataCell(ft.Text(SINGLE_SHOT_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR  if single_shot_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if single_shot_switch.value == 1 else ft.colors.RED)),
+                        ],),
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text("Auto Run")),
-                            ft.DataCell(ft.Text("OFF")),
-                        ],
-                ),
+                            ft.DataCell(ft.Text(AUTO_RUN_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR  if auto_run_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if auto_run_switch.value == 1 else ft.colors.RED)),
+                        ],),
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text("Raw Data")),
-                            ft.DataCell(ft.Text("OFF")),
-                        ],
-                ),
+                            ft.DataCell(ft.Text(RAW_DATA_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR if raw_requect_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if raw_requect_switch.value == 1 else ft.colors.RED)),
+                        ],),
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text("Time Domain ")),
-                            ft.DataCell(ft.Text("OFF")),
-                        ],
-                ),
+                            ft.DataCell(ft.Text(TD_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR  if time_domain_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if time_domain_switch.value == 1 else ft.colors.RED)),
+                        ],),
                 ],
             )
 
@@ -691,7 +677,8 @@ def main(page: ft.Page):
         title=ft.Text(APPBAR_TITLE),
         #bgcolor=ft.colors.SURFACE_VARIANT,
         #bgcolor= '#f08dbf',
-        bgcolor= '#d5a6bd',
+        #bgcolor= '#d5a6bd',
+        bgcolor= BANNER_COLOR,
         actions=[
             ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
@@ -703,9 +690,6 @@ def main(page: ft.Page):
     # page.add(ft.Column([Controls]),config_table,chart)
     page.add(ft.Column([Controls]),config_table,ft.Row([chart, config_table2]))
     
-
-
-
     
 if __name__ == '__main__':
     ft.app(
