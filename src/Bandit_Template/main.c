@@ -4,9 +4,9 @@
 */
 //#define FORCE_SAMPLING_4_TESTING
 #define NO_DEBUG_LED
-#define FORCESEND_TESTING
+//#define FORCESEND_TESTING
 //#define FORCESEND_FAKETAPS
-#define FORCESEND_NOFFT
+//#define FORCESEND_NOFFT
 //#define FORCESEND_USE_REALDATA
 //#define SEND_RAW_2_OUTPUT
 
@@ -244,6 +244,7 @@ static void core_0_main(){
     Global_Bandit_Settings.manual_error_limit = 0;
     Global_Bandit_Settings.manual_freq_range = 0;
     Global_Bandit_Settings.manual_lms_offset = 0;
+    Global_Bandit_Settings.skip_lms = false;
     CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
     SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
 
@@ -260,6 +261,10 @@ static void core_0_main(){
     // USB State Machine, Settings Application, FFT
 
     volatile bool SKIP_FFT = false;
+
+    uint32_t pace_timer = timer_hw->timerawl;
+    //uint32_t pace_time_limit = 31250;
+    uint32_t pace_time_limit = 100000;
 
     while(1){
         tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
@@ -288,6 +293,7 @@ static void core_0_main(){
                 struct Transfer_Data *data_src;
 
                 Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
+                pace_timer = timer_hw->timerawl;
                 data_src = &ICTXFR_A;
                 tud_task();
 
@@ -359,6 +365,8 @@ static void core_0_main(){
 #endif
 
                 // Free memory constraints
+                //  stall for limiting packets per second
+                while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                 tud_task();
 
@@ -389,6 +397,7 @@ static void core_0_main(){
                 tud_task();
                 busy_wait_ms(1000);
 #else
+                cool_fft.fr[0] = cool_fft.fr[1];
                 USB_Handler(&cool_fft);     //send data to GUI through tusb
 #endif
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
@@ -733,6 +742,8 @@ debug_no_adc_setup_label:
                 } else {
                     error_attempts = 0;
                     flush_FIR_buffer_and_taps(&LMS_FIR);
+
+                    set_ULED_level(Bandit_RGBU.U = 0);
                     
                     LMS_Inst.samples_processed = 0;
 
@@ -765,17 +776,19 @@ debug_no_adc_setup_label:
                     if(LMS_Inst.tap_len > MAX_TAPS) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
                     // Shift by num taps / 2 + some manual offset 04/24/2024 jdv
-                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (LMS_Inst.tap_len >> 1);
+                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (int16_t)(LMS_Inst.tap_len >> 1);
 
                     LMS_Inst.max_convergence_attempts = Global_Bandit_Settings.manual_lms_attempts;
 
                     LMS_Inst.learning_rate = Global_Bandit_Settings.manual_learning_rate;
-                    if(!LMS_Inst.learning_rate) LMS_Inst.learning_rate = 0x0002;
+                    if(!LMS_Inst.learning_rate) LMS_Inst.learning_rate = 0x0003;
 
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
 
                     LMS_FIR.curr_zero = 0;
-                    
+
+                    CORE_1_SEND_UNPROCESSED = Global_Bandit_Settings.skip_lms;
+
 
                     Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
                     Global_Bandit_Settings.updated = false;
@@ -883,7 +896,7 @@ debug_no_adc_setup_label:
                     //asm("nop"); asm("nop"); asm("nop"); asm("nop");
                     //asm("nop"); asm("nop"); asm("nop"); asm("nop");
                     //asm("nop"); asm("nop"); asm("nop"); asm("nop"); asm("nop"); 
-                    asm("nop"); asm("nop"); asm("nop");
+                    //asm("nop"); asm("nop"); asm("nop");
                     ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, (uint16_t *)&D_N_0[n], (uint16_t *)&X_N_0[n], 1);
                     X_N_0[n] -= Bandit_DC_Offset_Cal;
                     X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
@@ -995,7 +1008,16 @@ debug_no_adc_setup_label:
                     }
                 }
 
-                if(CORE_1_SEND_UNPROCESSED) CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                if(CORE_1_SEND_UNPROCESSED){
+                    if(LMS_Inst.ddsmpl_stride > 1){
+                        uint16_t idx = 0;
+                        for(uint16_t n = 0; n < STD_MAX_SAMPLES; n += LMS_Inst.ddsmpl_stride){
+                            D_N_0[idx++] = D_N_0[n];
+                        }
+                    }
+                    
+                    CORE_1_STATE = CORE_1_POST_PROC;
+                }
                 else CORE_1_STATE = CORE_1_LMS;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
@@ -1079,6 +1101,8 @@ debug_no_adc_setup_label:
                             for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n) LMS_FIR.taps[n] = D_N_0[n];
                         }
                         
+                        busy_wait_ms(10);
+
                     } else {
                         for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
                             LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
@@ -1288,19 +1312,21 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
         uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB] << 8) | (BS_RX_BF[USBBSRX_TAPLEN_LSB]);
         uint16_t man_error_limit = (BS_RX_BF[USBBSRX_ERR_MSB] << 8) | (BS_RX_BF[USBBSRX_ERR_LSB]);
-        uint8_t newlmsoffset = BS_RX_BF[USBBSRX_OFFSET_LSB];
+        uint16_t newlmsoffset = (BS_RX_BF[USBBSRX_OFFSET_LSB] << 8) | (BS_RX_BF[USBBSRX_OFFSET_LSB]);
         uint16_t newlmsmaxattempts = (BS_RX_BF[USBBSRX_ATTEMPTS_MSB] << 8) | BS_RX_BF[USBBSRX_ATTEMPTS_LSB];
 
         Global_Bandit_Settings.manual_freq_range = newfreq_range;
         Global_Bandit_Settings.manual_error_limit = man_error_limit;
         Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
-        Global_Bandit_Settings.manual_lms_offset = newlmsoffset;
+        Global_Bandit_Settings.manual_lms_offset = *((int16_t *)&newlmsoffset);
         Global_Bandit_Settings.manual_lms_attempts = newlmsmaxattempts;
 
         Global_Bandit_Settings.manual_learning_rate = learnin_rate;
         //new_settings_value |= (1u << BS_AUTO_RUN);
 
         Global_Bandit_Settings.settings_bf = new_settings_value;
+
+        Global_Bandit_Settings.skip_lms = (BS_RX_BF[USBBSRX_RAW_RQ]) ? true : false;
 
         // Set settings updated flag
         Global_Bandit_Settings.updated = true;

@@ -160,9 +160,10 @@ struct BANDIT_SETTINGS {
     volatile uint16_t        manual_tap_len_setting;
     volatile uint32_t        manual_error_limit;
     volatile uint32_t        manual_freq_range;
-    volatile uint8_t        manual_lms_offset;
+    volatile int16_t        manual_lms_offset;
     volatile uint16_t       manual_lms_attempts;
     volatile Q15            manual_learning_rate;
+    volatile bool           skip_lms;
 };
 
 #define CHK_BANDIT_SETTING(a, b)        (a & (1u << b))
@@ -219,7 +220,7 @@ enum USB_STATE_MACHINEEEEE {
     USB_SEND_CORE_DEBUG
 };    
 
-#define BS_BF_LEN               15
+#define BS_BF_LEN               20
     //  Byte[0] If Enabled
     //  Byte[1] Auto run
     //  Byte[2] Auto send
@@ -231,14 +232,15 @@ enum USB_STATE_MACHINEEEEE {
     //  Byte[8] Manual Tap Length (MSB)
     //  Byte[9] F Range (ENUM)
     //  Byte[10]    LSB Offset in Samples
-    //  Byte[11]    LSB Attempts
-    //  Byte[12]    MSB Attempts
-    //  Byte[13]    LSB Learning Rate
-    //  Byte[14]    MSB Learning Rate
-    //  Byte[15]    RAW Request (get unprocessed data from core 1)
-    //  Byte[16]    Get time domain (skip fft)
-    //  Byte[17]    Single shot request
-    //  Byte[18]    Core 1 debug report request
+    //  Byte[11]    MSB Offset in Samples
+    //  Byte[12]    LSB Attempts
+    //  Byte[13]    MSB Attempts
+    //  Byte[14]    LSB Learning Rate
+    //  Byte[15]    MSB Learning Rate
+    //  Byte[16]    RAW Request (get unprocessed data from core 1)
+    //  Byte[17]    Get time domain (skip fft)
+    //  Byte[18]    Single shot request
+    //  Byte[19]    Core 1 debug report request
 enum USB_BS_RX_BUF_BYTES {
     USBBSRX_EN,
     USBBSRX_AUTORUN,
@@ -251,6 +253,7 @@ enum USB_BS_RX_BUF_BYTES {
     USBBSRX_TAPLEN_MSB,
     USBBSRX_F_FRANGE,
     USBBSRX_OFFSET_LSB,
+    USBBSRX_OFFSET_MSB,
     USBBSRX_ATTEMPTS_LSB,
     USBBSRX_ATTEMPTS_MSB,
     USBBSRX_LEARNING_RATE_LSB,

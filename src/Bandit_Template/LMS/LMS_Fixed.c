@@ -48,16 +48,20 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
     
    // uint16_t max_iters = (LMS->iteration_ct >> LMS->ddsmpl_shift);
 
-    uint16_t max_iters = LMS->iteration_ct - LMS->fixed_offset - LMS->tap_len;
+    uint16_t max_iters = LMS->iteration_ct - 
+                            LMS->fixed_offset - 
+//                            LMS->tap_len - 
+                            LMS->d_n_offset;
 
     uint16_t stride = LMS->ddsmpl_stride;
 
     Q15 err_accum = 0;
     uint16_t err_timeout = LMS->tap_len >> 2;
 
-    for(n = 0; n < LMS->tap_len; ++n){
-        WGN_FIR->data[n] = LMS->x_n[n];
-    }
+    // Prefill
+//    for(n = 0; n < LMS->tap_len; ++n){
+//        WGN_FIR->data[n] = LMS->x_n[n];
+//    }
 
     for(n = LMS->fixed_offset; n < max_iters; n += stride){
     //for(n = 0; n < max_iters; ++n){
@@ -76,7 +80,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
         for(uint16_t m = 0; m < LMS->tap_len; ++m){
             error += mul_Q15(WGN_FIR->taps[m], WGN_FIR->data[m]);
         }
-        error = LMS->d_n[n] - error;
+        error = LMS->d_n[n + LMS->d_n_offset] - error;
         // Update Taps
         for(uint16_t m = 0; m < LMS->tap_len; ++m){
             Q15 dataval = WGN_FIR->data[m];
