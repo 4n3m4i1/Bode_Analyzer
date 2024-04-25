@@ -48,23 +48,46 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
     
    // uint16_t max_iters = (LMS->iteration_ct >> LMS->ddsmpl_shift);
 
-    uint16_t max_iters = LMS->iteration_ct - LMS->fixed_offset;
+    uint16_t max_iters = LMS->iteration_ct - LMS->fixed_offset - LMS->tap_len;
 
     uint16_t stride = LMS->ddsmpl_stride;
 
-    //for(n = LMS->fixed_offset; n < max_iters; n += stride){
-    for(n = 0; n < 2048; ++n){
+    Q15 err_accum = 0;
+    uint16_t err_timeout = LMS->tap_len >> 2;
+
+    for(n = 0; n < LMS->tap_len; ++n){
+        WGN_FIR->data[n] = LMS->x_n[n];
+    }
+
+    for(n = LMS->fixed_offset; n < max_iters; n += stride){
+    //for(n = 0; n < max_iters; ++n){
 
         //retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
         //retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
         //retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
 
-        Q15 Y_HAT = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->d_n_offset]);
-
-        LMS->error = LMS->d_n[n] - Y_HAT;
+        //Q15 Y_HAT = run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->d_n_offset]);
+        //LMS->error = LMS->d_n[n] - Y_HAT;
+        //LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
         
-        LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
-
+        // Manual FIR Cycle
+        WGN_FIR->data[0] = LMS->x_n[n];
+        Q15 error = 0;
+        for(uint16_t m = 0; m < LMS->tap_len; ++m){
+            error += mul_Q15(WGN_FIR->taps[m], WGN_FIR->data[m]);
+        }
+        error = LMS->d_n[n] - error;
+        // Update Taps
+        for(uint16_t m = 0; m < LMS->tap_len; ++m){
+            Q15 dataval = WGN_FIR->data[m];
+            Q15 tap_error = mul_Q15(dataval, error);
+            Q15 std_lms_update = mul_Q15(LMS->learning_rate, tap_error);
+            WGN_FIR->taps[m] += std_lms_update;
+        }
+        for(uint16_t m = LMS->tap_len - 1; m > 0; --m){
+            WGN_FIR->data[m] = WGN_FIR->data[m - 1];
+        }
+        
         LMS->samples_processed++;      
 
         // Error processing Stuff goes here!!!!!!!!!!!
@@ -73,9 +96,12 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
         if(LMS->error < 0) retval = mul_Q15(LMS->error, -1);
         else retval = LMS->error;
 
-        if(retval <= LMS->target_error){
+        err_accum += retval;
+        err_accum >>= 1;
+
+        if(err_accum <= LMS->target_error && n > err_timeout){
             retval = LMS_OK;
-            //break;
+            break;
         } 
     }
 

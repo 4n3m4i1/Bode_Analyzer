@@ -8,7 +8,7 @@
 //#define FORCESEND_FAKETAPS
 #define FORCESEND_NOFFT
 //#define FORCESEND_USE_REALDATA
-#define SEND_RAW_2_OUTPUT
+//#define SEND_RAW_2_OUTPUT
 
 #ifdef FORCESEND_USE_REALDATA
 #include "realdata.h"
@@ -258,6 +258,9 @@ static void core_0_main(){
     USB_NEXT_STATE = USB_INIT;
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
     // USB State Machine, Settings Application, FFT
+
+    volatile bool SKIP_FFT = false;
+
     while(1){
         tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
         tud_task();
@@ -302,26 +305,7 @@ static void core_0_main(){
                     //  then don't run the FFT
                     bool allzeros = true;
 
-#ifdef FORCESEND_FAKETAPS
-                    fft_setup(&cool_fft, 64, (uint16_t)SINTABLESIZE);
-
-                    for(uint16_t n = 0; n < 64; ++n){
-                        cool_fft.fr[n] = arrr[n];
-                        cool_fft.fi[n] = 0;
-                    }
-                    allzeros = false;
-#else
-#ifdef FORCESEND_USE_REALDATA
-                    fft_setup(&cool_fft, REALDSIZE, (uint16_t)SINTABLESIZE);
-
-                    cool_fft.num_samples = REALDSIZE;
-                    for(uint16_t n = 0; n < REALDSIZE; ++n){
-                        cool_fft.fr[n] = REALD[n];
-                        cool_fft.fi[n] = 0;
-                    }
-                    allzeros = false;
-#else
-                    if(data_src->len){
+                    if(data_src->len && !SKIP_FFT){
                         // Apply windowing here if needed!!!
                         
                         fft_setup(&cool_fft, data_src->len, (uint16_t)SINTABLESIZE);
@@ -331,8 +315,6 @@ static void core_0_main(){
                             cool_fft.fi[n] = 0;
                         }
                     }
-#endif
-#endif
 
 #ifdef FORCESEND_TESTING 
                     USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
@@ -350,15 +332,23 @@ static void core_0_main(){
             
             case USB_RUN_DMC_JK_RUN_FFT: {
                 tud_task();
-                FFT_fixdpt(&cool_fft);      // Run FFT
-                FFT_mag(&cool_fft);         // Extract magnitude, output in fft.fr
+                if(!SKIP_FFT){
+                    FFT_fixdpt(&cool_fft);      // Run FFT
+                    FFT_mag(&cool_fft);         // Extract magnitude, output in fft.fr
+                    cool_fft.num_samples >>= 1; // Print only half of fft result, dodge reflected stuff
+                } else {
+                    for(uint16_t n = 0; n < ICTXFR_A.len; ++n){
+                        cool_fft.fr[n] = ICTXFR_A.data[n];
+                    }    
+                }
+                
 
 #ifdef FORCESEND_NOFFT
                 for(uint16_t n = 0; n < ICTXFR_A.len; ++n){
                         cool_fft.fr[n] = ICTXFR_A.data[n];
                 }
 #else
-                cool_fft.num_samples >>= 1;
+                
                 
                 // Raw Core 1 data bypass
                 //if(CORE_0_SKIP_FFT){
@@ -699,6 +689,7 @@ start_refdac_cal:
     bool CORE_1_WGN_STATE   = false;            // Is WGN always on?
     uint8_t CORE_1_FRANGE   = DOWNSAMPLE_1X_250K_CUT;
     bool CORE_1_SEND_UNPROCESSED = false;
+    bool CORE_1_SEND_INTERLEAVED = false;
 
 
     // Configure- White Noise Generation Signal Chain
@@ -759,21 +750,27 @@ debug_no_adc_setup_label:
                 Acquire_Lock_Blocking(INTERCORE_SETTINGS_LOCK);
 
                 if(Global_Bandit_Settings.updated){
-                    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON)){
+                    // if white noise should be on, and isn't, turn it on
+                    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON) && !CORE_1_WGN_STATE){
                         start_wgn_dma_channels();
                         start_randombit_dma_chain(dma_awgn_ctrl_chan);
                         CORE_1_WGN_STATE = true;
                     }
 
+                    // Configure next LMS run
                     CORE_1_FRANGE = Global_Bandit_Settings.manual_freq_range;
                     LMS_Inst.max_error_allowed = Global_Bandit_Settings.manual_error_limit;
                     LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
 
                     if(LMS_Inst.tap_len > MAX_TAPS) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
-                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset;
+                    // Shift by num taps / 2 + some manual offset 04/24/2024 jdv
+                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (LMS_Inst.tap_len >> 1);
 
                     LMS_Inst.max_convergence_attempts = Global_Bandit_Settings.manual_lms_attempts;
+
+                    LMS_Inst.learning_rate = Global_Bandit_Settings.manual_learning_rate;
+                    if(!LMS_Inst.learning_rate) LMS_Inst.learning_rate = 0x0002;
 
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
 
@@ -787,8 +784,11 @@ debug_no_adc_setup_label:
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
                         CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN)){
                             CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN);
+                            // Auto run or a single shot run has been requested
                             CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                     } else {
+                        // If auto run is off, just kinda hang out until either
+                        //  auto run is toggled or a single shot request comes in
                         SET_STALL = true;
                     }
                 }
@@ -889,8 +889,8 @@ debug_no_adc_setup_label:
                     X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
                     D_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
 
-                    X_N_0[n] *= 4;
-                    D_N_0[n] *= 4;
+                    X_N_0[n] *= 8;
+                    D_N_0[n] *= 8;
                 }
 
                 //Stop_Sampling();
@@ -995,7 +995,8 @@ debug_no_adc_setup_label:
                     }
                 }
 
-                CORE_1_STATE = CORE_1_LMS;
+                if(CORE_1_SEND_UNPROCESSED) CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                else CORE_1_STATE = CORE_1_LMS;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
             }
@@ -1061,34 +1062,40 @@ debug_no_adc_setup_label:
                     // Calibration Acquired, go back to do first run
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
-                    // Finish processing H HAT buffer that'll get sent to Core 0
-                    // Move on with a normal run
-                   // LMS_Inst.tap_len = 1024;
-                    //for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-#ifdef SEND_RAW_2_OUTPUT
-                    for(uint16_t n = 0; n < LMS_Inst.tap_len >> 1; ++n){
-                        LMS_FIR.taps[n] = D_N_0[n];
+                    
+                    // Select what data is shipped over to core 0
+
+                    if(CORE_1_SEND_UNPROCESSED){
+                        if(CORE_1_SEND_INTERLEAVED) {
+                            // Send both D_N and X_N data, D_N first then X_N each filling half the buffer
+                            for(uint16_t n = 0; n < LMS_Inst.tap_len >> 1; ++n){
+                                LMS_FIR.taps[n] = D_N_0[n];
+                            }
+                            for(uint16_t n = LMS_Inst.tap_len >> 1; n < LMS_Inst.tap_len; ++n){
+                                LMS_FIR.taps[n] = X_N_0[n - (LMS_Inst.tap_len >> 1)];
+                            }
+                        } else {
+                            // Send only data read from D_N input port
+                            for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n) LMS_FIR.taps[n] = D_N_0[n];
+                        }
+                        
+                    } else {
+                        for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                            LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                            // Deboog only
+                            //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
+                            //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
+                            //LMS_FIR.taps[n] = D_N_0[n];
+                            //LMS_FIR.taps[n] = Bandit_DC_Offset_Cal;
+                            //LMS_H_HATS[n] = 0xAB;
+                            //LMS_FIR.taps[n] = 0xBC;
+                        //    LMS_FIR.taps[n] = LMS_Inst.error;
+                        //    LMS_FIR.taps[n + 1] = LMS_Inst.samples_processed;
+                            //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
+                        }
                     }
-                    for(uint16_t n = LMS_Inst.tap_len >> 1; n < LMS_Inst.tap_len; ++n){
-                        LMS_FIR.taps[n] = X_N_0[n - (LMS_Inst.tap_len >> 1)];
-                    }
-#else
-                    for(uint16_t n = 0; n < LMS_Inst.tap_len >> 1; ++n){
-                        //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
-                        // Deboog only
-                        //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
-                        //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
-                        //LMS_FIR.taps[n] = D_N_0[n];
-                        //LMS_FIR.taps[n] = Bandit_DC_Offset_Cal;
-                        //LMS_H_HATS[n] = 0xAB;
-                        //LMS_FIR.taps[n] = 0xBC;
-                    //    LMS_FIR.taps[n] = LMS_Inst.error;
-                    //    LMS_FIR.taps[n + 1] = LMS_Inst.samples_processed;
-                    }
-#endif
-                    //for(uint16_t n = LMS_Inst.tap_len >> 1; n < LMS_Inst.tap_len; ++n){
-                    //    LMS_FIR.taps[n] = X_N_0[n - (LMS_Inst.tap_len >> 1)];
-                    //}
+                    
+
                     CORE_1_STATE = CORE_1_SHIP_RESULTS;
                 }
 
@@ -1102,9 +1109,9 @@ debug_no_adc_setup_label:
             break;
 
             case CORE_1_SHIP_RESULTS: {
-//#ifndef NO_DEBUG_LED
+
                 set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 0, Bandit_RGBU.B = 127);
-//#endif
+                
                 // Transfer results from LMS to memory accessible by both cores
                 //  only like this to improve speed someday with DMA...
                 //      but not today :)
@@ -1129,7 +1136,7 @@ debug_no_adc_setup_label:
                 //  prevent loop from spinning too quickly
                 busy_wait_us_32(100);
                 set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-                busy_wait_ms(500);
+                //busy_wait_ms(500);
 
 
 #ifndef NO_DEBUG_LED
@@ -1275,21 +1282,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) new_settings_value |= (1u << BS_WGN_ON);
         else new_settings_value &= ~(1u << BS_WGN_ON);
        
-       // if(BS_RX_BF[USBBSRX_SINGLE_SHOT]) new_settings_value |= (1u << BS_SINGLE_SHOT_RUN);
-       // else new_settings_value &= ~(1u << BS_SINGLE_SHOT_RUN);
-
-        // WHY DOESN"T THIS WORK
-        //if(BS_RX_BF[USBBSRX_EN]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_ENABLE);
-        //else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_ENABLE);
-
-        //if(BS_RX_BF[USBBSRX_AUTORUN]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
-        //else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN);
-
-        //if(BS_RX_BF[USBBSRX_AUTOSEND]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
-        //else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_SEND);
-
-        //if(BS_RX_BF[USBBSRX_WGN_ALWAYS_ON]) SET_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON);
-        //else CLR_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_WGN_ON);
+        Q15 learnin_rate = (BS_RX_BF[USBBSRX_LEARNING_RATE_MSB] << 8) | BS_RX_BF[USBBSRX_LEARNING_RATE_LSB];
 
         // see Bode_Bandit.h for enum settings map defineds
         uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
@@ -1303,6 +1296,8 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         Global_Bandit_Settings.manual_tap_len_setting = newtaplen;
         Global_Bandit_Settings.manual_lms_offset = newlmsoffset;
         Global_Bandit_Settings.manual_lms_attempts = newlmsmaxattempts;
+
+        Global_Bandit_Settings.manual_learning_rate = learnin_rate;
         //new_settings_value |= (1u << BS_AUTO_RUN);
 
         Global_Bandit_Settings.settings_bf = new_settings_value;
@@ -1318,6 +1313,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&man_error_limit, 2);
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsoffset, 1);   
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsmaxattempts, 2);                  // Decoded manual error limit
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&learnin_rate, 2);                        // Decoded manual Learning Rate
 
         // Flush outgoing transmissions
         tud_cdc_n_write_flush(CDC_DATA_CHAN);

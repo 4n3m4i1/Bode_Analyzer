@@ -162,6 +162,7 @@ struct BANDIT_SETTINGS {
     volatile uint32_t        manual_freq_range;
     volatile uint8_t        manual_lms_offset;
     volatile uint16_t       manual_lms_attempts;
+    volatile Q15            manual_learning_rate;
 };
 
 #define CHK_BANDIT_SETTING(a, b)        (a & (1u << b))
@@ -189,6 +190,11 @@ enum BANDIT_CORE_1_DSP_STATES {
     CORE_1_DEBUG_HANDLER
 };
 
+enum BANDIT_CORE_1_OP_STATE {
+    C1_NORM_OPERATION,
+    C1_SAMPLE_ONLY
+};
+
 //tinyUsb definitions
 #define START_CHAR              '~'
 #define SETTINGS_CHAR           '('
@@ -213,7 +219,7 @@ enum USB_STATE_MACHINEEEEE {
     USB_SEND_CORE_DEBUG
 };    
 
-#define BS_BF_LEN               13
+#define BS_BF_LEN               15
     //  Byte[0] If Enabled
     //  Byte[1] Auto run
     //  Byte[2] Auto send
@@ -227,6 +233,8 @@ enum USB_STATE_MACHINEEEEE {
     //  Byte[10]    LSB Offset in Samples
     //  Byte[11]    LSB Attempts
     //  Byte[12]    MSB Attempts
+    //  Byte[13]    LSB Learning Rate
+    //  Byte[14]    MSB Learning Rate
 enum USB_BS_RX_BUF_BYTES {
     USBBSRX_EN,
     USBBSRX_AUTORUN,
@@ -241,6 +249,8 @@ enum USB_BS_RX_BUF_BYTES {
     USBBSRX_OFFSET_LSB,
     USBBSRX_ATTEMPTS_LSB,
     USBBSRX_ATTEMPTS_MSB,
+    USBBSRX_LEARNING_RATE_LSB,
+    USBBSRX_LEARNING_RATE_MSB,
     USBBSRX_RAW_RQ,
     USBBSRX_TIME_DOMAIN_DATA,
     USBBSRX_SINGLE_SHOT,

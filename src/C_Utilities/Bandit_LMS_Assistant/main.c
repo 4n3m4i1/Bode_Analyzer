@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <inttypes.h>
 #include <unistd.h>
 #include <time.h>
@@ -16,8 +17,9 @@
 #define false   0u
 #endif
 
-#define NLMS
+//#define NLMS
 
+#define FLOATSCALECONST     0.000125
 
 Q15 D_N_0[1024];
 Q15 X_N_0[1024];
@@ -62,7 +64,15 @@ struct FIR_Parameters {
 
 // Function prototipica
 Q15 run_2n_fir_cycle(struct FIR_Parameters *fir, Q15 new_data);
+void shift_fir(struct FIR_Parameters *fir);
 void update_LMS_taps(struct FIR_Parameters *fir, Q15 error, Q15 learning_rate);
+
+
+Q15 generate_awgn_sample(){
+    double U1 = drand48();
+
+    return float_2_Q15((sqrt(-2 * log(U1)) - 1.25) * FLOATSCALECONST);
+}
 
 
 void main(int argc, char **argv){
@@ -217,7 +227,7 @@ void main(int argc, char **argv){
     LMS_FIR.data = malloc(sizeof(Q15) * LMS_FIR.len);
     LMS_FIR.taps = malloc(sizeof(Q15) * LMS_FIR.len);
 
-    uint32_t    countoferrorplot = (numsamples - TSA_PreCheck.D_N_Delay) * TSA_PreCheck.ITER_CTS;
+    uint32_t    countoferrorplot = (numsamples - TSA_PreCheck.D_N_Delay - LMS_FIR.len) * TSA_PreCheck.ITER_CTS;
     Q15 *errorplot = (Q15 *)1lu;
     Q15 *y_n_plot = (Q15 *)1lu;
 
@@ -247,16 +257,22 @@ void main(int argc, char **argv){
     // MAIN LOOP
 
     for(uint32_t iter = 0; iter < TSA_PreCheck.ITER_CTS; ++iter){
-        for(uint16_t n = 0; n < (numsamples - TSA_PreCheck.D_N_Delay); ++n){
-            //Q15 Y_N = run_2n_fir_cycle(&LMS_FIR, X_N_0[(numsamples - 1) - n]);
+        uint32_t n;
+        for(n = 0; n < LMS_FIR.len; ++n){
+            run_2n_fir_cycle(&LMS_FIR, X_N_0[n]);
+        }
+        for(; n < (numsamples - TSA_PreCheck.D_N_Delay); ++n){
             Q15 Y_N = run_2n_fir_cycle(&LMS_FIR, X_N_0[n]);
+            //Q15 Y_N = run_2n_fir_cycle(&LMS_FIR, X_N_0[(numsamples - TSA_PreCheck.D_N_Delay - 1) - n]);
             //printf("Y_N[%3u] = %d (%lf)\n", n, Y_N, Q15_2_float(Y_N));
+            //Q15 error = (D_N_0[n] + generate_awgn_sample()) - Y_N;
             Q15 error = D_N_0[n] - Y_N;
             if(TSA_PreCheck.save_error == true){
                 y_n_plot[ctr] = Y_N;
                 errorplot[ctr++] = error;
             }
             update_LMS_taps(&LMS_FIR, error, TSA_PreCheck.LMS_LEARNING_RATE);
+            shift_fir(&LMS_FIR);
             LMS_FIR.current_zero--;
         }
     }
@@ -318,17 +334,19 @@ Q15 run_2n_fir_cycle(struct FIR_Parameters *fir, Q15 new_data){
     //    retval += mul_Q15(mulval, fir->taps[n]);
     //}
     ////fir->current_zero--;
-    //
+    
 
     fir->data[0] = new_data;
     for(uint32_t n = 0; n < fir->len; ++n) retval += mul_Q15(fir->taps[n] , fir->data[n]);
-    for(uint32_t n = fir->len - 1; n > 0; --n) fir->data[n] = fir->data[n - 1];
 
     //printf("FIR: data[0] = %d (%lf)\t->\t%d (%lf)\n", new_data, Q15_2_float(new_data), retval, Q15_2_float(retval));
 
     return retval;
 }
 
+void shift_fir(struct FIR_Parameters *fir){
+        for(uint32_t n = fir->len - 1; n > 0; --n) fir->data[n] = fir->data[n - 1];
+}
 
 
 void update_LMS_taps(struct FIR_Parameters *fir, Q15 error, Q15 learning_rate){
@@ -342,7 +360,8 @@ void update_LMS_taps(struct FIR_Parameters *fir, Q15 error, Q15 learning_rate){
 #endif
     
     for(uint16_t n = 0; n < fir->len; ++n){
-        Q15 dataval = fir->data[(n + fir->current_zero) & fir->address_mask];
+        //Q15 dataval = fir->data[(n + fir->current_zero) & fir->address_mask];
+        Q15 dataval = fir->data[n];
         Q15 tap_error = mul_Q15(dataval, error);
         //printf("Data %0.14lf Err: 0x%04X\t%.14lf\n", Q15_2_float(fir->data[n]), tap_error, Q15_2_float(tap_error));
         Q15 std_lms_update = mul_Q15(learning_rate, tap_error);
