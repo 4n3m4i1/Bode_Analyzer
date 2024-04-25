@@ -10,7 +10,7 @@ import serial
 # import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
 # import serial.tools.list_ports_linux as list_ports_linux
-# import serial.tools.list_ports as list_ports
+import serial.tools.list_ports as list_ports
 import platform
 import matplotlib
 matplotlib.use('agg')
@@ -57,7 +57,7 @@ port_selections = []
 # #         port_selections.append(ft.dropdown.Option(str(port)))
 # else: pass
 
-for port in serial.tools.list_ports.comports():
+for port in list_ports.comports():
     print(port)
     port_selections.append(ft.dropdown.Option(str(port)))
 parametric_taps =[32,64,128,256, 512, 1024]
