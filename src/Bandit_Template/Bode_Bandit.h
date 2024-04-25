@@ -235,6 +235,10 @@ enum USB_STATE_MACHINEEEEE {
     //  Byte[12]    MSB Attempts
     //  Byte[13]    LSB Learning Rate
     //  Byte[14]    MSB Learning Rate
+    //  Byte[15]    RAW Request (get unprocessed data from core 1)
+    //  Byte[16]    Get time domain (skip fft)
+    //  Byte[17]    Single shot request
+    //  Byte[18]    Core 1 debug report request
 enum USB_BS_RX_BUF_BYTES {
     USBBSRX_EN,
     USBBSRX_AUTORUN,
