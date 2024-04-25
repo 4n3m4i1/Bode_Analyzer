@@ -23,7 +23,8 @@ import flet as ft
 from flet_core.matplotlib_chart import MatplotlibChart
 from flet import RouteChangeEvent, ViewPopEvent
 import multiprocessing
-from multiprocessing import Process, Queue, Lock, Event
+from multiprocessing import Queue, Lock, Event
+from multiprocess import Process
 from threading import Thread
 # from queue import Empty
 import time
@@ -207,6 +208,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue, loc
             # lock.release()
             pass
 ##########################################################################################UPDATEGRAPH
+global update_graph
 def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis: matplotlib.axes.Axes, fig: matplotlib.figure.Figure):
     # is_set = GraphEvent.wait()
     frange = 0
@@ -621,13 +623,12 @@ def main(page: ft.Page):
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
     data_converter_process.daemon = True
     print('try')
-    update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
+    update_graph_thread = Process(group=None, target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
     update_graph_thread.daemon = True
     update_graph_thread.start()
     serial_reader.start()
     data_converter_process.start()
 
-    page.update()
     
 if __name__ == '__main__':
     ft.app(
