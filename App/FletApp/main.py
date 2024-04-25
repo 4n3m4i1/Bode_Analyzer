@@ -1,8 +1,12 @@
+import matplotlib.axes
+import matplotlib.axis
+import matplotlib.figure
+import matplotlib.lines
 from generic_include import *
 from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
 import serial
-import serial.tools.list_ports
+# from enum import IntEnum
 # import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
 # import serial.tools.list_ports_linux as list_ports_linux
@@ -11,14 +15,16 @@ import platform
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+import matplotlib.scale as scaler
+import matplotlib.ticker as ticker
 from itertools import chain
 import struct 
 import flet as ft
-from flet.matplotlib_chart import MatplotlibChart
+from flet_core.matplotlib_chart import MatplotlibChart
 from flet import RouteChangeEvent, ViewPopEvent
-from multiprocess import Process, Event
-from multiprocessing import Queue
 import multiprocessing
+from multiprocessing import Queue, Lock, Event
+from multiprocess import Process
 from threading import Thread
 # from queue import Empty
 import time
@@ -29,7 +35,6 @@ os = platform.system()
 
 # dataPort = None
 # ctrlPort = None
-
 start_event = Event()
 GraphEvent = Event()
 settings_event = Event()
@@ -71,9 +76,8 @@ data_port = Port()
 ctrl_port = Port()
 
 # init_graph = [0 for i in range(NUM_VALUES)]
-
 ##########################################################################################SERIALREAD
-def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page):
+def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page, lock):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
 
@@ -167,7 +171,9 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         end = time.time()
                         # print(f_data)
                         print(f'{end - start} second transmition')
-                        data_Queue.put(f_data)
+                        lock.acquire()
+                        data_Queue.put(f_data, block=False)
+                        lock.release()
         except serial.SerialException:
             page.banner = ft.Banner(
                 bgcolor=ft.colors.AMBER_100,
@@ -179,15 +185,16 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             start_event.clear()
             page.update()
 ##########################################################################################DATACONVERTER
-def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
+def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue, lock):
     # is_set = GraphEvent.wait()
     while True:
         is_set = GraphEvent.wait()
-        if data_in_Queue.empty():
-            pass
-            
-        else:
+        # lock.acquire()
+        try:
             graph_data_raw = data_in_Queue.get(block=False)
+            # print(len(graph_data_raw))
+            # lock.release()
+            # print(graph_data_raw)
             # print(len(graph_data_raw))
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
@@ -195,17 +202,22 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue):
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
             # print(converted_graph_data)
             data_out_Queue.put(converted_graph_data, block=False)
+        except Exception as e:
+            # lock.release()
+            pass
 ##########################################################################################UPDATEGRAPH
-def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis, fig):
+global update_graph
+def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis: matplotlib.axes.Axes, fig: matplotlib.figure.Figure):
     # is_set = GraphEvent.wait()
     frange = 0
+    print('start graph')
     while True:
+        # print(' ')
         # print(frange)
         is_set = GraphEvent.wait()
-        if data_Queue.empty():
-            pass
-        else:
+        try:
             data = data_Queue.get()
+            # print(data)
             # print(data)
             # print(len(data))
             line.set_data(np.arange(len(data)), data)
@@ -220,22 +232,37 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
 
             if data:
                 if max(data) != 0:
-                    # print(line.get_data())
-                    plt.xlim(1e-15, frange)
+                    print("Valid Data Print!!")
+                    # print(data)
+                    #print(line.get_data())
+                    plt.xlim(1e-15, len(data))
+                    ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
                     plt.ylim(1e-15, max(data) + 0.01)
                     # plt.xlim(min(float), le)
                     # axis.set_xbound
+                    axis.xaxis.set_major_formatter(ticks_x)
                     axis.draw_artist(line)
+                    print('oop')
+                    #fig.canvas.blit(fig.bbox)  # I added this
                     fig.canvas.blit(fig.bbox)
-                    fig.canvas.flush_events()
+                    # fig.canvas.flush_events()
             # print('step')
+                    print('here')
+                    # chart.before_update()
                     chart.update()
+                    
+                    fig.canvas.flush_events()
+                    print('huh')
             # print('step2')
                 else:
                     print("Data All Zero!!")
                 
             else:
                 pass
+        except Exception as e:
+
+            print(e)
+            pass
             
 ##########################################################################################MAIN
 def main(page: ft.Page):
@@ -253,42 +280,16 @@ def main(page: ft.Page):
     )
 )
     
-            ## Graph configurations
-    #figure = plt.figure()
-    figure = plt.figure(figsize=(15,7))
-    #figure = plt.figure(figsize=(30,7))
-    ax = figure.add_subplot()
-    line, = ax.plot(init_graph, animated=True,)
-    ax.grid()
-
-    line.set_color('#F55BB0')
-    chart = MatplotlibChart(figure, expand=True,)
-    #ax.set_facecolor('#e3e3e3')
-    figure.set_facecolor('#e3e3e3')
-    ax.set_xscale(PLOT_XUNIT)
-    ax.set_yscale(PLOT_YUNIT)
-    ax.set_title(PLOT_TITLE, fontsize = 18)
-    ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
-    ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
+    temp_settings = INIT_SETTINGS
 
     pool = multiprocessing.Pool(processes=1)
     m = multiprocessing.Manager()
     FFT_real_queue = m.Queue()
     FFT_converted_queue = m.Queue()
     Settings_Queue = m.Queue()
-
     FRANGE_queue = m.Queue()
+    lock = Lock()
 
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page))
-    serial_reader.daemon = True
-    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
-    data_converter_process.daemon = True
-    update_graph_thread = pool.apply_async(update_graph, (FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
-    update_graph_thread.daemon = True
-    serial_reader.start()
-    data_converter_process.start()
-    # update_graph_thread.start()
-    temp_settings = INIT_SETTINGS
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
           
@@ -328,7 +329,22 @@ def main(page: ft.Page):
 
     
         
+    ## Graph configurations
+    #figure = plt.figure()
+    figure = plt.figure(figsize=(15,7))
+    ax = figure.add_subplot(111)
+    line, = ax.plot(init_graph, animated=True,)
+    ax.grid()
 
+    line.set_color('#F55BB0')
+    chart = MatplotlibChart(figure, isolated=True, expand=True)
+    #ax.set_facecolor('#e3e3e3')
+    figure.set_facecolor('#e3e3e3')
+    ax.set_xscale(PLOT_XUNIT)
+    ax.set_yscale(PLOT_YUNIT)
+    ax.set_title(PLOT_TITLE, fontsize = 18)
+    ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
+    ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
     
     
     def is_connected():
@@ -396,36 +412,34 @@ def main(page: ft.Page):
 
     # change bit at index 3
     def toggle_wgn(e):
-        # if wgn_switch.label == WGN_LABEL_ON:
-        #     temp_settings[3] = 0
-        #     #print("off")
-        # else :
-        #     #print("on")
-        #     temp_settings[3] = 1
+        if wgn_switch.label == WGN_LABEL_ON:
+            temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 0
+            #print("off")
+        else :
+            #print("on")
+            temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 1
 
-        # wgn_switch.label = (
-        #     WGN_LABEL_OFF if temp_settings[3] == 0 else WGN_LABEL_ON
-        # )
-
-        temp_settings[3] = 1 if wgn_switch.value == 1 else 0
+        wgn_switch.label = (
+            WGN_LABEL_OFF if temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] == 0 else WGN_LABEL_ON
+        )
         print(wgn_switch.label)
         print(temp_settings)
 
         page.update()
     def toggle_single_shot(e):
-        temp_settings[12] = int(single_shot_switch.value)
-        temp_settings[1] = int(not temp_settings[12])
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_SINGLE_SHOT.value] = int(single_shot_switch.value)
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value] = int(not temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_SINGLE_SHOT.value])
 
     def toggle_auto_run(e):
-        temp_settings[1] = int(auto_run_switch.value)
-        temp_settings[12] = int(not temp_settings[1])
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value] = int(auto_run_switch.value)
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_SINGLE_SHOT.value] = int(not temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value])
 
     def toggle_raw_request(e):
-        temp_settings[10] = int(raw_requect_switch.value)
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_RAW_RQ.value] = int(raw_requect_switch.value)
     
 
     def toggle_time_d(e):
-        temp_settings[11] = int(time_domain_switch.value)
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TIME_DOMAIN_DATA.value] = int(time_domain_switch.value)
 
 
     wgn_switch = ft.Switch(label= WGN_LABEL, on_change=toggle_wgn)
@@ -625,12 +639,12 @@ def main(page: ft.Page):
 
     def select_tap_length(e):
         bytes_tmp = int(tap_select.value).to_bytes(2, 'little')
-        temp_settings[7] = bytes_tmp[0]
-        temp_settings[8] = bytes_tmp[1]
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_LSB.value] = bytes_tmp[0]
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_MSB.value] = bytes_tmp[1]
         print(temp_settings)
     def select_frange(e):
         tmp = int(freq_range_select.value)
-        temp_settings[9] = tmp
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_F_FRANGE.value] = tmp
         FRANGE_queue.put(FRANGE_VAL[tmp])
         print(temp_settings)
 
@@ -687,10 +701,19 @@ def main(page: ft.Page):
     )
 
     #page.add(ft.Column([Controls]) ,chart ) 
-    # page.add(ft.Column([Controls]),config_table,chart)
-    page.add(ft.Column([Controls]),config_table,ft.Row([chart, config_table2]))
-    
-    
+    page.add(ft.Column([Controls]),config_table,chart)
+
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
+    serial_reader.daemon = True
+    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
+    data_converter_process.daemon = True
+    print('try')
+    update_graph_thread = Process(group=None, target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
+    update_graph_thread.daemon = True
+    update_graph_thread.start()
+    serial_reader.start()
+    data_converter_process.start()
+
 if __name__ == '__main__':
     ft.app(
         target=main,

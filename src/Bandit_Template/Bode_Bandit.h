@@ -1,6 +1,9 @@
 #ifndef BODE_BANDIT_h
 #define BODE_BANDIT_h
 
+// Desperate times...
+//#define LONGFIXED
+
 #include "Bandit_Pins.h"
 #include "fixedpt_include.h"
 #include "Memory_Management.h"
@@ -24,8 +27,6 @@
 #include "Bandit_InterCore/Bandit_Inter_Core.h"
 #include "Downsampling/Fixed_Filters.h"
 
-
-// #include "dummy_taps.h"
 
 /*
     Remember:
@@ -146,7 +147,7 @@ enum BANDIT_SETTINGS_BF {
     BS_RAW_RQ,
     BS_TIME_DOMAIN_RQ
 };
-#define BS_BF_LEN               10
+
 /*
     Bandit Main Settings
 */
@@ -158,6 +159,10 @@ struct BANDIT_SETTINGS {
     volatile uint16_t        manual_tap_len_setting;
     volatile uint32_t        manual_error_limit;
     volatile uint32_t        manual_freq_range;
+    volatile int16_t        manual_lms_offset;
+    volatile uint16_t       manual_lms_attempts;
+    volatile Q15            manual_learning_rate;
+    volatile bool           skip_lms;
 };
 
 #define CHK_BANDIT_SETTING(a, b)        (a & (1u << b))
@@ -185,6 +190,11 @@ enum BANDIT_CORE_1_DSP_STATES {
     CORE_1_DEBUG_HANDLER
 };
 
+enum BANDIT_CORE_1_OP_STATE {
+    C1_NORM_OPERATION,
+    C1_SAMPLE_ONLY
+};
+
 //tinyUsb definitions
 #define START_CHAR              '~'
 #define SETTINGS_CHAR           '('
@@ -193,6 +203,7 @@ enum BANDIT_CORE_1_DSP_STATES {
 #define CDC_DATA_CHAN           0
 #define CDC_CTRL_CHAN           1
 #define CDC_PACKET_LEN          64
+#define LOG2_CDC_PACKET_LEN     6
 
 //core0 state machine init
 //#define STATE             // variables?
@@ -208,7 +219,7 @@ enum USB_STATE_MACHINEEEEE {
     USB_SEND_CORE_DEBUG
 };    
 
-
+#define BS_BF_LEN               20
     //  Byte[0] If Enabled
     //  Byte[1] Auto run
     //  Byte[2] Auto send
@@ -219,6 +230,16 @@ enum USB_STATE_MACHINEEEEE {
     //  Byte[7] Manual Tap Length (LSB)
     //  Byte[8] Manual Tap Length (MSB)
     //  Byte[9] F Range (ENUM)
+    //  Byte[10]    LSB Offset in Samples
+    //  Byte[11]    MSB Offset in Samples
+    //  Byte[12]    LSB Attempts
+    //  Byte[13]    MSB Attempts
+    //  Byte[14]    LSB Learning Rate
+    //  Byte[15]    MSB Learning Rate
+    //  Byte[16]    RAW Request (get unprocessed data from core 1)
+    //  Byte[17]    Get time domain (skip fft)
+    //  Byte[18]    Single shot request
+    //  Byte[19]    Core 1 debug report request
 enum USB_BS_RX_BUF_BYTES {
     USBBSRX_EN,
     USBBSRX_AUTORUN,
@@ -230,10 +251,16 @@ enum USB_BS_RX_BUF_BYTES {
     USBBSRX_TAPLEN_LSB,
     USBBSRX_TAPLEN_MSB,
     USBBSRX_F_FRANGE,
+    USBBSRX_OFFSET_LSB,
+    USBBSRX_OFFSET_MSB,
+    USBBSRX_ATTEMPTS_LSB,
+    USBBSRX_ATTEMPTS_MSB,
+    USBBSRX_LEARNING_RATE_LSB,
+    USBBSRX_LEARNING_RATE_MSB,
     USBBSRX_RAW_RQ,
-    USBBSRX_TIMEDOMAIN_RQ,
+    USBBSRX_TIME_DOMAIN_DATA,
     USBBSRX_SINGLE_SHOT,
-    USBBSRX_CORE_1_DBG_RQ,
+    USBBSRX_CORE_1_DBG_RQ
 
 };
 
