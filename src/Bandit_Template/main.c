@@ -1308,6 +1308,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
        
         Q15 learnin_rate = (BS_RX_BF[USBBSRX_LEARNING_RATE_MSB] << 8) | BS_RX_BF[USBBSRX_LEARNING_RATE_LSB];
 
+
         // see Bode_Bandit.h for enum settings map defineds
         uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
         uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB] << 8) | (BS_RX_BF[USBBSRX_TAPLEN_LSB]);
