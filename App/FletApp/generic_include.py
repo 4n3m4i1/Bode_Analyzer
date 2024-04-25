@@ -58,4 +58,4 @@ INIT_SETTINGS = [
     0x00, #SINGLE SHOT
     0x00  #DEBGUG RQ
     ]
-init_graph = [1e-15 for _ in range(128)]
+init_graph = [_ + 1e-15 for _ in range(128)]

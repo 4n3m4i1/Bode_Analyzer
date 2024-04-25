@@ -1,3 +1,7 @@
+import matplotlib.axes
+import matplotlib.axis
+import matplotlib.figure
+import matplotlib.lines
 from generic_include import *
 from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
@@ -16,11 +20,10 @@ import matplotlib.ticker as ticker
 from itertools import chain
 import struct 
 import flet as ft
-from flet.matplotlib_chart import MatplotlibChart
+from flet_core.matplotlib_chart import MatplotlibChart
 from flet import RouteChangeEvent, ViewPopEvent
-from multiprocess import Process, Queue, Event
 import multiprocessing
-from multiprocessing import Queue, Lock
+from multiprocessing import Process, Queue, Lock, Event
 from threading import Thread
 # from queue import Empty
 import time
@@ -75,7 +78,7 @@ ctrl_port = Port()
 
 GraphEvent = Event()
 ##########################################################################################SERIALREAD
-def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page, lock: Lock):
+def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page, lock):
     BYTES_PER_NUMBER = 2
     CDC_PACKET_LENGTH = 64
 
@@ -204,7 +207,7 @@ def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue, loc
             # lock.release()
             pass
 ##########################################################################################UPDATEGRAPH
-def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis, fig):
+def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis: matplotlib.axes.Axes, fig: matplotlib.figure.Figure):
     # is_set = GraphEvent.wait()
     frange = 0
     print('start graph')
@@ -230,6 +233,7 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             if data:
                 if max(data) != 0:
                     print("Valid Data Print!!")
+                    # print(data)
                     #print(line.get_data())
                     plt.xlim(1e-15, len(data))
                     ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
@@ -239,11 +243,15 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                     axis.xaxis.set_major_formatter(ticks_x)
                     axis.draw_artist(line)
                     print('oop')
-                    fig.canvas.blit(fig.bbox)  # I added this
-                    fig.canvas.flush_events()
+                    #fig.canvas.blit(fig.bbox)  # I added this
+                    fig.canvas.blit(fig.bbox)
+                    # fig.canvas.flush_events()
             # print('step')
                     print('here')
+                    # chart.before_update()
                     chart.update()
+                    
+                    fig.canvas.flush_events()
                     print('huh')
             # print('step2')
                 else:
@@ -322,7 +330,7 @@ def main(page: ft.Page):
     ax.grid()
 
     line.set_color('#F55BB0')
-    chart = MatplotlibChart(figure, expand=True,)
+    chart = MatplotlibChart(figure, isolated=True, expand=True)
     #ax.set_facecolor('#e3e3e3')
     figure.set_facecolor('#e3e3e3')
     ax.set_xscale(PLOT_XUNIT)
@@ -618,6 +626,8 @@ def main(page: ft.Page):
     update_graph_thread.start()
     serial_reader.start()
     data_converter_process.start()
+
+    page.update()
     
 if __name__ == '__main__':
     ft.app(
