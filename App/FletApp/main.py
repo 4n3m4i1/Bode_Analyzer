@@ -249,8 +249,11 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             # print('step')
                     print('here')
                     # chart.before_update()
+                    #chart.update()
+                    axis.clear()
+                    axis.plot(line.get_data(), animated=True)
                     chart.update()
-                    
+
                     fig.canvas.flush_events()
                     print('huh')
             # print('step2')
@@ -326,7 +329,7 @@ def main(page: ft.Page):
     #figure = plt.figure()
     figure = plt.figure(figsize=(15,7))
     ax = figure.add_subplot(111)
-    line, = ax.plot(init_graph, animated=True,)
+    line, = ax.plot(init_graph, animated=True)
     ax.grid()
 
     line.set_color('#F55BB0')

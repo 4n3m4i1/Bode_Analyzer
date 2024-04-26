@@ -4,7 +4,7 @@
 */
 //#define FORCE_SAMPLING_4_TESTING
 #define NO_DEBUG_LED
-//#define FORCESEND_TESTING
+#define FORCESEND_TESTING
 //#define FORCESEND_FAKETAPS
 //#define FORCESEND_NOFFT
 //#define FORCESEND_USE_REALDATA
@@ -395,7 +395,7 @@ static void core_0_main(){
 #endif                
                 send_f_packets(cool_fft.fr, cool_fft.num_samples);
                 tud_task();
-                busy_wait_ms(1000);
+                busy_wait_ms(100);
 #else
                 cool_fft.fr[0] = cool_fft.fr[1];
                 USB_Handler(&cool_fft);     //send data to GUI through tusb
