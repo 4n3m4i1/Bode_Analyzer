@@ -2,6 +2,7 @@ APPBAR_TITLE = "BANDIT"
 PAGE_TITLE = "BODE GUI TESTING"
 
 CLOSE_STR = "SUBMIT"
+RESET_STR = "RESET"
 BANDIT_LOGO_SRC = "/banditlogo.png"
 START_BUTTON_TEXT = "Start"
 STOP_BUTTON_TEXT = "Stop"
@@ -53,7 +54,8 @@ PLOT_YUNIT = "log"
 
 
 WGN_LABEL = "Toggle WGN Mode"
-
+WGN_LABEL_OFF = "OFF"
+WGN_LABEL_ON = "ON"
 SINGLE_SHOT_LABEL = "Toggle Single Shot Mode"
 
 AUTO_RUN_LABEL = "Toggle Auto Run Mode"
