@@ -640,6 +640,7 @@ def main(page: ft.Page):
             label=SELECT_CP_STR,
             options=port_selections,
             on_change=select_ctrl_port
+            
         )
     
 
