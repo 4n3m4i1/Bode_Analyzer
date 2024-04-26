@@ -296,18 +296,6 @@ def main(page: ft.Page):
     Settings_Queue = m.Queue()
     FRANGE_queue = m.Queue()
     lock = Lock()
-
-
-
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page))
-    serial_reader.daemon = True
-    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue))
-    data_converter_process.daemon = True
-    update_graph_thread = pool.apply_async(update_graph, (FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
-    update_graph_thread.daemon = True
-    serial_reader.start()
-    data_converter_process.start()
-    # update_graph_thread.start()
     temp_settings = INIT_SETTINGS
 
     def open_youtube(e):
