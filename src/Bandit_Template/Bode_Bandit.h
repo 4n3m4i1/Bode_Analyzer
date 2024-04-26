@@ -28,9 +28,6 @@
 #include "Downsampling/Fixed_Filters.h"
 
 
-
-
-
 /*
     Remember:
         e = d[n] - y[n]
@@ -146,7 +143,9 @@ enum BANDIT_SETTINGS_BF {
     BS_RES2,
     BS_RES3,
     BS_RES4,
-    BS_DEBUG_REPORT_RQ
+    BS_DEBUG_REPORT_RQ,
+    BS_RAW_RQ,
+    BS_TIME_DOMAIN_RQ
 };
 
 /*
@@ -262,6 +261,7 @@ enum USB_BS_RX_BUF_BYTES {
     USBBSRX_TIME_DOMAIN_DATA,
     USBBSRX_SINGLE_SHOT,
     USBBSRX_CORE_1_DBG_RQ
+
 };
 
 //enum BANDIT_FRANGE {
