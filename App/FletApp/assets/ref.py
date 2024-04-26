@@ -71,3 +71,7 @@ STOP_BUTTON_COLOR = "#c27ba0" # dark pink
 
 ## About us page components
 ABOUT_TITLE = "About Us"
+ARI_IMAGE = "/Ari.png"
+CHRISTIAN_IMAGE = "/Christian.png"
+LIGHT_PINK = "#ecd4df"
+DARK_PINK = "#d5a6bd"
