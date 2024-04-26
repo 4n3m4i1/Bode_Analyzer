@@ -274,6 +274,9 @@ def main(page: ft.Page):
     page.window_width = 1000     
     #page.window_height = 1000  
 
+    #page.window_resizable = False
+    #page.window_full_screen = True
+
     page.theme = ft.Theme(
     color_scheme=ft.ColorScheme(
         primary=ft.colors.BLACK,   
@@ -422,6 +425,7 @@ def main(page: ft.Page):
         wgn_switch.label = (
             WGN_LABEL_OFF if temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] == 0 else WGN_LABEL_ON
         )
+
         print(wgn_switch.label)
         print(temp_settings)
 
@@ -519,18 +523,20 @@ def main(page: ft.Page):
         ,stop_container,
         ] 
         )
-    
-    # switches = ft.Row(
-    #     [ wgn_switch
-    #     ] 
-    #     )
-    
-    
-    
+        
     def open_modal(e): # handle settings modal opening
         page.dialog = SettingsSelection
         SettingsSelection.open = True
         page.update()
+
+    def reset_modal(e):
+  
+        page.update()
+    
+    def exit_modal(e):
+        SettingsSelection.open = False
+        page.update()
+
 
     def close_modal(e): #handle settings modal closing
         SettingsSelection.open = False  
@@ -680,10 +686,14 @@ def main(page: ft.Page):
     )
 
     SettingsSelection = ft.AlertDialog(
-        modal=True,
-        title=ft.Text(CONFIG_STR),
-        content=ConfigDisplay,
-        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
+        #modal=True,
+        modal=False,
+        #title=ft.Text(CONFIG_STR),
+        title = ft.Row([ft.Text(CONFIG_STR),ft.IconButton(ft.icons.CLOSE ,on_click= exit_modal)], spacing = 450),
+        content= ConfigDisplay,
+        #actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
+        actions=[ft.TextButton(RESET_STR, on_click=reset_modal) , ft.TextButton(CLOSE_STR, on_click=close_modal)],
+        actions_alignment=ft.MainAxisAlignment.END,
     )
     page.appbar = ft.AppBar(
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
@@ -701,7 +711,8 @@ def main(page: ft.Page):
     )
 
     #page.add(ft.Column([Controls]) ,chart ) 
-    page.add(ft.Column([Controls]),config_table,chart)
+    #page.add(ft.Column([Controls]),config_table,chart)
+    page.add(ft.Column([Controls]),config_table,ft.Row([chart, config_table2]))
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
     serial_reader.daemon = True
