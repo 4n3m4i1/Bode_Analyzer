@@ -1,7 +1,11 @@
+
 import matplotlib.axes
 import matplotlib.axis
 import matplotlib.figure
 import matplotlib.lines
+
+import webbrowser
+
 from generic_include import *
 from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
@@ -292,21 +296,41 @@ def main(page: ft.Page):
     Settings_Queue = m.Queue()
     FRANGE_queue = m.Queue()
     lock = Lock()
+    temp_settings = INIT_SETTINGS
+
+    def open_youtube(e):
+        youtube_url = "https://youtu.be/heG2l5tyS7A?si=Tvam4DrzBTFw0_lb" 
+        webbrowser.open(youtube_url)
+                        
 
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
-          
-          
+            page.vertical_alignment = ft.MainAxisAlignment.CENTER
+            page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+            page.theme = ft.Theme(
+                color_scheme_seed=LIGHT_PINK,
+            )       
+
+            youtube_button = ft.ElevatedButton(
+                text="Watch Here",
+                on_click=open_youtube,
+                icon=ft.icons.TV
+            )   
+            
+            controls_about = [
+                ft.AppBar(title=ft.Text(ABOUT_TITLE), bgcolor=BANNER_COLOR, actions=[youtube_button]),
+                logo,overview_title, overview_statement, specs_title, specs_description, technologies_title, technologies_description,
+                meet_team,  meet_ari #team_pictures, meet_ari,
+            ] 
+            alignment=ft.MainAxisAlignment.CENTER,
+            
             page.views.append(
                 ft.View(
-                    route = "/about",
-                    controls = [
-                        ft.AppBar(title=ft.Text(ABOUT_TITLE), bgcolor=ft.colors.SURFACE_VARIANT), 
-                        logo, about_header, mission_statement, meet_team
-                    ],   
+                    route="/about",
+                    controls = controls_about 
                 )
             )
-        page.update()
+            page.update()
 
 
     def view_pop(view):
@@ -367,29 +391,164 @@ def main(page: ft.Page):
             actions=[ft.TextButton(CLOSE_STR, on_click=close_banner),]
             )
     
+    
     ## Content for the about us page
     logo = ft.Container(
-        ft.Image(
+        content = ft.Image(
             src= BANDIT_LOGO_SRC,
             width=150,
             height=150,
             fit=ft.ImageFit.CONTAIN,
         ),
+        alignment = ft.alignment.center,
+    )
+        
+    overview_title = ft.Container(
+        content = ft.Text("Project Overview", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        
+        )
 
-        alignment = ft.alignment.center
+    overview_statement = ft.Container(
+        ft.Text("Bode Analysis N’ Display of Instrument Testing (BANDIT) is a small, portable, and inexpensive Frequency Response Analyzer aimed at providing rapid assessments of a system’s transfer function. User selectable resolutions and analysis ranges, as well as output visualization, are provided by a comprehensive Graphical User Interface. BANDIT is capable of in depth self-calibration routines correcting for board to board component tolerances and voltage supply fluctuations, ensuring performance across devices without expensive component binning.", theme_style=ft.TextThemeStyle.BODY_MEDIUM),
+        bgcolor=LIGHT_PINK,
+        border=ft.border.all(2, DARK_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        )
+    
+    specs_title =  ft.Container(
+        ft.Text("Key Specifications", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        )
+    
+    specs_description = ft.Container(
+        ft.DataTable(
+            width=2000,
+            bgcolor = LIGHT_PINK,
+            border = ft.border.all(2,DARK_PINK),
+            #border_radius = 10,
+            vertical_lines=ft.border.BorderSide(width=2, color=DARK_PINK),
+            horizontal_lines=ft.border.BorderSide(width=2, color=DARK_PINK),
+            sort_column_index=0,
+            sort_ascending=True,
+            heading_row_color=ft.colors.BLACK12,
+            heading_row_height=0,
+            data_row_max_height=25,
+            data_row_color= LIGHT_PINK,
+            column_spacing= 200,
+            columns = [
+                ft.DataColumn(ft.Text("")),
+                ft.DataColumn(ft.Text(""),numeric=False),
+
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("USB Powered")),
+                         ft.DataCell(ft.Text("Operates across entire USB 2.0 voltage range")),
+                    ],
+                ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Input")),
+                        ft.DataCell(ft.Text("Direct from output of GWN fed SUT (4Vpk-pk Signal max)")),
+                    ],
+                ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Output:")),
+                         ft.DataCell(ft.Text("Gaussian White Noise (GWN), input for System Under Test")),
+                    ],
+                ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Digital Signal Processing")),
+                         ft.DataCell(ft.Text("Dynamic Downsampling, Least Mean Squared (LMS) Adaptive Filter, Cooley-Tukey FFT, Fully Q15 fixed point routines. Optimized for dual-core ARM M0+")),
+                    ],
+                ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Greater than 1 HZ update Rate")),
+                         ft.DataCell(ft.Text("")),
+                    ],
+                ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("GUI")),
+                         ft.DataCell(ft.Text("Multiprocessing cross-platform Python script")),
+                    ],
+                ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("High speed USB Communications Device Class (CDC) interface")),
+                         ft.DataCell(ft.Text("")),
+                    ],
+                ),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text("Analysis Ranges")),
+                         ft.DataCell(ft.Text("20Hz - 31kHz, 20Hz - 62kHz, 20Hz - 125kHz")),                
+                    ],
+                ),
+            ],
+        ),
+        alignment=ft.alignment.center
     )
     
-    about_header = ft.Container(
-        ft.Text("The Bode Bandits", theme_style=ft.TextThemeStyle.DISPLAY_LARGE),
+    technologies_title =  ft.Container(
+        ft.Text("Key Technologies", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
         )
     
-    mission_statement = ft.Container(
-        ft.Text("Bode Analysis N’ Display of Instrument Testing") #TBD
+    technologies_description =  ft.Container(
+        ft.Text("Developed: Multiprocessing GUI, Multicore Embedded Firmware, DSP Processing Stack, Device Enclosure\n                                                            Procured: PCB Assembly", theme_style=ft.TextThemeStyle.BODY_MEDIUM),
+        bgcolor=LIGHT_PINK,
+        border=ft.border.all(2, DARK_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
         )
     
+
     meet_team =  ft.Container(
-        ft.Text("Meet the Team", theme_style=ft.TextThemeStyle.DISPLAY_MEDIUM),
+        ft.Text("Meet the Bode Bandits", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
         )
+    
+    team_pictures = ft.Container(
+       ft.Image(
+            src= ARI_IMAGE,
+            width=200,
+            height=200
+        ),
+            alignment = ft.alignment.center
+
+   
+    )
+
+    meet_ari = ft.Container(
+        ft.ElevatedButton("Arianna-Sarahi Bergado", on_click=lambda _: page.go("/ari")),
+        ft.ElevatedButton("Exit", on_click=lambda _:page.go("/about"))
+    )
+        
     
     start_container = ft.Container (
 
@@ -708,6 +867,7 @@ def main(page: ft.Page):
             ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
             ft.IconButton(icon=ft.icons.UNDO)
+            
         ]
     )
 
