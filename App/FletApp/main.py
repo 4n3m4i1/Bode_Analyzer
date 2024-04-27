@@ -273,13 +273,14 @@ def main(page: ft.Page):
     page.title = PAGE_TITLE
     page.route = "/"
     page.bgcolor = PAGE_BG_COLOR
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER ## test
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.scroll=ft.ScrollMode.ALWAYS
 
-    page.window_width = 1000     
-    #page.window_height = 1000  
+    # page.window_width = 1300     
+    # page.window_height = 800 
 
     #page.window_resizable = False
-    #page.window_full_screen = True
+    page.window_full_screen = True # disable when running tests
 
     page.theme = ft.Theme(
     color_scheme=ft.ColorScheme(
@@ -321,6 +322,18 @@ def main(page: ft.Page):
                 ft.AppBar(title=ft.Text(ABOUT_TITLE), bgcolor=BANNER_COLOR, actions=[youtube_button]),
                 logo,overview_title, overview_statement, specs_title, specs_description, technologies_title, technologies_description,
                 meet_team,  meet_ari #team_pictures, meet_ari,
+
+            ,ft.BottomAppBar(
+                    bgcolor= BANNER_COLOR,
+                    content=ft.Row([
+                    ft.Text(COPYRIGHT_TXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+                    ft.Container(expand=True), 
+                    ft.Text(SDSU_CE_TEXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM)
+            ]
+        ),
+    )
+                
+
             ] 
             alignment=ft.MainAxisAlignment.CENTER,
             
@@ -401,6 +414,13 @@ def main(page: ft.Page):
             fit=ft.ImageFit.CONTAIN,
         ),
         alignment = ft.alignment.center,
+    )
+
+    logo_appbar = ft.Container(
+        content = ft.Image(
+            src= BANDIT_LOGO_SRC,
+            fit=ft.ImageFit.CONTAIN,
+        )
     )
         
     overview_title = ft.Container(
@@ -554,7 +574,7 @@ def main(page: ft.Page):
 
         content= ft.OutlinedButton(
         text=START_BUTTON_TEXT,
-        width=150,
+        width=250,
         on_click = handle_start_button_clicked,
     ),
         bgcolor= START_BUTTON_COLOR,
@@ -564,7 +584,7 @@ def main(page: ft.Page):
     stop_container = ft.Container (
         content= ft.OutlinedButton(
         text=STOP_BUTTON_TEXT,
-        width=150,
+        width=250,
         on_click = handle_stop_button_clicked,
     ),
         #bgcolor='#e895c0',
@@ -572,6 +592,7 @@ def main(page: ft.Page):
         border_radius=20,
     )
 
+    
     # change bit at index 3
     def toggle_wgn(e):
         if wgn_switch.label == WGN_LABEL_ON:
@@ -618,7 +639,8 @@ def main(page: ft.Page):
     config_table = ft.DataTable(
         border=ft.border.all(1, "black"),
         bgcolor = 'white',
-        # width = 700,
+        heading_row_color= TABLE_HEAD_COLOR,
+        width = 1150,
 
             columns=[
                 ft.DataColumn(ft.Text(CONTROL_PORT_STR, color = ft.colors.BLACK)),
@@ -636,11 +658,15 @@ def main(page: ft.Page):
                     ],),
             ],
         )
-    
+
     config_table2 = ft.DataTable(
         border=ft.border.all(1, "black"),
         bgcolor = 'white',
         column_spacing=0,
+        data_row_max_height= 78,
+        height = 450,
+        width = 240,
+        heading_row_color= TABLE_HEAD_COLOR,
 
             columns=[
                 ft.DataColumn(ft.Text(SETTING_STR, color = ft.colors.BLACK)),
@@ -677,7 +703,12 @@ def main(page: ft.Page):
         )
     
 
-    Controls = ft.Row(
+    # Controls = ft.Row(
+    #     [start_container
+    #     ,stop_container,
+    #     ] 
+    #     )
+    Controls = ft.Column(
         [start_container
         ,stop_container,
         ] 
@@ -689,8 +720,10 @@ def main(page: ft.Page):
         page.update()
 
     def reset_modal(e):
-  
+        page.controls.clear()
+        page.add(ft.Row([Controls,config_table]),ft.Row([config_table2,chart,]))
         page.update()
+    
     
     def exit_modal(e):
         SettingsSelection.open = False
@@ -705,6 +738,8 @@ def main(page: ft.Page):
         updated_table = ft.DataTable(
             border=ft.border.all(1, "black"),
             bgcolor = 'white',
+            width = 1150,
+            heading_row_color= TABLE_HEAD_COLOR,
                 columns=[
                     ft.DataColumn(ft.Text(CONTROL_PORT_STR, color = ft.colors.BLACK)),
                     ft.DataColumn(ft.Text(DATA_PORT_STR, color = ft.colors.BLACK)),
@@ -728,6 +763,10 @@ def main(page: ft.Page):
             border=ft.border.all(1, "black"),
             bgcolor = 'white',
             column_spacing=0,
+            data_row_max_height= 78,
+            height = 450,
+            width = 240,
+            heading_row_color= TABLE_HEAD_COLOR,
                 columns=[
                     ft.DataColumn(ft.Text(SETTING_STR, color = ft.colors.BLACK)),
                     ft.DataColumn(ft.Text(STATUS_STR, color = ft.colors.BLACK)),
@@ -763,7 +802,8 @@ def main(page: ft.Page):
 
         page.controls.clear()
         #page.add(ft.Column([Controls]),updated_table,chart)
-        page.add(ft.Column([Controls]),updated_table,ft.Row([chart, updated_table2]))
+        #page.add(ft.Column([Controls]),updated_table,ft.Row([chart, updated_table2]))
+        page.add(ft.Row([Controls,updated_table]),ft.Row([updated_table2,chart,]))
 
         page.update()
 
@@ -852,11 +892,13 @@ def main(page: ft.Page):
         title = ft.Row([ft.Text(CONFIG_STR),ft.IconButton(ft.icons.CLOSE ,on_click= exit_modal)], spacing = 450),
         content= ConfigDisplay,
         #actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
-        actions=[ft.TextButton(RESET_STR, on_click=reset_modal) , ft.TextButton(CLOSE_STR, on_click=close_modal)],
+        #actions=[ft.TextButton(RESET_STR, on_click=reset_modal) , ft.TextButton(CLOSE_STR, on_click=close_modal)],
+        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
         actions_alignment=ft.MainAxisAlignment.END,
     )
     page.appbar = ft.AppBar(
-        leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
+        #leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
+        leading=logo_appbar,
 
         title=ft.Text(APPBAR_TITLE),
         #bgcolor=ft.colors.SURFACE_VARIANT,
@@ -866,14 +908,25 @@ def main(page: ft.Page):
         actions=[
             ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
             ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
-            ft.IconButton(icon=ft.icons.UNDO)
-            
+            ft.IconButton(icon=ft.icons.UNDO, on_click= reset_modal)
         ]
     )
 
+    page.bottom_appbar= ft.BottomAppBar(
+        bgcolor= BANNER_COLOR,
+        content=ft.Row([
+            ft.Text(COPYRIGHT_TXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM),
+            ft.Container(expand=True), 
+            ft.Text(SDSU_CE_TEXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM)
+            ]
+        ),
+    )
+
+
     #page.add(ft.Column([Controls]) ,chart ) 
     #page.add(ft.Column([Controls]),config_table,chart)
-    page.add(ft.Column([Controls]),config_table,ft.Row([chart, config_table2]))
+    #page.add(ft.Column([Controls]),config_table,ft.Row([chart, config_table2])) # og
+    page.add(ft.Row([Controls,config_table]),ft.Row([config_table2,chart,]))
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
     serial_reader.daemon = True
