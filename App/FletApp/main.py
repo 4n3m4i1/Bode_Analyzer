@@ -130,7 +130,7 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                     else:
                         CTRLCHANNEL.write(b'~')
                         settings = settings_Queue.get(block=False)
-                        # print(settings)
+                        print(settings)
                         CTRLCHANNEL.write(bytes(settings))
                         setting = BitArray(hex=CTRLCHANNEL.read(10).hex())
                         rest = BitArray(hex=CTRLCHANNEL.read(4).hex())
@@ -305,12 +305,24 @@ def main(page: ft.Page):
             start_event.set()
             GraphEvent.set()
             page.update()
+            temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value] = 1
+            temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTOSEND.value] = 1
+            Settings_Queue.put(temp_settings)
+            settings_event.set()
         else:
             handle_not_connected()
 
     def handle_stop_button_clicked(e):
         start_event.clear()
         GraphEvent.clear()
+        stop_settings = temp_settings
+        stop_settings[BANDIT_SETTINGS_BYTES.USBBSRX_SINGLE_SHOT.value] = 0
+        stop_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value] = 0
+        stop_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTOSEND.value] = 0
+
+        Settings_Queue.put(stop_settings)
+
+        settings_event.set()
 
     
         
