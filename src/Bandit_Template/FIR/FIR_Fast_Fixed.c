@@ -60,6 +60,15 @@ inline Q15 run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data){
     return retval;
 }
 
+inline Q15 run_2n_FIR_cycle_no_inc(struct Q15_FIR_PARAMS *a, Q15 new_data){
+    add_sample_to_2n_FIR_I16_no_inc(a, new_data);
+    Q15 retval = 0;
+    for(int n = 0; n < a->size; ++n){
+        retval += mul_Q15((recall_sample_from_2n_FIR(a, n)), a->taps[n]);
+    }
+    return retval;
+}
+
 
 void flush_FIR_buffer(struct Q15_FIR_PARAMS *a){
     for(int n = 0; n < a->size; ++n){

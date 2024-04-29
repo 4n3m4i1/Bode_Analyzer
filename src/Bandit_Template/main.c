@@ -4,7 +4,7 @@
 */
 //#define FORCE_SAMPLING_4_TESTING
 #define NO_DEBUG_LED
-#define FORCESEND_TESTING
+//#define FORCESEND_TESTING
 //#define FORCESEND_FAKETAPS
 //#define FORCESEND_NOFFT
 //#define FORCESEND_USE_REALDATA
@@ -438,7 +438,7 @@ static void core_1_main(){
     
     
     DFL_LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
-    DFL_LMS_Inst.max_convergence_attempts = 256;
+    DFL_LMS_Inst.max_convergence_attempts = 4;
 
     // Setup LMS controller and buffering
     struct LMS_Fixed_Inst LMS_Inst;
@@ -1105,7 +1105,7 @@ debug_no_adc_setup_label:
 
                     } else {
                         for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-                            LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                            //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
                             // Deboog only
                             //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
                             //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
