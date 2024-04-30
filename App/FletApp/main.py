@@ -644,7 +644,7 @@ def main(page: ft.Page):
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
     data_converter_process.daemon = True
     print('try')
-    update_graph_thread = Process(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
+    update_graph_thread = Thread(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
     # update_graph_thread.nice
     update_graph_thread.daemon = True
     update_graph_thread.start()
