@@ -63,6 +63,7 @@ RAW_REQUEST_LABEL = "Toggle Raw Data Mode"
 
 TIME_DOMAIN_REQUEST_LABEL = "Toggle Time Domain Mode"
 
+LEARNING_RATE_LABEL = "Select Learning Rate"
 #colors
 BANNER_COLOR = "#d5a6bd" # light pink
 PAGE_BG_COLOR = "#e3e3e3" # light gray

@@ -182,6 +182,11 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             page.banner.open = True
             start_event.clear()
             page.update()
+        except OSError:
+            x = x - 1
+            start_event.clear()
+            # page.update()
+
 ##########################################################################################DATACONVERTER
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue, lock):
     # is_set = GraphEvent.wait()
@@ -233,10 +238,11 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                     #print(line.get_data())
                     plt.xlim(1e-15, len(data))
                     ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
-                    plt.ylim(1e-15, max(data) + 0.01)
+                    plt.ylim(min(data), max(data) + 1e-13)
                     # plt.xlim(min(float), le)
                     # axis.set_xbound
                     axis.xaxis.set_major_formatter(ticks_x)
+                    # axis.xaxis.
                     axis.draw_artist(line)
                     print('oop')
                     fig.canvas.blit(fig.bbox)  # I added this
@@ -440,6 +446,7 @@ def main(page: ft.Page):
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TIME_DOMAIN_DATA.value] = int(time_domain_switch.value)
 
 
+
     wgn_switch = ft.Switch(label= WGN_LABEL_OFF, on_change=toggle_wgn)
 
     single_shot_switch = ft.Switch(label = SINGLE_SHOT_LABEL, on_change=toggle_single_shot)
@@ -449,6 +456,8 @@ def main(page: ft.Page):
     raw_requect_switch = ft.Switch(label = RAW_REQUEST_LABEL, on_change=toggle_raw_request)
 
     time_domain_switch = ft.Switch(label = TIME_DOMAIN_REQUEST_LABEL, on_change=toggle_time_d)
+
+    
 #######################################################
     config_table = ft.DataTable(
         border=ft.border.all(1, "black"),
@@ -553,7 +562,11 @@ def main(page: ft.Page):
             options=port_selections,
             on_change=select_ctrl_port
         )
-    
+    def change_LR(e):
+        bytes_tmp = int(learning_rate_slider.value).to_bytes(2, 'little')
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_LEARNING_RATE_LSB.value] = bytes_tmp[0]
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_LEARNING_RATE_MSB.value] = bytes_tmp[1]
+        print(temp_settings)
 
     def select_tap_length(e):
         bytes_tmp = int(tap_select.value).to_bytes(2, 'little')
@@ -578,7 +591,13 @@ def main(page: ft.Page):
             on_change=select_frange
 
         )
-    
+    learning_rate_slider = ft.Slider(
+        label = "{value}", 
+        min=0x01, 
+        max=0x7FFF, 
+        divisions=32767, 
+        on_change=change_LR
+        )
     ConfigDisplay = ft.Column(controls=[
         ft.Text(CONFIG_INSTR),
         data_select,
@@ -589,8 +608,8 @@ def main(page: ft.Page):
         single_shot_switch,
         auto_run_switch,
         raw_requect_switch,
-        time_domain_switch
-
+        time_domain_switch,
+        learning_rate_slider
 
         ],
         scroll=ft.ScrollMode.ALWAYS
