@@ -75,6 +75,8 @@ PAGE_BG_COLOR = "#e3e3e3" # light gray
 START_BUTTON_COLOR = "#ecd4df" # lighter pink
 STOP_BUTTON_COLOR = "#c27ba0" # dark pink
 TABLE_HEAD_COLOR = "#D4D4D4"
+SINGLE_SHOT_ON = "#c8f7ce"    # light green
+SINGLE_SHOT_OFF = "#fc5d5d"  # light red
 
 
 ## About us page components

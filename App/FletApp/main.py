@@ -593,26 +593,32 @@ def main(page: ft.Page):
     )
 
     
-    # change bit at index 3
     def toggle_wgn(e):
-        if wgn_switch.label == WGN_LABEL_ON:
-            temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 0
-            #print("off")
-        else :
-            #print("on")
-            temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 1
+        # if wgn_switch.label == WGN_LABEL_ON:
+        #     temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 0
+        #     #print("off")
+        # else :
+        #     #print("on")
+        #     temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 1
 
-        wgn_switch.label = (
-            WGN_LABEL_OFF if temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] == 0 else WGN_LABEL_ON
-        )
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 0 if wgn_switch.value == 0 else 1
+
+        # wgn_switch.label = (
+        #     WGN_LABEL_OFF if temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] == 0 else WGN_LABEL_ON
+        # )
 
         print(wgn_switch.label)
         print(temp_settings)
 
         page.update()
+
     def toggle_single_shot(e):
+        single_shot_btn.bgcolor = SINGLE_SHOT_ON if single_shot_btn.bgcolor == SINGLE_SHOT_OFF else SINGLE_SHOT_OFF
+        single_shot_switch.value = 1 if single_shot_btn.bgcolor == SINGLE_SHOT_ON else 0
+
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_SINGLE_SHOT.value] = int(single_shot_switch.value)
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value] = int(not temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_SINGLE_SHOT.value])
+        page.update()
 
     def toggle_auto_run(e):
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value] = int(auto_run_switch.value)
@@ -626,9 +632,14 @@ def main(page: ft.Page):
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TIME_DOMAIN_DATA.value] = int(time_domain_switch.value)
 
 
+
+    single_shot_btn = ft.Container (content= ft.OutlinedButton(text=SINGLE_SHOT_LABEL,on_click = toggle_single_shot,),
+        bgcolor= SINGLE_SHOT_OFF, border_radius=20,
+    )
+
     wgn_switch = ft.Switch(label= WGN_LABEL, on_change=toggle_wgn)
 
-    single_shot_switch = ft.Switch(label = SINGLE_SHOT_LABEL, on_change=toggle_single_shot)
+    single_shot_switch = ft.Switch(label = SINGLE_SHOT_LABEL, on_change=toggle_single_shot) # dont remove
 
     auto_run_switch = ft.Switch(label = AUTO_RUN_LABEL, on_change=toggle_auto_run)
 
@@ -720,8 +731,8 @@ def main(page: ft.Page):
         page.update()
 
     def reset_modal(e):
-        page.controls.clear()
-        page.add(ft.Row([Controls,config_table]),ft.Row([config_table2,chart,]))
+        # page.controls.clear()
+        # page.add(ft.Row([Controls,config_table]),ft.Row([config_table2,chart,]))
         page.update()
     
     
@@ -873,16 +884,15 @@ def main(page: ft.Page):
         ctrl_select,
         tap_select,
         freq_range_select,
-        wgn_switch,
-        single_shot_switch,
-        auto_run_switch,
-        raw_requect_switch,
-        time_domain_switch
-
-
-        ],
+        # wgn_switch,
+        # #single_shot_switch,
+        # auto_run_switch,
+        # raw_requect_switch,
+        # time_domain_switch,
+        #single_shot_btn,
+        ft.Row([ft.Column([wgn_switch, auto_run_switch]), ft.Column([raw_requect_switch,time_domain_switch]) ], alignment= ft.MainAxisAlignment.START),
+        ],            
         scroll=ft.ScrollMode.ALWAYS
-
     )
 
     SettingsSelection = ft.AlertDialog(
@@ -893,8 +903,8 @@ def main(page: ft.Page):
         content= ConfigDisplay,
         #actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
         #actions=[ft.TextButton(RESET_STR, on_click=reset_modal) , ft.TextButton(CLOSE_STR, on_click=close_modal)],
-        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
-        actions_alignment=ft.MainAxisAlignment.END,
+        actions=[single_shot_btn, ft.TextButton(CLOSE_STR, on_click=close_modal)],
+        actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
     )
     page.appbar = ft.AppBar(
         #leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
