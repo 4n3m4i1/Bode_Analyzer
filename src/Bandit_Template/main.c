@@ -89,6 +89,8 @@ CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 volatile CORE_0_MEM uint16_t USB_STATE;
 volatile CORE_0_MEM uint16_t USB_NEXT_STATE;
 
+volatile CORE_0_MEM bool SKIP_FFT = false;
+
 CORE_0_MEM uint8_t  BS_RX_BF[BS_BF_LEN];
 volatile CORE_0_MEM bool CORE_0_SKIP_FFT = false;
   //////////////////////////////////////////////////////////////////////
@@ -260,8 +262,6 @@ static void core_0_main(){
     tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
     // USB State Machine, Settings Application, FFT
 
-    volatile bool SKIP_FFT = false;
-
     uint32_t pace_timer = timer_hw->timerawl;
     //uint32_t pace_time_limit = 31250;
     uint32_t pace_time_limit = 100000;
@@ -296,7 +296,6 @@ static void core_0_main(){
                 pace_timer = timer_hw->timerawl;
                 data_src = &ICTXFR_A;
                 tud_task();
-
                 
                 if(!data_src->updated){
                     // FFT Data wasn't updated, shouldn't happen given semaphore
@@ -325,7 +324,7 @@ static void core_0_main(){
 #ifdef FORCESEND_TESTING 
                     USB_NEXT_STATE = USB_RUN_DMC_JK_RUN_FFT;
 #else
-                    if(allzeros){
+                    if(allzeros && !SKIP_FFT){
                         Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                         USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
                     } else {
@@ -366,7 +365,9 @@ static void core_0_main(){
 
                 // Free memory constraints
                 //  stall for limiting packets per second
-                while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
+                if(!SKIP_FFT) while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
+                // LMS Sends 2x as many bytes as usual FFT packets, so slow down A LOT
+                else while(timer_hw->timerawl - pace_timer < (pace_time_limit * 4)) tud_task();
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                 tud_task();
 
@@ -397,7 +398,7 @@ static void core_0_main(){
                 tud_task();
                 busy_wait_ms(100);
 #else
-                cool_fft.fr[0] = cool_fft.fr[1];
+                if(!SKIP_FFT) cool_fft.fr[0] = cool_fft.fr[1];
                 USB_Handler(&cool_fft);     //send data to GUI through tusb
 #endif
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
@@ -741,7 +742,7 @@ debug_no_adc_setup_label:
                     CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     error_attempts = 0;
-                    flush_FIR_buffer_and_taps(&LMS_FIR);
+                    //flush_FIR_buffer_and_taps(&LMS_FIR);
 
                     set_ULED_level(Bandit_RGBU.U = 0);
                     
@@ -773,7 +774,7 @@ debug_no_adc_setup_label:
                     LMS_Inst.max_error_allowed = Global_Bandit_Settings.manual_error_limit;
                     LMS_Inst.tap_len = Global_Bandit_Settings.manual_tap_len_setting;
 
-                    if(LMS_Inst.tap_len > MAX_TAPS) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
+                    if(LMS_Inst.tap_len > MAX_TAPS || LMS_Inst.tap_len < DEFAULT_LMS_TAP_LEN) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
                     // Shift by num taps / 2 + some manual offset 04/24/2024 jdv
                     LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (int16_t)(LMS_Inst.tap_len >> 1);
@@ -789,6 +790,8 @@ debug_no_adc_setup_label:
 
                     CORE_1_SEND_UNPROCESSED = Global_Bandit_Settings.skip_lms;
 
+                    // Delete me if problem
+                    flush_FIR_buffer_and_taps(&LMS_FIR);
 
                     Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
                     Global_Bandit_Settings.updated = false;
@@ -1105,7 +1108,7 @@ debug_no_adc_setup_label:
 
                     } else {
                         for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-                            //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                            LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
                             // Deboog only
                             //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
                             //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
@@ -1328,6 +1331,8 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         Global_Bandit_Settings.settings_bf = new_settings_value;
 
         Global_Bandit_Settings.skip_lms = (BS_RX_BF[USBBSRX_RAW_RQ]) ? true : false;
+
+        SKIP_FFT = (BS_RX_BF[USBBSRX_TIME_DOMAIN_DATA]) ? true : false;
 
         // Set settings updated flag
         Global_Bandit_Settings.updated = true;
