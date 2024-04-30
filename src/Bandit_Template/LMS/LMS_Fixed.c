@@ -51,7 +51,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
     uint16_t max_iters = LMS->iteration_ct - 
                             //LMS->fixed_offset - 
 //                            LMS->tap_len - 
-                            LMS->d_n_offset;
+                            ((LMS->d_n_offset >= 0) ? LMS->d_n_offset : 0);
 
     uint16_t stride = LMS->ddsmpl_stride;
 
@@ -63,7 +63,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 //        WGN_FIR->data[n] = LMS->x_n[n];
 //    }
 
-    for(n = LMS->fixed_offset; n < max_iters; n += stride){
+    for(n = LMS->fixed_offset + ((LMS->d_n_offset >= 0) ? 0 : LMS->d_n_offset); n < max_iters; n += stride){
     //for(n = 0; n < max_iters; ++n){
 
         //retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
@@ -106,7 +106,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 
         if(err_accum <= LMS->target_error && n > err_timeout){
             retval = LMS_OK;
-            break;
+        //    break;
         } 
     }
 
