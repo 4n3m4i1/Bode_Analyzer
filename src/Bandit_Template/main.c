@@ -367,7 +367,7 @@ static void core_0_main(){
                 //  stall for limiting packets per second
                 if(!SKIP_FFT) while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
                 // LMS Sends 2x as many bytes as usual FFT packets, so slow down A LOT
-                else while(timer_hw->timerawl - pace_timer < (pace_time_limit * 32)) tud_task();
+                else while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                 tud_task();
 
@@ -742,7 +742,7 @@ debug_no_adc_setup_label:
                     CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     error_attempts = 0;
-                    //flush_FIR_buffer_and_taps(&LMS_FIR);
+                    flush_FIR_buffer_and_taps(&LMS_FIR);
 
                     set_ULED_level(Bandit_RGBU.U = 0);
                     
@@ -776,6 +776,11 @@ debug_no_adc_setup_label:
 
                     if(LMS_Inst.tap_len > MAX_TAPS || LMS_Inst.tap_len < DEFAULT_LMS_TAP_LEN) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
+                    if(((Global_Bandit_Settings.manual_lms_offset < 0) ? Global_Bandit_Settings.manual_lms_offset * -1 : Global_Bandit_Settings.manual_lms_offset) 
+                            > (LMS_Inst.tap_len >> 1)) {
+                                Global_Bandit_Settings.manual_lms_offset = 0;
+                            }
+
                     // Shift by num taps / 2 + some manual offset 04/24/2024 jdv
                     LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (int16_t)(LMS_Inst.tap_len >> 1);
 
@@ -791,7 +796,7 @@ debug_no_adc_setup_label:
                     CORE_1_SEND_UNPROCESSED = Global_Bandit_Settings.skip_lms;
 
                     // Delete me if problem
-                    flush_FIR_buffer_and_taps(&LMS_FIR);
+                   // flush_FIR_buffer_and_taps(&LMS_FIR);
 
                     Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
                     Global_Bandit_Settings.updated = false;
@@ -957,7 +962,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 2;
-                        
+                        LMS_Inst.ddsmpl_shift = 1;
                     break;
                     case DOWNSAMPLE_4X_62K5_CUT:
                         torun = &CUT_62KHZ;
@@ -967,7 +972,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 4;
-                        
+                        LMS_Inst.ddsmpl_shift = 2;
                     break;
                     case DOWNSAMPLE_8X_32K2_CUT:
                         torun = &CUT_31KHZ;
@@ -977,7 +982,7 @@ debug_no_adc_setup_label:
                         LMS_Inst.fixed_offset = DOWNSAMPLE_LEN;
                         
                         LMS_Inst.ddsmpl_stride = 8;
-                        
+                        LMS_Inst.ddsmpl_shift = 3;
                     break;
 
                     case DOWNSAMPLE_1X_250K_CUT:
@@ -985,6 +990,7 @@ debug_no_adc_setup_label:
                         torun = 0;
                         LMS_Inst.fixed_offset = 0;
                         LMS_Inst.ddsmpl_stride = 1;
+                        LMS_Inst.ddsmpl_shift = 0;
                         
                         LMS_Inst.d_n = D_N_0;
                         LMS_Inst.x_n = X_N_0;
@@ -1017,6 +1023,7 @@ debug_no_adc_setup_label:
                         for(uint16_t n = 0; n < STD_MAX_SAMPLES; n += LMS_Inst.ddsmpl_stride){
                             D_N_0[idx++] = D_N_0[n];
                         }
+                        LMS_Inst.tap_len = STD_MAX_SAMPLES >> LMS_Inst.ddsmpl_shift;
                     }
                     
                     CORE_1_STATE = CORE_1_POST_PROC;
@@ -1108,7 +1115,7 @@ debug_no_adc_setup_label:
 
                     } else {
                         for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-                            LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                            //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
                             // Deboog only
                             //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
                             //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
@@ -1342,9 +1349,9 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&Global_Bandit_Settings.settings_bf, 4);  // Updated Settings bitfield
         tud_cdc_n_write(CDC_CTRL_CHAN, &newfreq_range, 1);                                  // Decoded frequency range
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newtaplen, 2);                           // Decoded tap length
-        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&man_error_limit, 2);
-        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsoffset, 1);   
-        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsmaxattempts, 2);                  // Decoded manual error limit
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&man_error_limit, 2);                     // Decoded error limit
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsoffset, 2);                        // Decoded LMS offset   
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsmaxattempts, 2);                   // Decoded manual error limit
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&learnin_rate, 2);                        // Decoded manual Learning Rate
 
         // Flush outgoing transmissions
