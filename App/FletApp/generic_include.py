@@ -59,3 +59,5 @@ INIT_SETTINGS = [
     0x00  #DEBGUG RQ
     ]
 init_graph = [((_ * _) + 1e-15) for _ in range(128)]
+
+MAX_TAPS = 1024

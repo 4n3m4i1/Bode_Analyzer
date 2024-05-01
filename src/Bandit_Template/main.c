@@ -367,7 +367,7 @@ static void core_0_main(){
                 //  stall for limiting packets per second
                 if(!SKIP_FFT) while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
                 // LMS Sends 2x as many bytes as usual FFT packets, so slow down A LOT
-                else while(timer_hw->timerawl - pace_timer < (pace_time_limit * 4)) tud_task();
+                else while(timer_hw->timerawl - pace_timer < (pace_time_limit * 32)) tud_task();
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                 tud_task();
 

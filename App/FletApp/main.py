@@ -568,11 +568,29 @@ def main(page: ft.Page):
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_LEARNING_RATE_MSB.value] = bytes_tmp[1]
         print(temp_settings)
 
+    def change_OFS(e):
+        bytes_tmp = int(offset_delay_slider.value)
+
+        taplen = temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_LSB.value]
+        taplen = taplen + temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_MSB.value] * 256
+
+        dividy = MAX_TAPS / taplen;
+
+        bytes_tmp = bytes_tmp / dividy;
+
+        bytes_tmp = int(bytes_tmp).to_bytes(2, 'little', signed = True)
+
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_OFFSET_LSB.value] = bytes_tmp[0]
+        temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_OFFSET_MSB.value] = bytes_tmp[1]
+        print(temp_settings)
+
     def select_tap_length(e):
         bytes_tmp = int(tap_select.value).to_bytes(2, 'little')
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_LSB.value] = bytes_tmp[0]
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_MSB.value] = bytes_tmp[1]
-        print(temp_settings)
+        
+        change_OFS(e)
+
     def select_frange(e):
         tmp = int(freq_range_select.value)
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_F_FRANGE.value] = tmp
@@ -591,13 +609,23 @@ def main(page: ft.Page):
             on_change=select_frange
 
         )
+    
     learning_rate_slider = ft.Slider(
-        label = "{value}", 
+        label = "{value}",
         min=0x01, 
         max=0x7FFF, 
         divisions=32767, 
         on_change=change_LR
         )
+    
+    offset_delay_slider = ft.Slider(
+        label = "{value}",
+        min = -512, 
+        max = 512, 
+        divisions = 1024, 
+        on_change=change_OFS
+        )
+    
     ConfigDisplay = ft.Column(controls=[
         ft.Text(CONFIG_INSTR),
         data_select,
@@ -609,8 +637,8 @@ def main(page: ft.Page):
         auto_run_switch,
         raw_requect_switch,
         time_domain_switch,
-        learning_rate_slider
-
+        learning_rate_slider,
+        offset_delay_slider
         ],
         scroll=ft.ScrollMode.ALWAYS
 
