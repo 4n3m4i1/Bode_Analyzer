@@ -910,8 +910,8 @@ debug_no_adc_setup_label:
                     X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
                     D_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
 
-                    X_N_0[n] *= 16;
-                    D_N_0[n] *= 16;
+                    X_N_0[n] *= 8;
+                    D_N_0[n] *= 8;
                 }
 
                 //Stop_Sampling();

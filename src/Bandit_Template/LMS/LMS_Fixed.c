@@ -106,7 +106,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 
         if(err_accum <= LMS->target_error && n > err_timeout){
             retval = LMS_OK;
-        //    break;
+            //break;
         } 
     }
 
