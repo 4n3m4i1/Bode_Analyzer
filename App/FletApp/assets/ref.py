@@ -59,9 +59,9 @@ SINGLE_SHOT_LABEL = "Toggle Single Shot Mode"
 
 AUTO_RUN_LABEL = "Toggle Auto Run Mode"
 
-RAW_REQUEST_LABEL = "Toggle Raw Data Mode"
+RAW_REQUEST_LABEL = "Skip LMS"
 
-TIME_DOMAIN_REQUEST_LABEL = "Toggle Time Domain Mode"
+TIME_DOMAIN_REQUEST_LABEL = "Skip FFT"
 
 LEARNING_RATE_LABEL = "Select Learning Rate"
 #colors

@@ -51,7 +51,7 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
     uint16_t max_iters = LMS->iteration_ct - 
                             //LMS->fixed_offset - 
 //                            LMS->tap_len - 
-                            ((LMS->d_n_offset >= 0) ? LMS->d_n_offset : 0);
+                            LMS->d_n_offset;
 
     uint16_t stride = LMS->ddsmpl_stride;
 
@@ -63,35 +63,35 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
 //        WGN_FIR->data[n] = LMS->x_n[n];
 //    }
 
-    for(n = LMS->fixed_offset + ((LMS->d_n_offset >= 0) ? 0 : LMS->d_n_offset); n < max_iters; n += stride){
+    for(n = LMS->fixed_offset; n < max_iters; n += stride){
     //for(n = 0; n < max_iters; ++n){
 
         //retval = *(desired + LMS->ddsmpl_stride) - run_2n_FIR_cycle(WGN_FIR, *(white_noise + LMS->ddsmpl_stride));
         //retval = desired[n] - run_2n_FIR_cycle(WGN_FIR, white_noise[n]);
         //retval = LMS->d_n[n + LMS->fixed_offset] - run_2n_FIR_cycle(WGN_FIR, LMS->x_n[n + LMS->fixed_offset]);
 
-        //Q15 Y_HAT = run_2n_FIR_cycle_no_inc(WGN_FIR, LMS->x_n[n + LMS->d_n_offset]);
-        //LMS->error = LMS->d_n[n] - Y_HAT;
-        //LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
-        //WGN_FIR->curr_zero++;
+        Q15 Y_HAT = run_2n_FIR_cycle_no_inc(WGN_FIR, LMS->x_n[n + LMS->d_n_offset]);
+        LMS->error = LMS->d_n[n] - Y_HAT;
+        LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
+        WGN_FIR->curr_zero++;
 
         // Manual FIR Cycle
-        WGN_FIR->data[0] = LMS->x_n[n + LMS->d_n_offset];
-        Q15 error = 0;
-        for(uint16_t m = 0; m < LMS->tap_len; ++m){
-            error += mul_Q15(WGN_FIR->taps[m], WGN_FIR->data[m]);
-        }
-        error = LMS->d_n[n] - error;
-        // Update Taps
-        for(uint16_t m = 0; m < LMS->tap_len; ++m){
-            Q15 dataval = WGN_FIR->data[m];
-            Q15 tap_error = mul_Q15(dataval, error);
-            Q15 std_lms_update = mul_Q15(LMS->learning_rate, tap_error);
-            WGN_FIR->taps[m] += std_lms_update;
-        }
-        for(uint16_t m = LMS->tap_len - 1; m > 0; --m){
-            WGN_FIR->data[m] = WGN_FIR->data[m - 1];
-        }
+        //WGN_FIR->data[0] = LMS->x_n[n + LMS->d_n_offset];
+        //Q15 error = 0;
+        //for(uint16_t m = 0; m < LMS->tap_len; ++m){
+        //    error += mul_Q15(WGN_FIR->taps[m], WGN_FIR->data[m]);
+        //}
+        //error = LMS->d_n[n] - error;
+        //// Update Taps
+        //for(uint16_t m = 0; m < LMS->tap_len; ++m){
+        //    Q15 dataval = WGN_FIR->data[m];
+        //    Q15 tap_error = mul_Q15(dataval, error);
+        //    Q15 std_lms_update = mul_Q15(LMS->learning_rate, tap_error);
+        //    WGN_FIR->taps[m] += std_lms_update;
+        //}
+        //for(uint16_t m = LMS->tap_len - 1; m > 0; --m){
+        //    WGN_FIR->data[m] = WGN_FIR->data[m - 1];
+        //}
         
         LMS->samples_processed++;      
 
