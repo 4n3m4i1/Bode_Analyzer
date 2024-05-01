@@ -7,21 +7,19 @@ import platform
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
-import matplotlib.scale as scaler
 import matplotlib.ticker as ticker
 from itertools import chain
 import struct 
 import flet as ft
 from flet.matplotlib_chart import MatplotlibChart
-from flet import RouteChangeEvent, ViewPopEvent
-from multiprocess import Process, Queue, Event
+from flet import RouteChangeEvent
+from multiprocess import Queue, Event
 import multiprocessing
 from multiprocessing import Queue, Lock
 from threading import Thread
 import time
 from bitstring import BitArray
 import numpy as np
-from scipy.interpolate import BSpline, make_interp_spline
 os = platform.system()
 negative_allowed_event = Event()
 negative_allowed_event.clear()
@@ -30,23 +28,16 @@ queue_max = Event()
 queue_max.clear()
 settings_event = Event()
 
-class Port():
-    def __init__(self, portString = None):
-        self.name = portString
-    def set(self, port):
-        self.name = port
-
-NUM_VALUES = 128
 port_selections = []
 for port in list_ports.comports():
     port_selections.append(ft.dropdown.Option(str(port)))
-parametric_taps =[32,64,128,256, 512, 1024]
+
 taps_list =[]
 size = len(parametric_taps)
 for index in range(size):
     taps_list.append(ft.dropdown.Option(key=parametric_taps[index]))
 
-frequency_ranges = ["250K","125K","62.5K", "32.25K"]
+
 range_list = []
 size1 = len(frequency_ranges)
 for index1 in range(size1):
@@ -326,8 +317,6 @@ def main(page: ft.Page):
     ax.set_title(PLOT_TITLE, fontsize = 18)
     ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
     ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
-
-    ax.xaxis.set
     
     
     def is_connected():
@@ -388,7 +377,6 @@ def main(page: ft.Page):
         width=150,
         on_click = handle_stop_button_clicked,
     ),
-        #bgcolor='#e895c0',
         bgcolor='#c27ba0',
         border_radius=20,
     )
@@ -397,9 +385,7 @@ def main(page: ft.Page):
     def toggle_wgn(e):
         if wgn_switch.label == WGN_LABEL_ON:
             temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 0
-            #print("off")
-        else :
-            #print("on")
+        else:
             temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_WGN_ALWAYS_ON.value] = 1
 
         wgn_switch.label = (
@@ -546,9 +532,9 @@ def main(page: ft.Page):
         taplen = temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_LSB.value]
         taplen = taplen + temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TAPLEN_MSB.value] * 256
 
-        dividy = MAX_TAPS / taplen;
+        dividy = MAX_TAPS / taplen
 
-        bytes_tmp = bytes_tmp / dividy;
+        bytes_tmp = bytes_tmp / dividy
 
         bytes_tmp = int(bytes_tmp).to_bytes(2, 'little', signed = True)
 
@@ -581,7 +567,7 @@ def main(page: ft.Page):
             on_change=select_frange
 
         )
-    learning_rate_text = ft.Text(value='Learning Rate')
+    learning_rate_text = ft.Text(value=LEARNING_RATE_LABEL)
     learning_rate_slider = ft.Slider(
         label = '{value}',
         min=0x01, 
@@ -593,7 +579,7 @@ def main(page: ft.Page):
         divisions=32767, 
         on_change=change_LR
         )
-    offset_text = ft.Text(value='Offset Amount')
+    offset_text = ft.Text(value=OFFSET_LABEL)
     offset_delay_slider = ft.Slider(
         label = "{value}",
         min = -MAX_TAPS/2, 
@@ -628,7 +614,7 @@ def main(page: ft.Page):
         modal=True,
         title=ft.Text(CONFIG_STR),
         content=ConfigDisplay,
-        actions=[ft.TextButton(CLOSE_STR, on_click=close_modal)],
+        actions=[ft.TextButton(SUBMIT_STR, on_click=close_modal)],
     )
     page.appbar = ft.AppBar(
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
@@ -644,7 +630,7 @@ def main(page: ft.Page):
 
     page.add(ft.Column([Controls]),config_table,chart)
 
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page, lock))
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
     data_converter_process.daemon = True

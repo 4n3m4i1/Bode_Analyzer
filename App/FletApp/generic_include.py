@@ -8,6 +8,12 @@ def Q15_to_float(a):
 def Q15_to_float_array(a, LENGTH):
     return [Q15_to_float(a[i]) for i in range(LENGTH)]
 
+class Port():
+    def __init__(self, portString = None):
+        self.name = portString
+    def set(self, port):
+        self.name = port
+
 class BANDIT_SETTINGS_BYTES(IntEnum):
     USBBSRX_EN = 0
     USBBSRX_AUTORUN = 1
@@ -65,3 +71,7 @@ MAX_TAPS = 1024
 MAX_QUEUE_SIZE = 3
 
 MIN_QUEUE_SIZE = 1
+
+parametric_taps =[32,64,128,256, 512, 1024]
+
+frequency_ranges = ["250K","125K","62.5K", "32.25K"]
