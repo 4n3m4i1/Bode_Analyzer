@@ -2,10 +2,6 @@ from generic_include import *
 from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
 import serial
-# from enum import IntEnum
-# import serial.tools.list_ports_osx as list_ports_osx
-# import serial.tools.list_ports_windows as list_ports_windows
-# import serial.tools.list_ports_linux as list_ports_linux
 import serial.tools.list_ports as list_ports
 import platform
 import matplotlib
@@ -22,15 +18,11 @@ from multiprocess import Process, Queue, Event
 import multiprocessing
 from multiprocessing import Queue, Lock
 from threading import Thread
-# from queue import Empty
 import time
 from bitstring import BitArray
 import numpy as np
 from scipy.interpolate import BSpline, make_interp_spline
 os = platform.system()
-
-# dataPort = None
-# ctrlPort = None
 start_event = Event()
 queue_max = Event()
 queue_max.clear()
@@ -44,17 +36,6 @@ class Port():
 
 NUM_VALUES = 128
 port_selections = []
-# if os == MACOS_STR: 
-#     for port in list_ports_osx.comports():
-#         port_selections.append(ft.dropdown.Option(str(port).split(".")[1]))
-# elif os == LINUX_STR:
-#     for port in list_ports_linux.comports():
-#         port_selections.append(ft.dropdown.Option(str(port)))
-# # elif os == WINDOWS_STR:
-# #     for port in list_ports_windows.comports():
-# #         port_selections.append(ft.dropdown.Option(str(port)))
-# else: pass
-
 for port in list_ports.comports():
     port_selections.append(ft.dropdown.Option(str(port)))
 parametric_taps =[32,64,128,256, 512, 1024]
@@ -71,9 +52,6 @@ for index1 in range(size1):
 
 data_port = Port()
 ctrl_port = Port()
-
-# init_graph = [0 for i in range(NUM_VALUES)]
-
 GraphEvent = Event()
 ##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page, lock):
@@ -130,7 +108,6 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             # print(thing.bin)
             # CTRLCHANNEL.flush()
             while True:
-                # print(DATACHANNEL.in_waiting)
                 #if settings have been changed                
                 if settings_event.is_set():
                     if settings_Queue.empty():
@@ -158,33 +135,19 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         print(newlearnin_rate)
                         settings_event.clear()
                 else:
-                    # print(DATACHANNEL.in_waiting)
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:
                         start = time.time()
                         header_data = DATACHANNEL.read(CDC_PACKET_LENGTH)
-                        # print(header_data)
-                        # print(len(header_data))
                         count = 0
                         CTRLCHANNEL.write(b'a')
                         num_samples = (header_data[3] * 256 + header_data[2]) * BYTES_PER_NUMBER
-                        
-
-                        # print(num_samples)
-                        # print(DATACHANNEL.in_waiting)
-                        # print(num_samples)
-                        # print(header_data[2])
-                        # print(header_data[3])
-                        # print('while')
                         while DATACHANNEL.in_waiting < num_samples and count < 1000:
                             count = count + 1
-                            # print(DATACHANNEL.in_waiting)
-                        
                         f_data = DATACHANNEL.read(num_samples)
                         end = time.time()
-                        # print(f_data)
                         print(f'{end - start} second transmition')
                         lock.acquire()
-                        if not queue_max.is_set():
+                        if not queue_max.is_set(): #if the queue is not full, obtain new data: this will help alleviate graph delays
                             data_Queue.put(f_data, block=False)
                         lock.release()
         except serial.SerialException:
@@ -204,78 +167,65 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
 
 ##########################################################################################DATACONVERTER
 def raw_data_to_float_converter(data_out_Queue: Queue, data_in_Queue: Queue, lock):
-    # is_set = GraphEvent.wait()
     while True:
         is_set = GraphEvent.wait()
-        # lock.acquire()
         try:
             graph_data_raw = data_in_Queue.get(block=False)
-            # print(len(graph_data_raw))
-            # lock.release()
-            # print(graph_data_raw)
-            # print(len(graph_data_raw))
             unpacked_graph_data = struct.iter_unpack('h', graph_data_raw)
             listed_graph_data = list(chain.from_iterable(unpacked_graph_data))
-            # print(len(listed_graph_data))
             converted_graph_data = Q15_to_float_array(listed_graph_data, len(listed_graph_data))
-            # print(converted_graph_data)
             data_out_Queue.put(converted_graph_data, block=False)
         except Exception as e:
-            # lock.release()
             pass
 ##########################################################################################UPDATEGRAPH
 def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lines.Line2D, frange_queue: Queue, axis, fig):
-    # is_set = GraphEvent.wait()
     frange = 0
     print('start graph')
     while True:
-        # print(' ')
-        # print(frange)
+        #Checks if the data queue is not full
         print(queue_max.is_set())
         if data_Queue.qsize() >= MAX_QUEUE_SIZE:
             queue_max.set()
         elif data_Queue.qsize() < MIN_QUEUE_SIZE and queue_max.is_set():
             queue_max.clear()
+
         is_set = GraphEvent.wait()
         try:
             data = data_Queue.get()
-            # print(data)
-            # print(data)
-            # print(len(data))
             line.set_data(np.arange(len(data)), data)
             if frange_queue.empty():
                 if frange == 0:
                     frange = 250e3
-                    ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
-                    axis.xaxis.set_major_formatter(ticks_x)
+                    # ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(frange / x))
+                    axis.xaxis.set_major_locator(ticker.LinearLocator(11))
+                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.xaxis.set_minor_locator(ticker.NullLocator())
+                    axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.grid(True)
                 else:
                     pass
             else:
 
                 frange = frange_queue.get()
                 
-                ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
-                axis.xaxis.set_major_formatter(ticks_x)
+                axis.xaxis.set_major_locator(ticker.LinearLocator(11))
+                axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                axis.xaxis.set_minor_locator(ticker.NullLocator())
+                axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                axis.grid(True)
             if data:
                 if max(data) != 0:
                     print("Valid Data Print!!")
-                    #print(line.get_data())
-                    plt.xlim(1e-15, len(data))
+                    plt.xlim(0, len(data) - 1)
                     
                     plt.ylim(min(data), max(data) + 1e-13)
-                    # plt.xlim(min(float), le)
-                    # axis.set_xbound
-                    
-                    # axis.xaxis.
                     axis.draw_artist(line)
                     print('oop')
                     fig.canvas.blit(fig.bbox)  # I added this
                     fig.canvas.flush_events()
-            # print('step')
                     print('here')
                     chart.update()
                     print('huh')
-            # print('step2')
                 else:
                     print("Data All Zero!!")
                 
@@ -357,7 +307,6 @@ def main(page: ft.Page):
     
         
     ## Graph configurations
-    #figure = plt.figure()
     figure = plt.figure(figsize=(15,7))
     ax = figure.add_subplot(111)
     line, = ax.plot(init_graph, animated=True,)
@@ -365,14 +314,14 @@ def main(page: ft.Page):
 
     line.set_color('#F55BB0')
     chart = MatplotlibChart(figure, expand=True,)
-    #ax.set_facecolor('#e3e3e3')
     figure.set_facecolor('#e3e3e3')
     ax.set_xscale(PLOT_XUNIT)
     ax.set_yscale(PLOT_YUNIT)
     ax.set_title(PLOT_TITLE, fontsize = 18)
     ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
     ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
-    
+
+    ax.xaxis.set
     
     
     def is_connected():
@@ -511,14 +460,6 @@ def main(page: ft.Page):
         ,stop_container,
         ] 
         )
-    
-    # switches = ft.Row(
-    #     [ wgn_switch
-    #     ] 
-    #     )
-    
-    
-    
     def open_modal(e): # handle settings modal opening
         page.dialog = SettingsSelection
         SettingsSelection.open = True
@@ -682,8 +623,6 @@ def main(page: ft.Page):
         leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
 
         title=ft.Text(APPBAR_TITLE),
-        #bgcolor=ft.colors.SURFACE_VARIANT,
-        #bgcolor= '#f08dbf',
         bgcolor= '#d5a6bd',
         actions=[
             ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
@@ -692,7 +631,6 @@ def main(page: ft.Page):
         ]
     )
 
-    #page.add(ft.Column([Controls]) ,chart ) 
     page.add(ft.Column([Controls]),config_table,chart)
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
