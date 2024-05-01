@@ -32,7 +32,8 @@ os = platform.system()
 # dataPort = None
 # ctrlPort = None
 start_event = Event()
-
+queue_max = Event()
+queue_max.clear()
 settings_event = Event()
 
 class Port():
@@ -183,7 +184,8 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         # print(f_data)
                         print(f'{end - start} second transmition')
                         lock.acquire()
-                        data_Queue.put(f_data, block=False)
+                        if not queue_max.is_set():
+                            data_Queue.put(f_data, block=False)
                         lock.release()
         except serial.SerialException:
             page.banner = ft.Banner(
@@ -229,6 +231,11 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
     while True:
         # print(' ')
         # print(frange)
+        print(queue_max.is_set())
+        if data_Queue.qsize() >= MAX_QUEUE_SIZE:
+            queue_max.set()
+        elif data_Queue.qsize() < MIN_QUEUE_SIZE and queue_max.is_set():
+            queue_max.clear()
         is_set = GraphEvent.wait()
         try:
             data = data_Queue.get()
@@ -239,22 +246,26 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
             if frange_queue.empty():
                 if frange == 0:
                     frange = 250e3
+                    ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
+                    axis.xaxis.set_major_formatter(ticks_x)
                 else:
                     pass
             else:
 
                 frange = frange_queue.get()
-
+                
+                ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
+                axis.xaxis.set_major_formatter(ticks_x)
             if data:
                 if max(data) != 0:
                     print("Valid Data Print!!")
                     #print(line.get_data())
                     plt.xlim(1e-15, len(data))
-                    ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / len(data)) * frange))
+                    
                     plt.ylim(min(data), max(data) + 1e-13)
                     # plt.xlim(min(float), le)
                     # axis.set_xbound
-                    axis.xaxis.set_major_formatter(ticks_x)
+                    
                     # axis.xaxis.
                     axis.draw_artist(line)
                     print('oop')
@@ -686,7 +697,6 @@ def main(page: ft.Page):
     data_converter_process.daemon = True
     print('try')
     update_graph_thread = Thread(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
-    # update_graph_thread.nice
     update_graph_thread.daemon = True
     update_graph_thread.start()
     serial_reader.start()
