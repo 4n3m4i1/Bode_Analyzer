@@ -73,3 +73,5 @@ STOP_BUTTON_COLOR = "#c27ba0" # dark pink
 
 ## About us page components
 ABOUT_TITLE = "About Us"
+
+YOUTUBE_URL = "https://youtu.be/heG2l5tyS7A?si=Tvam4DrzBTFw0_lb" 

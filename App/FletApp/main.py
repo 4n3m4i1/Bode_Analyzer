@@ -2,6 +2,7 @@ from generic_include import *
 from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
 import serial
+import webbrowser
 # from enum import IntEnum
 # import serial.tools.list_ports_osx as list_ports_osx
 # import serial.tools.list_ports_windows as list_ports_windows
@@ -267,13 +268,18 @@ def main(page: ft.Page):
     page.title = PAGE_TITLE
     page.route = "/"
     page.bgcolor = '#e3e3e3'
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER ## test
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER 
+    page.scroll=ft.ScrollMode.ALWAYS## test
     page.theme = ft.Theme(
     color_scheme=ft.ColorScheme(
         primary=ft.colors.BLACK,   
     )
 )
     temp_settings = INIT_SETTINGS
+
+    def open_youtube(e):
+        webbrowser.open(YOUTUBE_URL)
+
 
     pool = multiprocessing.Pool(processes=1)
     m = multiprocessing.Manager()
