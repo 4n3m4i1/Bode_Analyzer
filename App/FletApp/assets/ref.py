@@ -64,11 +64,17 @@ RAW_REQUEST_LABEL = "Toggle Raw Data Mode"
 TIME_DOMAIN_REQUEST_LABEL = "Toggle Time Domain Mode"
 
 LEARNING_RATE_LABEL = "Select Learning Rate"
+
+COPYRIGHT_TXT = "Copyright @ 2024 BODE BANDITS"
+#SDSU_CE_TEXT = "San Diego State University College of Engineering"
+SDSU_CE_TEXT = "SDSU College of Engineering"
+
 #colors
 BANNER_COLOR = "#d5a6bd" # light pink
 PAGE_BG_COLOR = "#e3e3e3" # light gray
 START_BUTTON_COLOR = "#ecd4df" # lighter pink
 STOP_BUTTON_COLOR = "#c27ba0" # dark pink
+TABLE_HEAD_COLOR = "#D4D4D4"
 
 
 ## About us page components
