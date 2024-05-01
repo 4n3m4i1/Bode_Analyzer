@@ -298,29 +298,193 @@ def main(page: ft.Page):
     lock = Lock()
     temp_settings = INIT_SETTINGS
 
+
+    #video
     def open_youtube(e):
         youtube_url = "https://youtu.be/heG2l5tyS7A?si=Tvam4DrzBTFw0_lb" 
         webbrowser.open(youtube_url)
-                        
 
+    #LINKDIN
+    def lance_contact(e):
+        lance_url = "https://www.linkedin.com/in/lance-m-reyes/" 
+        webbrowser.open(lance_url)
+
+    def joseph_contact(e):
+        joseph_url = "https://www.linkedin.com/in/joseph-adrian-de-vico/"
+        webbrowser.open(joseph_url)
+
+    def ari_contact(e):
+        ari_url = "https://www.linkedin.com/in/arianna-sarahi-bergado-84863b272/" 
+        webbrowser.open(ari_url)
+    
+    def josh_contact(e):
+        josh_url = "https://www.linkedin.com/in/joshkylecole/?utm_source=share&utm_campaign=share_via&utm_content=profile&utm_medium=android_app"
+        webbrowser.open(josh_url)
+    
+    def christian_contact(e):
+        christian_url = "https://www.linkedin.com/in/christian-abellacompe/"
+        webbrowser.open(christian_url)
+    
+    # def image_change(page:ft.Page):
+    logo = ft.Container(
+        ft.Image(
+        src= BANDIT_LOGO_SRC,
+        width=130,
+        height=130,
+        fit=ft.ImageFit.CONTAIN,),
+        alignment=ft.alignment.center,
+    )
+            
+    diagram=ft.Container(
+        ft.Image(
+        src= DIAGRAM,
+        width=600,
+        height=600,
+        fit=ft.ImageFit.CONTAIN,),
+        alignment=ft.alignment.center,
+    )
+    
+    c = ft.AnimatedSwitcher(
+        logo,
+        transition=ft.AnimatedSwitcherTransition.SCALE,
+        duration=500,
+        reverse_duration=100,
+        switch_in_curve=ft.AnimationCurve.BOUNCE_OUT,
+        switch_out_curve=ft.AnimationCurve.BOUNCE_IN,
+    )
+
+    def animate(e):
+        c.content = diagram if c.content == logo else logo
+        page.update()
+
+        # return c, ft.ElevatedButton("Click", on_click=animate)
+       
+
+    
+
+    
+    #HARD CODED KEY SPECIFICATIONS 
+        #SPEC ONE 
+    def panel_one(page: ft.Page):
+        def handle_change(e: ft.ControlEvent):
+            print(f"change on panel with index {e.data}")
+            #print("Event type:", e.type)
+            page.update()
+
+        panel = ft.ExpansionPanelList(
+            expand_icon_color= DARK_PINK,
+            elevation=8,
+            divider_color=DARK_PINK,
+            on_change=handle_change,
+            expanded_header_padding=ft.Padding(top=25, left=20, right=20, bottom=0),
+            controls=[
+                ft.ExpansionPanel(
+                    header=ft.Text("USB", theme_style=ft.TextThemeStyle.TITLE_MEDIUM, text_align=ft.TextAlign.CENTER ),
+                    content = ft.Text("-Powered: Operates across entire USB 2.0 voltage range\n-High speed USB Communications Device Class (CDC) interface\n ",theme_style=ft.TextThemeStyle.BODY_MEDIUM, text_align=ft.TextAlign.CENTER),
+                    bgcolor=LIGHT_PINK,
+                    expanded=False,
+                    
+                ),
+                ft.ExpansionPanel(
+                    header=ft.Text("Input / Ouput", theme_style=ft.TextThemeStyle.TITLE_MEDIUM, text_align=ft.TextAlign.CENTER ),
+                    content = ft.Text("-Direct from output of GWN fed SUT (4Vpk-pk Signal max)\n-Gaussian White Noise (GWN), input for System Under Test\n",theme_style=ft.TextThemeStyle.BODY_MEDIUM, text_align=ft.TextAlign.CENTER),
+                    bgcolor=LIGHT_PINK,
+                    expanded=False,
+                ),
+                ft.ExpansionPanel(
+                    header=ft.Text("Digital Signal Processing", theme_style=ft.TextThemeStyle.TITLE_MEDIUM, text_align=ft.TextAlign.CENTER ),
+                    content = ft.Text("-Dynamic Downsampling\n-Least Mean Squared (LMS) Adaptive Filter\n-Cooley-Tukey FFT\nFully Q15 fixed point routines. Optimized for dual-core ARM M0+\n",theme_style=ft.TextThemeStyle.BODY_MEDIUM, text_align=ft.TextAlign.CENTER),
+                    bgcolor=LIGHT_PINK,
+                    expanded=False,
+                ),
+                ft.ExpansionPanel(
+                    header=ft.Text("Graphical User Interface", theme_style=ft.TextThemeStyle.TITLE_MEDIUM, text_align=ft.TextAlign.CENTER ),
+                    content = ft.Text("-Multiprocessing cross-platform Python script\n",theme_style=ft.TextThemeStyle.BODY_MEDIUM, text_align=ft.TextAlign.CENTER),
+                    bgcolor=LIGHT_PINK,
+                    expanded=False,
+                ),
+                ft.ExpansionPanel(
+                    header=ft.Text("Analysis Ranges", theme_style=ft.TextThemeStyle.TITLE_MEDIUM, text_align=ft.TextAlign.CENTER ),
+                    content = ft.Text("- 20Hz-31kHz\n-20Hz-62kHz\n-20Hz-125kHz\n",theme_style=ft.TextThemeStyle.BODY_MEDIUM, text_align=ft.TextAlign.CENTER),
+                    bgcolor=LIGHT_PINK,
+                    expanded=False,
+                )
+            ]
+        )
+        return panel
+    
+    # def grid(page: ft.Page)
+    #     def handle_change(e: ft.ControlEvent):
+    #         print(f"change on panel with index {e.data}")
+    #         #print("Event type:", e.type)
+    #         page.update()
+
+    #         images = ft.GridView(
+    #             expand=1
+    #             runs_count=5
+    #             max_extent = 150,
+    #             child_aspect_ratio=1.0,
+    #             spacing=5,
+    #             run_spacing=5,
+    #         )
+
+        
+
+
+    #ABOUT US MAIN
     def route_change(e: RouteChangeEvent) -> None:
         if page.route == "/about":
             page.vertical_alignment = ft.MainAxisAlignment.CENTER
             page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
             page.theme = ft.Theme(
                 color_scheme_seed=LIGHT_PINK,
-            )       
+            )
+               
 
             youtube_button = ft.ElevatedButton(
                 text="Watch Here",
                 on_click=open_youtube,
                 icon=ft.icons.TV
-            )   
+            )
+
+            picture_switch = ft.ElevatedButton(
+                text = "Diagram", 
+                on_click=animate,
+            )
+
+            key_specs = panel_one(e.page)
+            #switch_image = image_change(e.page)
+            
+            button_row = ft.Row(
+                controls=[
+                    ft.ElevatedButton("Lance Reyes", on_click=lambda _:page.go("/lance")),  #meet_ari #team_pictures, meet_ari,
+                    ft.ElevatedButton("Joseph De Vico", on_click=lambda _:page.go("/joseph")),
+                    ft.ElevatedButton("Arianna-Sarahi Bergado", on_click=lambda _:page.go("/ari")),
+                    ft.ElevatedButton("Joshua Cole", on_click=lambda _:page.go("/josh")),
+                    ft.ElevatedButton("Christian Abella", on_click=lambda _:page.go("/christian")),
+
+                ],
+                spacing=10,
+                alignment=ft.MainAxisAlignment.CENTER
+            )
+
+            # ari_collage = ft.Row(
+            #     controls = [
+            #         ft.Image(src= ARI_IMAGE,width=140,height=140,fit=ft.ImageFit.CONTAIN,),
+            #         ft.Image(src= ARI_HOBBY, width=140,height=140,fit=ft.ImageFit.CONTAIN,),
+            #     ],
+            #     spacing=10,
+            #     alignment=ft.MainAxisAlignment.CENTER
+            # )
             
             controls_about = [
-                ft.AppBar(title=ft.Text(ABOUT_TITLE), bgcolor=BANNER_COLOR, actions=[youtube_button]),
-                logo,overview_title, overview_statement, specs_title, specs_description, technologies_title, technologies_description,
-                meet_team,  meet_ari #team_pictures, meet_ari,
+                ft.AppBar(title=ft.Text(ABOUT_TITLE), bgcolor=BANNER_COLOR, actions=[picture_switch, youtube_button]),
+                #switch_image
+                #logo, 
+                c, overview_title, overview_statement, specs_title, key_specs, 
+                #specs_description,technologies_title, technologies_description,
+                meet_team, team_description, button_row
+                
             ] 
             alignment=ft.MainAxisAlignment.CENTER,
             
@@ -330,6 +494,134 @@ def main(page: ft.Page):
                     controls = controls_about 
                 )
             )
+
+
+#######LANCE ABOUT US
+        if page.route == "/lance":
+            page.vertical_alignment = ft.MainAxisAlignment.CENTER
+            page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+            page.theme = ft.Theme(
+                color_scheme_seed=LIGHT_PINK,
+            )
+            lance_button =ft.ElevatedButton(
+            text="Connect with Me",
+            on_click=lance_contact,
+            icon=ft.icons.FAVORITE
+            )
+        #if page.route == "/lance":
+            page.views.append(
+                ft.View(
+                    "/lance",
+                    [
+                        ft.AppBar(title=ft.Text("Bode Bandits"), bgcolor=BANNER_COLOR, actions=[lance_button]),
+                        #ft.ElevatedButton("Exit", on_click=lambda _: page.go("/about")),
+                        lance_title, lance_collage, lance_description,
+                    ]
+                )
+            )
+
+#######JOSEPH ABOUT US
+        
+        if page.route == "/joseph":
+            page.vertical_alignment = ft.MainAxisAlignment.CENTER
+            page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+            page.theme = ft.Theme(
+                color_scheme_seed=LIGHT_PINK,
+            )
+            joseph_button =ft.ElevatedButton(
+            text="Connect with Me",
+            on_click=joseph_contact,
+            icon=ft.icons.FAVORITE
+            )
+        #if page.route == "/joseph":
+            page.views.append(
+                ft.View(
+                    "/joseph",
+                    [
+                        ft.AppBar(title=ft.Text("Bode Bandit"), bgcolor=BANNER_COLOR, actions=[joseph_button]),
+                        #ft.ElevatedButton("Exit", on_click=lambda _: page.go("/about")),
+                        joseph_title, joseph_collage, joseph_description,
+                    ]
+                )
+            )
+
+#######ARI ABOUT US
+        if page.route == "/ari":
+            page.vertical_alignment = ft.MainAxisAlignment.CENTER
+            page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+            page.theme = ft.Theme(
+                color_scheme_seed=LIGHT_PINK,
+            )
+            ari_button =ft.ElevatedButton(
+            text="Connect with Me",
+            on_click=ari_contact,
+            icon=ft.icons.FAVORITE
+            )
+        #if page.route == "/ari":
+            page.views.append(
+                ft.View(
+                    "/ari",
+                    [
+                        ft.AppBar(title=ft.Text("Bode Bandits"), bgcolor=BANNER_COLOR, actions=[ari_button]),
+                        #ft.ElevatedButton("Exit", on_click=lambda _: page.go("/about")),
+                        ari_title, ari_onecollage, ari_description,
+                    ]
+                )
+            )
+
+
+
+#######JOSH ABOUT US
+        if page.route == "/josh":
+            page.vertical_alignment = ft.MainAxisAlignment.CENTER
+            page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+            page.theme = ft.Theme(
+                color_scheme_seed=LIGHT_PINK,
+            )
+            josh_button =ft.ElevatedButton(
+            text="Connect with Me",
+            on_click=josh_contact,
+            icon=ft.icons.FAVORITE
+            )
+        #if page.route == "/josh":
+            page.views.append(
+                ft.View(
+                    "/josh",
+                    [
+                        ft.AppBar(title=ft.Text("Bode Bandits"), bgcolor=BANNER_COLOR, actions=[josh_button]),
+                        #ft.ElevatedButton("Exit", on_click=lambda _: page.go("/about")),
+                        josh_title, josh_collage, josh_description,
+                    ]
+                )
+            )
+
+
+
+#######CHRISTIAN ABOUT US
+        if page.route == "/christian":
+            page.vertical_alignment = ft.MainAxisAlignment.CENTER
+            page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+            page.theme = ft.Theme(
+                color_scheme_seed=LIGHT_PINK,
+            )
+            christian_button =ft.ElevatedButton(
+            text="Connect with Me",
+            on_click=christian_contact,
+            icon=ft.icons.FAVORITE
+            )
+        #if page.route == "/christian":
+            page.views.append(
+                ft.View(
+                    "/christian",
+                    [
+                        ft.AppBar(title=ft.Text("Bode Bandits"), bgcolor=BANNER_COLOR, actions=[christian_button]),
+                        #ft.ElevatedButton("Exit", on_click=lambda _: page.go("/about")),
+                        christian_title, christian_collage, christian_description,
+                        
+                    ]
+                )
+            )
+
             page.update()
 
 
@@ -392,19 +684,20 @@ def main(page: ft.Page):
             )
     
     
-    ## Content for the about us page
-    logo = ft.Container(
-        content = ft.Image(
-            src= BANDIT_LOGO_SRC,
-            width=150,
-            height=150,
-            fit=ft.ImageFit.CONTAIN,
-        ),
-        alignment = ft.alignment.center,
-    )
+    ## CONTAINERS for the about us page
+    # logo = ft.Container(
+    #     content = ft.Image(
+    #         src= BANDIT_LOGO_SRC,
+    #         width=140,
+    #         height=140,
+    #         fit=ft.ImageFit.CONTAIN,
+    #     ),
+    #     alignment = ft.alignment.center,
+    # )
+    
         
     overview_title = ft.Container(
-        content = ft.Text("Project Overview", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+        content = ft.Text("Project Overview", theme_style=ft.TextThemeStyle.TITLE_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
         bgcolor=DARK_PINK,
         border=ft.border.all(2, LIGHT_PINK),
         padding = ft.padding.all,
@@ -414,7 +707,7 @@ def main(page: ft.Page):
         )
 
     overview_statement = ft.Container(
-        ft.Text("Bode Analysis N’ Display of Instrument Testing (BANDIT) is a small, portable, and inexpensive Frequency Response Analyzer aimed at providing rapid assessments of a system’s transfer function. User selectable resolutions and analysis ranges, as well as output visualization, are provided by a comprehensive Graphical User Interface. BANDIT is capable of in depth self-calibration routines correcting for board to board component tolerances and voltage supply fluctuations, ensuring performance across devices without expensive component binning.", theme_style=ft.TextThemeStyle.BODY_MEDIUM),
+        ft.Text("Bode Analysis N’ Display of Instrument Testing (BANDIT) is a small, portable, and inexpensive Frequency Response Analyzer aimed at providing rapid assessments of a system’s transfer function. User selectable resolutions and analysis ranges, as well as output visualization, are provided by a comprehensive Graphical User Interface. BANDIT is capable of in depth self-calibration routines correcting for board to board component tolerances and voltage supply fluctuations, ensuring performance across devices without expensive component binning. Double click the button labeled Diagram to take a internal look at the BANDIT.", theme_style=ft.TextThemeStyle.BODY_LARGE),
         bgcolor=LIGHT_PINK,
         border=ft.border.all(2, DARK_PINK),
         padding = ft.padding.all,
@@ -423,90 +716,18 @@ def main(page: ft.Page):
         )
     
     specs_title =  ft.Container(
-        ft.Text("Key Specifications", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+        ft.Text("Key Specifications", theme_style=ft.TextThemeStyle.TITLE_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
         bgcolor=DARK_PINK,
         border=ft.border.all(2, LIGHT_PINK),
         padding = ft.padding.all,
         width=2000,
         alignment = ft.alignment.center,
         )
+        
     
-    specs_description = ft.Container(
-        ft.DataTable(
-            width=2000,
-            bgcolor = LIGHT_PINK,
-            border = ft.border.all(2,DARK_PINK),
-            #border_radius = 10,
-            vertical_lines=ft.border.BorderSide(width=2, color=DARK_PINK),
-            horizontal_lines=ft.border.BorderSide(width=2, color=DARK_PINK),
-            sort_column_index=0,
-            sort_ascending=True,
-            heading_row_color=ft.colors.BLACK12,
-            heading_row_height=0,
-            data_row_max_height=25,
-            data_row_color= LIGHT_PINK,
-            column_spacing= 200,
-            columns = [
-                ft.DataColumn(ft.Text("")),
-                ft.DataColumn(ft.Text(""),numeric=False),
 
-            ],
-            rows=[
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("USB Powered")),
-                         ft.DataCell(ft.Text("Operates across entire USB 2.0 voltage range")),
-                    ],
-                ),
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("Input")),
-                        ft.DataCell(ft.Text("Direct from output of GWN fed SUT (4Vpk-pk Signal max)")),
-                    ],
-                ),
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("Output:")),
-                         ft.DataCell(ft.Text("Gaussian White Noise (GWN), input for System Under Test")),
-                    ],
-                ),
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("Digital Signal Processing")),
-                         ft.DataCell(ft.Text("Dynamic Downsampling, Least Mean Squared (LMS) Adaptive Filter, Cooley-Tukey FFT, Fully Q15 fixed point routines. Optimized for dual-core ARM M0+")),
-                    ],
-                ),
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("Greater than 1 HZ update Rate")),
-                         ft.DataCell(ft.Text("")),
-                    ],
-                ),
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("GUI")),
-                         ft.DataCell(ft.Text("Multiprocessing cross-platform Python script")),
-                    ],
-                ),
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("High speed USB Communications Device Class (CDC) interface")),
-                         ft.DataCell(ft.Text("")),
-                    ],
-                ),
-                ft.DataRow(
-                    cells=[
-                        ft.DataCell(ft.Text("Analysis Ranges")),
-                         ft.DataCell(ft.Text("20Hz - 31kHz, 20Hz - 62kHz, 20Hz - 125kHz")),                
-                    ],
-                ),
-            ],
-        ),
-        alignment=ft.alignment.center
-    )
-    
-    technologies_title =  ft.Container(
-        ft.Text("Key Technologies", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+    meet_team =  ft.Container(
+        ft.Text("Meet the Bode Bandits", theme_style=ft.TextThemeStyle.TITLE_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
         bgcolor=DARK_PINK,
         border=ft.border.all(2, LIGHT_PINK),
         padding = ft.padding.all,
@@ -514,8 +735,9 @@ def main(page: ft.Page):
         alignment = ft.alignment.center,
         )
     
-    technologies_description =  ft.Container(
-        ft.Text("Developed: Multiprocessing GUI, Multicore Embedded Firmware, DSP Processing Stack, Device Enclosure\n                                                            Procured: PCB Assembly", theme_style=ft.TextThemeStyle.BODY_MEDIUM),
+    
+    team_description =  ft.Container(
+        ft.Text("The Bode Bandits, composed of five Computer and Electrical Engineering students: Christian Abella, Joshua Cole, Lance Reyes, Joseph De Vico, and Arianna-Sarahi Bergado. We have been tasked with an Electrical/Computer Engineering (ECE) Project. Double click each name below to learn more about us.", theme_style=ft.TextThemeStyle.BODY_LARGE, text_align= ft.TextAlign.CENTER),
         bgcolor=LIGHT_PINK,
         border=ft.border.all(2, DARK_PINK),
         padding = ft.padding.all,
@@ -524,31 +746,261 @@ def main(page: ft.Page):
         )
     
 
-    meet_team =  ft.Container(
-        ft.Text("Meet the Bode Bandits", theme_style=ft.TextThemeStyle.TITLE_LARGE),
+
+#########LANCE PAGE 
+    lance_title = ft.Container(
+        content = ft.Text("Lance Reyes", theme_style=ft.TextThemeStyle.DISPLAY_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
         bgcolor=DARK_PINK,
         border=ft.border.all(2, LIGHT_PINK),
         padding = ft.padding.all,
         width=2000,
         alignment = ft.alignment.center,
+        
         )
     
-    team_pictures = ft.Container(
-       ft.Image(
-            src= ARI_IMAGE,
-            width=200,
-            height=200
-        ),
-            alignment = ft.alignment.center
-
-   
+    lance_collage = ft.Container(
+        content=ft.Row(
+            controls = [
+                ft.Image(src= LANCE_IMAGE,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= LANCE_FRIENDS, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= LANCE_HOBBY,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= LANCE_FAM, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+            ],
+            spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER
+        )
     )
 
-    meet_ari = ft.Container(
-        ft.ElevatedButton("Arianna-Sarahi Bergado", on_click=lambda _: page.go("/ari")),
-        ft.ElevatedButton("Exit", on_click=lambda _:page.go("/about"))
-    )
+
+    lance_description = ft.Container(
+        ft.Text("Hi, I’m Lance Reyes. I was born and raised in San Diego and have lived here my whole life. I am majoring in computer engineering and will graduate in the spring of 2024. I got into engineering because I’ve always had an interest in building and putting things together. As well as tinkering with items and understanding how they work. Ultimately, I enjoy coding and the flexibility of the software side which allows me to build projects of any scale. My role in building the BANDIT was mainly designing the GUI for the BANDIT to communicate to but my other responsibilities included soldering components and assisting with USB protocol and data streaming. Outside of engineering I enjoy watching the San Diego Padres, kicking back and having a good time with some friends, or watching the latest movies recommended to me.",
+                 theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM, text_align= ft.TextAlign.CENTER),
+        bgcolor=LIGHT_PINK,
+        border=ft.border.all(2, DARK_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        )
+    
+
+#########JOSEPH PAGE 
+    joseph_title = ft.Container(
+        content = ft.Text("Joseph De Vico", theme_style=ft.TextThemeStyle.DISPLAY_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
         
+        )
+    
+    joseph_collage = ft.Container(
+        content=ft.Row(
+            controls = [
+                ft.Image(src= JOSEPH_IMAGE,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= JOSEPH_FRIENDS, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= JOSEPH_HOBBY,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= JOSEPH_SOLO, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+            ],
+            spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER
+        )
+    )
+
+
+    joseph_description = ft.Container(
+        ft.Text("I'm Joseph, a former machinist and fabricator finishing out my Computer Engineering undergraduate degree at San Diego State University. I’ve long been engaging in hobby electronics, initially drawn in by analog synthesizers. I’m predominantly interested in digital signal processing, mixed signal design, and systems engineering. Within the project I helped implement out DSP algorithms, executed the digital design and systems planning for our board, and laid the groundwork for architecture specific optimizations for the BANDIT. Moving forward, I’d like to work in modem and phased array communications system design. If you or a friend has a good connection at Qualcomm please get in touch! :)",
+                 theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM, text_align= ft.TextAlign.CENTER),
+        bgcolor=LIGHT_PINK,
+        border=ft.border.all(2, DARK_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        )
+    
+
+
+#########ARI PAGE
+    ari_title = ft.Container(
+        content = ft.Text("Arianna-Sarahi Bergado", theme_style=ft.TextThemeStyle.DISPLAY_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        
+        )
+    
+    ari_onecollage = ft.Container(
+        content=ft.Row(
+            controls = [
+                ft.Image(src= ARI_IMAGE,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= ARI_HOBBY, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= ARI_FAM,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= ARI_GRAD, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+            ],
+            spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER
+        )
+    )
+
+
+    ari_description = ft.Container(
+        ft.Text("Hello! My name is Arianna-Sarahi Bergado. Born and raised in Chula Vista, I’ve called San Diego home all my life. As the youngest of four sisters, family has always been a big part of my life. In my leisure time, I enjoy staying active through weightlifting and hiking, and I cherish the moments spent with family and friends. I am currently pursuing a degree in Computer Engineering, with an anticipated graduation in Spring 2024, My academic interests are diverse, spanning Web Development to Analog and Digital Communications. My role in this project includes designing the Graphical User Interface(GUI), soldering printed circuit boards (PCBs), and being team lead. As graduation approaches, I am eager and excited for the new opportunities that await in my professional journey.",
+                 theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM, text_align= ft.TextAlign.CENTER),
+        bgcolor=LIGHT_PINK,
+        border=ft.border.all(2, DARK_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        )
+
+##########JOSH PAGE
+    josh_title = ft.Container(
+        content = ft.Text("Joshua Cole", theme_style=ft.TextThemeStyle.DISPLAY_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        
+        )
+    josh_collage = ft.Container(
+        content=ft.Row(
+            controls = [
+                ft.Image(src= JOSH_IMAGE,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= JOSH_FAM, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= JOSH_HOBBY,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= JOSH_FRIENDS, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+            ],
+            spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER
+        )
+    )
+
+    josh_description = ft.Container(
+        ft.Text("Hello, my name is Joshua Cole. I am a Navy veteran and will be graduating with a Bachelor's degree in Electrical Engineering in Spring 2024. I hail from Minnesota and am currently undertaking an internship at the Naval Information Warfare Center (NIWC), where I collaborate with an interdisciplinary team on advancing research projects aimed at enhancing warfighter capabilities.In the realm of electrical engineering, my areas of interest include radio frequency engineering and electrical design. Throughout my recent project, I engaged in PCB creation, conducted MATLAB system overviews, designed filters, and developed firmware.In addition to my academic and professional pursuits, I am passionate about trail running, hiking, and weight lifting. With graduation on the horizon, I am eager to devote more time to these hobbies.",
+                 theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM, text_align= ft.TextAlign.CENTER),
+        bgcolor=LIGHT_PINK,
+        border=ft.border.all(2, DARK_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        )
+    
+#########CHRISTIAN PAGE
+    christian_title = ft.Container(
+        content = ft.Text("Christian Abella", theme_style=ft.TextThemeStyle.DISPLAY_LARGE, weight=ft.FontWeight.BOLD, text_align= ft.TextAlign.CENTER),
+        bgcolor=DARK_PINK,
+        border=ft.border.all(2, LIGHT_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        
+        )
+    christian_collage = ft.Container(
+        content=ft.Row(
+            controls = [
+                ft.Image(src= CHRISTIAN_IMAGE,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= CHRISTIAN_HOBBY, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= CHRISTIAN_FRIENDS,width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+                ft.Image(src= CHRISTIAN_GRAD, width=350,height=350,fit=ft.ImageFit.CONTAIN,),
+            ],
+            spacing=10,
+            alignment=ft.MainAxisAlignment.CENTER
+        )
+    )
+
+    christian_description = ft.Container(
+        ft.Text("Hello, my name is Christian Abella. I am from Bay Area, CA. I am passionate about cooking, music, being in nature, and hanging out with my friends! I wanted to become an engineer because I want to build devices and software that help people all over the world. I am a computer engineering major and I am most interested in software engineering and embedded systems. I was on the Graphical User Interface (GUI) team where I designed the front end of our application and engineered the multithreaded backend. I have the privilege of working as a Software Engineer at Atlassian starting in the summer! I look forward to applying all that I learned through this project onto my future career.",
+                 theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM, text_align= ft.TextAlign.CENTER),
+        bgcolor=LIGHT_PINK,
+        border=ft.border.all(2, DARK_PINK),
+        padding = ft.padding.all,
+        width=2000,
+        alignment = ft.alignment.center,
+        )
+
+    # meet_ari = ft.Container(
+    #     ft.ElevatedButton("Arianna-Sarahi Bergado", on_click=lambda _: page.go("/ari")),
+    #     ft.ElevatedButton("Exit", on_click=lambda _:page.go("/about"))
+    # )
+
+#   specs_description = ft.Container(
+    #     ft.DataTable(
+    #         width=2000,
+    #         bgcolor = LIGHT_PINK,
+    #         border = ft.border.all(2,DARK_PINK),
+    #         #border_radius = 10,
+    #         vertical_lines=ft.border.BorderSide(width=2, color=DARK_PINK),
+    #         horizontal_lines=ft.border.BorderSide(width=2, color=DARK_PINK),
+    #         sort_column_index=0,
+    #         sort_ascending=True,
+    #         heading_row_color=ft.colors.BLACK12,
+    #         heading_row_height=0,
+    #         data_row_max_height=25,
+    #         data_row_color= LIGHT_PINK,
+    #         column_spacing= 200,
+    #         columns = [
+    #             ft.DataColumn(ft.Text("")),
+    #             ft.DataColumn(ft.Text(""),numeric=False),
+
+    #         ],
+    #         rows=[
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("USB Powered")),
+    #                      ft.DataCell(ft.Text("Operates across entire USB 2.0 voltage range")),
+    #                 ],
+    #             ),
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("Input")),
+    #                     ft.DataCell(ft.Text("Direct from output of GWN fed SUT (4Vpk-pk Signal max)")),
+    #                 ],
+    #             ),
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("Output:")),
+    #                      ft.DataCell(ft.Text("Gaussian White Noise (GWN), input for System Under Test")),
+    #                 ],
+    #             ),
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("Digital Signal Processing")),
+    #                      ft.DataCell(ft.Text("Dynamic Downsampling, Least Mean Squared (LMS) Adaptive Filter, Cooley-Tukey FFT, Fully Q15 fixed point routines. Optimized for dual-core ARM M0+")),
+    #                 ],
+    #             ),
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("Greater than 1 HZ update Rate")),
+    #                      ft.DataCell(ft.Text("")),
+    #                 ],
+    #             ),
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("GUI")),
+    #                      ft.DataCell(ft.Text("Multiprocessing cross-platform Python script")),
+    #                 ],
+    #             ),
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("High speed USB Communications Device Class (CDC) interface")),
+    #                      ft.DataCell(ft.Text("")),
+    #                 ],
+    #             ),
+    #             ft.DataRow(
+    #                 cells=[
+    #                     ft.DataCell(ft.Text("Analysis Ranges")),
+    #                      ft.DataCell(ft.Text("20Hz - 31kHz, 20Hz - 62kHz, 20Hz - 125kHz")),                
+    #                 ],
+    #     #        ),
+    #    #     ],
+    #   #  ),
+    #  #   alignment=ft.alignment.center
+    # #)
+
+ 
     
     start_container = ft.Container (
 
@@ -874,16 +1326,16 @@ def main(page: ft.Page):
     #page.add(ft.Column([Controls]),config_table,chart)
     page.add(ft.Column([Controls]),config_table,ft.Row([chart, config_table2]))
 
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
-    serial_reader.daemon = True
-    data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
-    data_converter_process.daemon = True
-    print('try')
-    update_graph_thread = Process(group=None, target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
-    update_graph_thread.daemon = True
-    update_graph_thread.start()
-    serial_reader.start()
-    data_converter_process.start()
+    #serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
+    #serial_reader.daemon = True
+    #data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
+    #data_converter_process.daemon = True
+    #print('try')
+    #update_graph_thread = Process(group=None, target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
+    #update_graph_thread.daemon = True
+    #update_graph_thread.start()
+    #serial_reader.start()
+    #data_converter_process.start()
 
 if __name__ == '__main__':
     ft.app(
