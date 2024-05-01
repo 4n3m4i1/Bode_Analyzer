@@ -398,7 +398,7 @@ static void core_0_main(){
                 tud_task();
                 busy_wait_ms(100);
 #else
-                if(!SKIP_FFT) cool_fft.fr[0] = cool_fft.fr[1];
+                //if(!SKIP_FFT) cool_fft.fr[0] = cool_fft.fr[1];
                 USB_Handler(&cool_fft);     //send data to GUI through tusb
 #endif
                 USB_NEXT_STATE = USB_FFT_DATA_COLLECT;

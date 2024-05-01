@@ -596,11 +596,11 @@ def main(page: ft.Page):
     offset_text = ft.Text(value='Offset Amount')
     offset_delay_slider = ft.Slider(
         label = "{value}",
-        min = -512, 
-        max = 512, 
+        min = -MAX_TAPS/2, 
+        max = MAX_TAPS/2, 
         active_color=STOP_BUTTON_COLOR,
         inactive_color=START_BUTTON_COLOR,
-        divisions = 1024, 
+        divisions = MAX_TAPS, 
         on_change=change_OFS
         )
     
