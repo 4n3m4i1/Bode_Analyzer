@@ -23,6 +23,8 @@ from bitstring import BitArray
 import numpy as np
 from scipy.interpolate import BSpline, make_interp_spline
 os = platform.system()
+negative_allowed_event = Event()
+negative_allowed_event.clear()
 start_event = Event()
 queue_max = Event()
 queue_max.clear()
@@ -218,7 +220,11 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                     print("Valid Data Print!!")
                     plt.xlim(0, len(data) - 1)
                     
-                    plt.ylim(min(data), max(data) + 1e-13)
+                    #plt.ylim(min(data), max(data) + 1e-13)
+                    if negative_allowed_event.is_set():
+                        plt.ylim(min(data), max(data) + 0.01)
+                    else:
+                        plt.ylim(0, max(data) + 0.01)
                     axis.draw_artist(line)
                     print('oop')
                     fig.canvas.blit(fig.bbox)  # I added this
@@ -416,6 +422,7 @@ def main(page: ft.Page):
     
 
     def toggle_time_d(e):
+        negative_allowed_event.set() if not negative_allowed_event.is_set() else negative_allowed_event.clear()
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TIME_DOMAIN_DATA.value] = int(time_domain_switch.value)
 
 
@@ -574,17 +581,19 @@ def main(page: ft.Page):
             on_change=select_frange
 
         )
-    
+    learning_rate_text = ft.Text(value='Learning Rate')
     learning_rate_slider = ft.Slider(
-        label = "{value}",
+        label = '{value}',
         min=0x01, 
         max=0x7FFF, 
+        # min = float(0.0),
+        # max = float(1.0),
         active_color=STOP_BUTTON_COLOR,
         inactive_color=START_BUTTON_COLOR,
         divisions=32767, 
         on_change=change_LR
         )
-    
+    offset_text = ft.Text(value='Offset Amount')
     offset_delay_slider = ft.Slider(
         label = "{value}",
         min = -512, 
@@ -606,7 +615,9 @@ def main(page: ft.Page):
         auto_run_switch,
         raw_requect_switch,
         time_domain_switch,
+        learning_rate_text,
         learning_rate_slider,
+        offset_text,
         offset_delay_slider
         ],
         scroll=ft.ScrollMode.ALWAYS
