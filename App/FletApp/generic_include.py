@@ -61,3 +61,7 @@ INIT_SETTINGS = [
 init_graph = [((_ * _) + 1e-15) for _ in range(128)]
 
 MAX_TAPS = 1024
+
+MAX_QUEUE_SIZE = 3
+
+MIN_QUEUE_SIZE = 1

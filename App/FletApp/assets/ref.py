@@ -73,3 +73,4 @@ STOP_BUTTON_COLOR = "#c27ba0" # dark pink
 
 ## About us page components
 ABOUT_TITLE = "About Us"
+
