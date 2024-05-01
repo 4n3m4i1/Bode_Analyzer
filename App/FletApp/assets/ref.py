@@ -53,8 +53,8 @@ PLOT_YUNIT = "linear"
 
 
 WGN_LABEL = "Toggle WGN Mode"
-WGN_LABEL_OFF = "OFF"
-WGN_LABEL_ON = "ON"
+WGN_LABEL_OFF = "Default White Noise Operation"
+WGN_LABEL_ON = "White Noise Always On"
 SINGLE_SHOT_LABEL = "Toggle Single Shot Mode"
 
 AUTO_RUN_LABEL = "Toggle Auto Run Mode"

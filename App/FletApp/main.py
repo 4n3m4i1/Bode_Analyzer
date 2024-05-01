@@ -638,6 +638,8 @@ def main(page: ft.Page):
         label = "{value}",
         min=0x01, 
         max=0x7FFF, 
+        active_color=STOP_BUTTON_COLOR,
+        inactive_color=START_BUTTON_COLOR,
         divisions=32767, 
         on_change=change_LR
         )
@@ -646,6 +648,8 @@ def main(page: ft.Page):
         label = "{value}",
         min = -512, 
         max = 512, 
+        active_color=STOP_BUTTON_COLOR,
+        inactive_color=START_BUTTON_COLOR,
         divisions = 1024, 
         on_change=change_OFS
         )
