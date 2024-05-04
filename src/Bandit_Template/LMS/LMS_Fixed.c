@@ -75,6 +75,14 @@ inline Q15 LMS_Looper(struct LMS_Fixed_Inst *LMS, struct Q15_FIR_PARAMS *WGN_FIR
         LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
         WGN_FIR->curr_zero++;
 
+
+        //Q15 Y_HAT = run_2n_FIR_cycle_no_inc(WGN_FIR, LMS->x_n[n]);
+        //LMS->error = LMS->d_n[n + LMS->d_n_offset] - Y_HAT;
+        //LMS_Update_Taps(LMS, WGN_FIR, LMS->error);
+        //WGN_FIR->curr_zero++;
+
+
+
         // Manual FIR Cycle
         //WGN_FIR->data[0] = LMS->x_n[n + LMS->d_n_offset];
         //Q15 error = 0;

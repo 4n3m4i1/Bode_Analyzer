@@ -82,6 +82,9 @@ struct BANDIT_SETTINGS  Global_Bandit_Settings;
 CORE_0_MEM Q15 FR_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
 CORE_0_MEM Q15 FI_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
 
+// FFT Averaging buffer
+CORE_0_MEM Q15 FFT_AVG_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
+
 // Reserve Buffer for Stored Results
 CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
 
@@ -341,6 +344,12 @@ static void core_0_main(){
                     FFT_fixdpt(&cool_fft);      // Run FFT
                     FFT_mag(&cool_fft);         // Extract magnitude, output in fft.fr
                     cool_fft.num_samples >>= 1; // Print only half of fft result, dodge reflected stuff
+                    
+                    for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
+                        FFT_AVG_BUFF[n] += cool_fft.fr[n];
+                        cool_fft.fr[n] = (FFT_AVG_BUFF[n] >>= 1);    
+                    
+                    }
                 } else {
                     for(uint16_t n = 0; n < ICTXFR_A.len; ++n){
                         cool_fft.fr[n] = ICTXFR_A.data[n];
@@ -777,12 +786,12 @@ debug_no_adc_setup_label:
                     if(LMS_Inst.tap_len > MAX_TAPS || LMS_Inst.tap_len < DEFAULT_LMS_TAP_LEN) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
                     if(((Global_Bandit_Settings.manual_lms_offset < 0) ? Global_Bandit_Settings.manual_lms_offset * -1 : Global_Bandit_Settings.manual_lms_offset) 
-                            > (LMS_Inst.tap_len >> 1)) {
+                            > ((LMS_Inst.tap_len >> 1) + (LMS_Inst.tap_len >> 2) + (LMS_Inst.tap_len >> 3))) {
                                 Global_Bandit_Settings.manual_lms_offset = 0;
                             }
 
                     // Shift by num taps / 2 + some manual offset 04/24/2024 jdv
-                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (int16_t)(LMS_Inst.tap_len >> 1);
+                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (int16_t)(LMS_Inst.tap_len >> 1) + (int16_t)(LMS_Inst.tap_len >> 2) + (LMS_Inst.tap_len >> 3);
 
                     LMS_Inst.max_convergence_attempts = Global_Bandit_Settings.manual_lms_attempts;
 
@@ -910,8 +919,8 @@ debug_no_adc_setup_label:
                     X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
                     D_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement
 
-                    X_N_0[n] *= 8;
-                    D_N_0[n] *= 8;
+                    X_N_0[n] *= 16;
+                    D_N_0[n] *= 16;
                 }
 
                 //Stop_Sampling();
@@ -1323,7 +1332,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         uint8_t newfreq_range = BS_RX_BF[USBBSRX_F_FRANGE];
         uint16_t newtaplen = (BS_RX_BF[USBBSRX_TAPLEN_MSB] << 8) | (BS_RX_BF[USBBSRX_TAPLEN_LSB]);
         uint16_t man_error_limit = (BS_RX_BF[USBBSRX_ERR_MSB] << 8) | (BS_RX_BF[USBBSRX_ERR_LSB]);
-        uint16_t newlmsoffset = (BS_RX_BF[USBBSRX_OFFSET_LSB] << 8) | (BS_RX_BF[USBBSRX_OFFSET_LSB]);
+        uint16_t newlmsoffset = (BS_RX_BF[USBBSRX_OFFSET_MSB] << 8) | (BS_RX_BF[USBBSRX_OFFSET_LSB]);
         uint16_t newlmsmaxattempts = (BS_RX_BF[USBBSRX_ATTEMPTS_MSB] << 8) | BS_RX_BF[USBBSRX_ATTEMPTS_LSB];
 
         Global_Bandit_Settings.manual_freq_range = newfreq_range;
