@@ -1,7 +1,8 @@
 APPBAR_TITLE = "BANDIT"
 PAGE_TITLE = "BODE GUI TESTING"
 
-CLOSE_STR = "SUBMIT"
+CLOSE_STR = "CLOSE"
+SUBMIT_STR = "SUBMIT"
 BANDIT_LOGO_SRC = "/banditlogo.png"
 START_BUTTON_TEXT = "Start"
 STOP_BUTTON_TEXT = "Stop"
@@ -64,6 +65,8 @@ RAW_REQUEST_LABEL = "Skip LMS"
 TIME_DOMAIN_REQUEST_LABEL = "Skip FFT"
 
 LEARNING_RATE_LABEL = "Select Learning Rate"
+
+OFFSET_LABEL = "Select Offset Amount"
 #colors
 BANNER_COLOR = "#d5a6bd" # light pink
 PAGE_BG_COLOR = "#e3e3e3" # light gray
