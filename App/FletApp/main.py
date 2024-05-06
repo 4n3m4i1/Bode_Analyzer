@@ -23,6 +23,7 @@ import numpy as np
 os = platform.system()
 negative_allowed_event = Event()
 negative_allowed_event.clear()
+# raw_req = Event()
 start_event = Event()
 queue_max = Event()
 queue_max.clear()
@@ -210,13 +211,19 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                         axis.yaxis.set_major_locator(ticker.LinearLocator(11))
                         axis.grid(True)
                     else:
+                        
                         axis.xaxis.set_major_locator(ticker.LogLocator(
                             base=10,
-                            subs='auto'
+                            subs='all',
+                            numticks=frange
 
                         ))
-                        axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: "{0:g}".format(frange / (len(data) - 1) * x)))
-
+                        
+                        # axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: "{0:g}".format((frange / 100) * x)))
+                        # axis.xaxis.set_major_locator(ticker.LinearLocator(11))
+                        # axis.xaxis.set_major_formatter(ticker.ScalarFormatter())
+                        axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(round(((x - 1) / (len(data) - 1)) * frange))) )
+                        axis.ticklabel_format(style='sci')
                         axis.yaxis.set_major_formatter(ticker.ScalarFormatter())
                         # axis.xaxis.set_minor_locator(ticker.Log)
                         # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
@@ -234,7 +241,9 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                 if negative_allowed_event.is_set():
                     axis.xaxis.set_major_locator(ticker.LinearLocator(11))
                     axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
-                        
+                    axis.xaxis.set_major_formatter(ticker.LogFormatter(
+                        base = 10
+                    ))
                     axis.xaxis.set_minor_locator(ticker.NullLocator())
                         # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
                     axis.yaxis.set_major_locator(ticker.LinearLocator(11))
@@ -242,11 +251,16 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                 else:
                     axis.xaxis.set_major_locator(ticker.LogLocator(
                             base=10,
-                            subs='auto'
+                            subs='all',
+                            numticks=frange
 
                         ))
-                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: "{0:g}".format(frange / (len(data) - 1) * x)))
-
+                        
+                        # axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: "{0:g}".format((frange / 100) * x)))
+                        # axis.xaxis.set_major_locator(ticker.LinearLocator(11))
+                        # axis.xaxis.set_major_formatter(ticker.ScalarFormatter())
+                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(round(((x - 1) / (len(data) - 1)) * frange))) )
+                    axis.ticklabel_format(style='sci')
                     axis.yaxis.set_major_formatter(ticker.ScalarFormatter())
                         # axis.xaxis.set_minor_locator(ticker.Log)
                         # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
@@ -274,7 +288,7 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                         #     line.set_data(np.arange(len(data)), data)
                         # axis.set_yscale(PLOT_YUNIT_log)
                         plt.ylim(min(data[1:len(data)-1])*1.1, max(data)*1.1)
-                        plt.xlim(1, len(data))
+                        plt.xlim(10**0, len(data))
 
 
                         #plt.ylim(0, max(data)*1.1)
@@ -367,7 +381,7 @@ def main(page: ft.Page):
     
         
     ## Graph configurations
-    figure = plt.figure(figsize=(15,7))
+    figure = plt.figure(figsize=(25,10))
     ax = figure.add_subplot(111)
     line, = ax.plot(init_graph, animated=True,)
     ax.grid()
@@ -467,6 +481,16 @@ def main(page: ft.Page):
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_SINGLE_SHOT.value] = int(not temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value])
 
     def toggle_raw_request(e):
+        if negative_allowed_event.is_set():
+            negative_allowed_event.clear()
+            ax.set_yscale(PLOT_YUNIT_log)
+            ax.set_xscale(PLOT_XUNIT_log)
+            
+        
+        else: 
+            negative_allowed_event.set()
+            ax.set_yscale(PLOT_YUNIT_linear)
+            ax.set_xscale(PLOT_XUNIT_linear)
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_RAW_RQ.value] = int(raw_requect_switch.value)
     
 

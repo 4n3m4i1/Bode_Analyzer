@@ -46,7 +46,7 @@ INVALID_PORTS_WARNING = "Invalid Port Selection"
 SR_ACK = b"a"
 
 PLOT_TITLE = "BANDIT Output"
-PLOT_XLABEL = "FREQUENCY"
+PLOT_XLABEL = "FREQUENCY (Hz)"
 PLOT_YLABEL = "dB"
 
 PLOT_XUNIT_linear = "linear"
