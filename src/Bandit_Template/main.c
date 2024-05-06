@@ -481,7 +481,24 @@ static void core_1_main(){
     Bandit_Debug_Report.epoch_core_1_boot_us = timer_hw->timelr;
     uint8_t Bandit_Calibration_State = BANDIT_UNCALIBRATED;
     Q15 Bandit_DC_Offset_Cal = 0;
-    
+
+
+    // Per Length Range
+    const Q15 LMS_Base_Learning_Rates[BANDIT_LEARNING_RATE_ARR_LEN] = {
+        0x0001,     // 1
+        0x0001,     // 2
+        0x0001,     // 4
+        0x0001,     // 8
+        0x0001,     // 16
+        3300,       // 32
+        2200,       // 64
+        1100,       // 128
+        550,       // 256
+        225,        // 512
+        112,        // 1024
+        0x0001      // 2048
+    };
+
     
     DFL_LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
     DFL_LMS_Inst.max_convergence_attempts = 4;
@@ -848,7 +865,29 @@ debug_no_adc_setup_label:
 
                     LMS_Inst.learning_rate = Global_Bandit_Settings.manual_learning_rate;
 
-                    if(!LMS_Inst.learning_rate) LMS_Inst.learning_rate = 0x0003;
+                    LMS_Inst.error = 0;
+
+                    switch(LMS_Inst.tap_len){
+                        case 64:
+                            LMS_Inst.learning_rate = LMS_Base_Learning_Rates[BASE_LEARNING_64];
+                        break;
+                        case 128:
+                            LMS_Inst.learning_rate = LMS_Base_Learning_Rates[BASE_LEARNING_128];
+                        break;
+                        case 256:
+                            LMS_Inst.learning_rate = LMS_Base_Learning_Rates[BASE_LEARNING_256];
+                        break;
+                        case 512:
+                            LMS_Inst.learning_rate = LMS_Base_Learning_Rates[BASE_LEARNING_512];
+                        break;
+                        case 1024:
+                            LMS_Inst.learning_rate += LMS_Base_Learning_Rates[BASE_LEARNING_1024];
+                        break;
+                        default:
+                            LMS_Inst.tap_len = 32;
+                            LMS_Inst.learning_rate = LMS_Base_Learning_Rates[BASE_LEARNING_32];
+                        break;
+                    }
 
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
 
@@ -922,12 +961,7 @@ debug_no_adc_setup_label:
                     busy_wait_us_32(5000);
                 }
 
-                LMS_Inst.error = 0;
-                //for(uint16_t n = 0; n < count_of(LMS_FIR_BANK); ++n){
-                //    LMS_FIR.taps[n] = 0;
-                //    LMS_FIR.data[n] = 0;
-                //}
-
+                
                 CORE_1_STATE = CORE_1_SAMPLE;
 
                 if(CORE_1_DBG_MODE) CORE_1_STATE = CORE_1_DEBUG_HANDLER;
@@ -971,7 +1005,7 @@ debug_no_adc_setup_label:
                     //asm("nop"); asm("nop"); asm("nop"); asm("nop");
                     //asm("nop"); asm("nop"); asm("nop"); asm("nop");
                     //asm("nop"); asm("nop"); asm("nop"); asm("nop"); asm("nop"); 
-                    //asm("nop"); asm("nop"); asm("nop");
+                    asm("nop"); asm("nop"); asm("nop");
                     ADS7253_Dual_Sampling(ADC_PIO, tmp_arr, (uint16_t *)&D_N_0[n], (uint16_t *)&X_N_0[n], 1);
                     X_N_0[n] -= Bandit_DC_Offset_Cal;
                     X_N_0[n] -= (Q15)ADS_MID_CODE_BINARY;   // Shift from binary output to 2s complement

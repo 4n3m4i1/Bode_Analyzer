@@ -201,37 +201,82 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                 if frange == 0:
                     frange = 250e3
                     # ticks_x = ticker.FuncFormatter(lambda x, pos: '{0:g}'.format(frange / x))
-                    axis.xaxis.set_major_locator(ticker.LinearLocator(11))
-                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
-                    axis.xaxis.set_minor_locator(ticker.NullLocator())
-                    axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
-                    axis.grid(True)
+                    if negative_allowed_event.is_set():
+                        axis.xaxis.set_major_locator(ticker.LinearLocator(11))
+                        axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                        
+                        axis.xaxis.set_minor_locator(ticker.NullLocator())
+                        # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                        axis.yaxis.set_major_locator(ticker.LinearLocator(11))
+                        axis.grid(True)
+                    else:
+                        axis.xaxis.set_major_locator(ticker.LogLocator(
+                            base=10,
+                            subs='auto'
+
+                        ))
+                        axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: "{0:g}".format(frange / (len(data) - 1) * x)))
+
+                        axis.yaxis.set_major_formatter(ticker.ScalarFormatter())
+                        # axis.xaxis.set_minor_locator(ticker.Log)
+                        # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                        axis.yaxis.set_major_locator(ticker.LogLocator(
+                            base=10,
+                            subs='auto',
+                            numticks = 10
+                        ))
+                        axis.grid(True)
                 else:
                     pass
             else:
 
                 frange = frange_queue.get()
+                if negative_allowed_event.is_set():
+                    axis.xaxis.set_major_locator(ticker.LinearLocator(11))
+                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                        
+                    axis.xaxis.set_minor_locator(ticker.NullLocator())
+                        # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.yaxis.set_major_locator(ticker.LinearLocator(11))
+                    axis.grid(True)
+                else:
+                    axis.xaxis.set_major_locator(ticker.LogLocator(
+                            base=10,
+                            subs='auto'
+
+                        ))
+                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: "{0:g}".format(frange / (len(data) - 1) * x)))
+
+                    axis.yaxis.set_major_formatter(ticker.ScalarFormatter())
+                        # axis.xaxis.set_minor_locator(ticker.Log)
+                        # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.yaxis.set_major_locator(ticker.LogLocator(
+                            base=10,
+                            subs='auto',
+                            numticks = 10
+                        ))
+                    axis.grid(True)
                 
-                axis.xaxis.set_major_locator(ticker.LinearLocator(11))
-                axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
-                axis.xaxis.set_minor_locator(ticker.NullLocator())
-                axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
-                axis.grid(True)
             if data:
                 if max(data) != 0:
                     print("Valid Data Print!!")
-                    plt.xlim(0, len(data) - 1)
+                    
                     
                     #plt.ylim(min(data), max(data) + 1e-13)
                     if negative_allowed_event.is_set():
                         plt.ylim(min(data)*1.1, max(data)*1.1)
+                        plt.xlim(0, len(data) - 1)
                         #plt.ylim(min(data[1:len(data)-1])*1.1, max(data[1:len(data)-1])*1.1)
                     else:
                         #plt.ylim(0, max(data[1:len(data)-1])*1.1)
-                        for n in range(len(data)):
-                            data[n] = 20 * np.log(data[n] + 1e-15) + 90
+                        # for n in range(len(data)):
+                        #     data[n] = 20 * np.log(data[n] + 1e-15) + 90
+                        #     line.set_data(np.arange(len(data)), data)
+                        # axis.set_yscale(PLOT_YUNIT_log)
+                        plt.ylim(min(data[1:len(data)-1])*1.1, max(data)*1.1)
+                        plt.xlim(1, len(data))
 
-                        plt.ylim(min(data)*1.1, max(data)*1.1)
+
                         #plt.ylim(0, max(data)*1.1)
                         #plt.ylim(-0.005, 0.1)
                     axis.draw_artist(line)
@@ -330,8 +375,8 @@ def main(page: ft.Page):
     line.set_color('#F55BB0')
     chart = MatplotlibChart(figure, expand=True,)
     figure.set_facecolor('#e3e3e3')
-    ax.set_xscale(PLOT_XUNIT)
-    ax.set_yscale(PLOT_YUNIT)
+    ax.set_xscale(PLOT_XUNIT_log)
+    ax.set_yscale(PLOT_YUNIT_log)
     ax.set_title(PLOT_TITLE, fontsize = 18)
     ax.set_xlabel(PLOT_XLABEL, fontsize = 18) 
     ax.set_ylabel(PLOT_YLABEL, fontsize = 18)
@@ -426,7 +471,16 @@ def main(page: ft.Page):
     
 
     def toggle_time_d(e):
-        negative_allowed_event.set() if not negative_allowed_event.is_set() else negative_allowed_event.clear()
+        if negative_allowed_event.is_set():
+            negative_allowed_event.clear()
+            ax.set_yscale(PLOT_YUNIT_log)
+            ax.set_xscale(PLOT_XUNIT_log)
+            
+        
+        else: 
+            negative_allowed_event.set()
+            ax.set_yscale(PLOT_YUNIT_linear)
+            ax.set_xscale(PLOT_XUNIT_linear)
         temp_settings[BANDIT_SETTINGS_BYTES.USBBSRX_TIME_DOMAIN_DATA.value] = int(time_domain_switch.value)
 
 
