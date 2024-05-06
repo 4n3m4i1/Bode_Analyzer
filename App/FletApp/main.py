@@ -3,18 +3,11 @@ import matplotlib.axes
 import matplotlib.axis
 import matplotlib.figure
 import matplotlib.lines
-
 import webbrowser
-
 from generic_include import *
 from generic_include import BANDIT_SETTINGS_BYTES
 from assets.ref import *
 import serial
-import webbrowser
-# from enum import IntEnum
-# import serial.tools.list_ports_osx as list_ports_osx
-# import serial.tools.list_ports_windows as list_ports_windows
-# import serial.tools.list_ports_linux as list_ports_linux
 import serial.tools.list_ports as list_ports
 import platform
 import matplotlib
@@ -651,12 +644,17 @@ def main(page: ft.Page):
             handle_not_connected()
 
     def handle_stop_button_clicked(e):
-        start_event.clear()
-        GraphEvent.clear()
+        if start_event.is_set() and GraphEvent.is_set():
+            start_event.clear()
+            GraphEvent.clear()
+            stop_settings = temp_settings
+            stop_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTORUN.value] = 0x00
+            stop_settings[BANDIT_SETTINGS_BYTES.USBBSRX_AUTOSEND.value] = 0x00
+            Settings_Queue.put(stop_settings)
 
-        Settings_Queue.put(stop_settings)
-
-        settings_event.set()
+            settings_event.set()
+        else:
+            pass
 
     
         
@@ -1318,7 +1316,6 @@ def main(page: ft.Page):
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
     data_converter_process.daemon = True
-    print('try')
     update_graph_thread = Thread(target=update_graph, args=(FFT_converted_queue, chart, line, FRANGE_queue, ax, figure))
     update_graph_thread.daemon = True
     update_graph_thread.start()
