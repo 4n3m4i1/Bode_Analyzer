@@ -27,6 +27,7 @@ Q15 recall_sample_from_FIR(struct Q15_FIR_PARAMS *a, int offset);
 Q15 recall_sample_from_2n_FIR(struct Q15_FIR_PARAMS *a, int offset);
 Q15 read_inc_2n_FIR(struct Q15_FIR_PARAMS *a);
 Q15 run_2n_FIR_cycle(struct Q15_FIR_PARAMS *a, Q15 new_data);
+Q15 run_2n_FIR_cycle_no_inc(struct Q15_FIR_PARAMS *a, Q15 new_data);
 
 void flush_FIR_buffer(struct Q15_FIR_PARAMS *a);
 void flush_FIR_taps(struct Q15_FIR_PARAMS *a);

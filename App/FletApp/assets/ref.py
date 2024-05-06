@@ -49,39 +49,73 @@ PLOT_TITLE = "BANDIT Output"
 PLOT_XLABEL = "FREQUENCY"
 PLOT_YLABEL = "dB"
 
-PLOT_XUNIT = "log"
-PLOT_YUNIT = "log"
+PLOT_XUNIT = "linear"
+PLOT_YUNIT = "linear"
 
 
 WGN_LABEL = "Toggle WGN Mode"
-WGN_LABEL_OFF = "OFF"
-WGN_LABEL_ON = "ON"
+WGN_LABEL_OFF = "Default White Noise Operation"
+WGN_LABEL_ON = "White Noise Always On"
 SINGLE_SHOT_LABEL = "Toggle Single Shot Mode"
 
 AUTO_RUN_LABEL = "Toggle Auto Run Mode"
 
-RAW_REQUEST_LABEL = "Toggle Raw Data Mode"
+RAW_REQUEST_LABEL = "Skip LMS"
 
-TIME_DOMAIN_REQUEST_LABEL = "Toggle Time Domain Mode"
+TIME_DOMAIN_REQUEST_LABEL = "Skip FFT"
 
+LEARNING_RATE_LABEL = "Select Learning Rate"
 
-COPYRIGHT_TXT = "Copyright @ 2024 BODE BANDITS"
-#SDSU_CE_TEXT = "San Diego State University College of Engineering"
-SDSU_CE_TEXT = "SDSU College of Engineering"
-
+OFFSET_LABEL = "Select Offset Amount"
 #colors
 BANNER_COLOR = "#d5a6bd" # light pink
 PAGE_BG_COLOR = "#e3e3e3" # light gray
 START_BUTTON_COLOR = "#ecd4df" # lighter pink
 STOP_BUTTON_COLOR = "#c27ba0" # dark pink
 TABLE_HEAD_COLOR = "#D4D4D4"
-SINGLE_SHOT_ON = "#c8f7ce"    # light green
-SINGLE_SHOT_OFF = "#fc5d5d"  # light red
 
 
 ## About us page components
 ABOUT_TITLE = "About Us"
-ARI_IMAGE = "/Ari.png"
-CHRISTIAN_IMAGE = "/Christian.png"
+####LANCE 
+LANCE_IMAGE = "/LANCEBB.png"
+LANCE_FRIENDS = "/LanceFriends.png"
+LANCE_HOBBY = "/LanceHobby.png"
+LANCE_FAM = "/LanceFam.png"
+
+
+#####JOSEPH PAGE 
+JOSEPH_IMAGE = "/JosephBB.png"
+JOSEPH_HOBBY = "/JosephHobby.png"
+JOSEPH_SOLO = "/Joseph.png"
+JOSEPH_FRIENDS = "/JosephFriends.png"
+
+
+
+####ARI PAGE
+ARI_IMAGE = "/AriBBTwo.png"
+ARI_HOBBY = "/AriHobby.png"
+ARI_GRAD = "/AriGrad.png"
+ARI_FAM = "/AriFam.png"
+
+#JOSH PAGE 
+JOSH_IMAGE = "/JoshBBTwo.png"
+JOSH_HOBBY = "/JoshHobby.png"
+JOSH_FRIENDS = "/JoshFriends.png"
+JOSH_FAM = "/JoshFam.png"
+
+#CHRISTIAN PAGE
+CHRISTIAN_IMAGE = "/ChristianBB.png"
+CHRISTIAN_HOBBY = "/ChristianHobby.png"
+CHRISTIAN_GRAD = "/ChristianGrad.png"
+CHRISTIAN_FRIENDS = "/ChristianFriends.png"
+
+
+JOSEPH_IMAGE = "/JosephBB.png"
+
+
+DIAGRAM = "/HardwareDiagram.png"
 LIGHT_PINK = "#ecd4df"
 DARK_PINK = "#d5a6bd"
+
+YOUTUBE_URL = "https://youtu.be/heG2l5tyS7A?si=Tvam4DrzBTFw0_lb" 
