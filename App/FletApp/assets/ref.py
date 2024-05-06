@@ -116,3 +116,5 @@ JOSEPH_IMAGE = "/JosephBB.png"
 DIAGRAM = "/HardwareDiagram.png"
 LIGHT_PINK = "#ecd4df"
 DARK_PINK = "#d5a6bd"
+
+YOUTUBE_URL = "https://youtu.be/heG2l5tyS7A?si=Tvam4DrzBTFw0_lb" 
