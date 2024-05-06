@@ -74,6 +74,7 @@ ctrl_port = Port()
 
 # init_graph = [0 for i in range(NUM_VALUES)]
 
+Settings_Queue = Queue()
 GraphEvent = Event()
 ##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page, lock):
@@ -799,7 +800,7 @@ def main(page: ft.Page):
     #page.add(ft.Column([Controls]),config_table,chart)
     page.add(ft.Row([Controls,config_table]),ft.Row([config_table2,chart,]))
 
-    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, ft.page, lock))
+    serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page))
     serial_reader.daemon = True
     data_converter_process = Thread(target=raw_data_to_float_converter, args=(FFT_converted_queue, FFT_real_queue, lock))
     data_converter_process.daemon = True
