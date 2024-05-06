@@ -1104,7 +1104,8 @@ debug_no_adc_setup_label:
             case CORE_1_LMS: {
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
 
-                Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
+                //Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
+                LMS_Looper(&LMS_Inst, &LMS_FIR);
 
                 //if(LMS_Error != LMS_OK){
                     // Handle the error
@@ -1326,14 +1327,26 @@ static void USB_Handler(struct FFT_PARAMS *fft){
     for(uint16_t n = 4; n < 31; ++n){
         header_data[n] = 0;
     }
+
+    uint32_t curr_time = timer_hw->timerawl;
+
     header_data[31] = 0xAA40;
     tud_cdc_n_write_flush(CDC_DATA_CHAN);
     send_header_packet(header_data);
     while (tud_cdc_n_read_char(CDC_CTRL_CHAN) != 'a') {
         tud_task(); // wait for ACK from GUI
+
+        // Basically for if BANDIT is unplugged while waiting for an ACK
+        if(curr_time + BANDIT_USB_ACK_TIMEOUT_US > timer_hw->timerawl) goto trash_that_packet_label;
     }
     tud_cdc_n_read_flush(CDC_CTRL_CHAN);
     send_f_packets(fft->fr, num_samples);
+
+    return;
+
+trash_that_packet_label:
+    tud_cdc_n_read_flush(CDC_CTRL_CHAN);
+    tud_cdc_n_read_flush(CDC_DATA_CHAN);
 }
 
 //sends header data through data chan to GUI interface

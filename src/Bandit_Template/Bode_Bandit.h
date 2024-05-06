@@ -205,6 +205,8 @@ enum BANDIT_CORE_1_OP_STATE {
 #define CDC_PACKET_LEN          64
 #define LOG2_CDC_PACKET_LEN     6
 
+#define BANDIT_USB_ACK_TIMEOUT_US   ((1000 * 1000))
+
 //core0 state machine init
 //#define STATE             // variables?
 //#define NEXT_STATE         
