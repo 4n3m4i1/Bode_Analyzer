@@ -89,6 +89,8 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             new_lms_offset = BitArray(hex=CTRLCHANNEL.read(2).hex())
             newlmsmax_attempts = BitArray(hex=CTRLCHANNEL.read(2).hex())
             newlearnin_rate = BitArray(hex=CTRLCHANNEL.read(2).hex())
+            skip_lmsset = newlearnin_rate = BitArray(hex=CTRLCHANNEL.read(1).hex())
+            skip_fftset = newlearnin_rate = BitArray(hex=CTRLCHANNEL.read(1).hex())
             print(setting)
             print(bandit_sett_bf)
             print(newfreqrange)
@@ -97,7 +99,10 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
             print(new_lms_offset)
             print(newlmsmax_attempts)
             print(newlearnin_rate)
-
+            if(skip_fftset): 
+                print("Skip FFT")
+            if(skip_lmsset): 
+                print("Skip LMS")
             # print(thing.bin)
             # CTRLCHANNEL.flush()
             while True:
@@ -118,6 +123,8 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         new_lms_offset = BitArray(hex=CTRLCHANNEL.read(2).hex())
                         newlmsmax_attempts = BitArray(hex=CTRLCHANNEL.read(2).hex())
                         newlearnin_rate = BitArray(hex=CTRLCHANNEL.read(2).hex())
+                        skip_lmsset = newlearnin_rate = BitArray(hex=CTRLCHANNEL.read(1).hex())
+                        skip_fftset = newlearnin_rate = BitArray(hex=CTRLCHANNEL.read(1).hex())
                         print(setting)
                         print(bandit_sett_bf)
                         print(newfreqrange)
@@ -126,6 +133,10 @@ def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queu
                         print(new_lms_offset)
                         print(newlmsmax_attempts)
                         print(newlearnin_rate)
+                        if(skip_fftset): 
+                            print("Skip FFT")
+                        if(skip_lmsset): 
+                            print("Skip LMS")
                         settings_event.clear()
                 else:
                     if DATACHANNEL.in_waiting >= CDC_PACKET_LENGTH:

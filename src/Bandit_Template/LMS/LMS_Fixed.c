@@ -14,6 +14,8 @@ void LMS_Struct_Equate(struct LMS_Fixed_Inst *src, struct LMS_Fixed_Inst *dst){
     dst->x_n = src->x_n;
     dst->samples_processed = src->samples_processed;
     dst->error = src->error;
+    dst->averaging_counts = src->averaging_counts;
+    dst->averaging_counts_limit = src->averaging_counts_limit;
 }
 
 void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable_error, int16_t samples_offset, uint16_t max_runtime, uint16_t start_offset){
@@ -25,6 +27,7 @@ void LMS_Struct_Init(struct LMS_Fixed_Inst *LMS, Q15 tgt_err, Q15 max_acceptable
     LMS->fixed_offset = start_offset;
     LMS->samples_processed = 0;
     LMS->max_convergence_attempts = LMS_DFL_MAX_FAILURES;
+    LMS->averaging_counts = LMS_DFL_AVERAGING_COUNTS;
     LMS->error = 0;
 }
 

@@ -60,6 +60,7 @@
 // Core 1 -> 0 transfer buffers
 struct Transfer_Data {
     volatile bool       updated;
+    volatile bool       calibration_data;
     volatile uint16_t   len;
     volatile Q15        data[TOTAL_ADAPTIVE_FIR_LEN];
 
@@ -84,6 +85,7 @@ CORE_0_MEM Q15 FI_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
 
 // FFT Averaging buffer
 CORE_0_MEM Q15 FFT_AVG_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
+CORE_0_MEM Q15 FFT_CAL_BUFF[TOTAL_ADAPTIVE_FIR_LEN];
 
 // Reserve Buffer for Stored Results
 CORE_0_MEM Q15 RESULTS_BUFFER[TOTAL_ADAPTIVE_FIR_LEN];
@@ -115,6 +117,8 @@ CORE_1_MEM Q15 D_N_0[TOTAL_BUFF_LEN];
 // LMS FIR For Producing Y[n]
 CORE_1_MEM Q15 LMS_FIR_BANK[TOTAL_ADAPTIVE_FIR_LEN + DEFAULT_LMS_TAP_LEN];
 CORE_1_MEM Q15 LMS_H_HATS[TOTAL_ADAPTIVE_FIR_LEN + DEFAULT_LMS_TAP_LEN];
+
+CORE_1_MEM Q15 LMS_H_HATS_AVG[TOTAL_ADAPTIVE_FIR_LEN + DEFAULT_LMS_TAP_LEN];
 
 CORE_1_MEM Q15 LMS_H_HATS_CORRECTION[TOTAL_ADAPTIVE_FIR_LEN + DEFAULT_LMS_TAP_LEN];
 
@@ -269,6 +273,8 @@ static void core_0_main(){
     //uint32_t pace_time_limit = 31250;
     uint32_t pace_time_limit = 100000;
 
+    bool is_calibration_data = false;
+
     while(1){
         tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
         tud_task();
@@ -313,6 +319,8 @@ static void core_0_main(){
                     //  then don't run the FFT
                     bool allzeros = true;
 
+                    is_calibration_data = data_src->calibration_data;
+
                     if(data_src->len && !SKIP_FFT){
                         // Apply windowing here if needed!!!
                         
@@ -345,15 +353,33 @@ static void core_0_main(){
                     FFT_mag(&cool_fft);         // Extract magnitude, output in fft.fr
                     cool_fft.num_samples >>= 1; // Print only half of fft result, dodge reflected stuff
                     
-                    for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
-                        FFT_AVG_BUFF[n] += cool_fft.fr[n];
-                        cool_fft.fr[n] = (FFT_AVG_BUFF[n] >>= 1);    
-                    
+                    if(is_calibration_data){
+                        Q15 maxval = 0;
+                        for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
+                            if(cool_fft.fr[n] > maxval) maxval = cool_fft.fr[n];
+                            //FFT_CAL_BUFF[n] = cool_fft.fr[n];
+                            FFT_AVG_BUFF[n] = 0;
+                        }
+
+                        for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
+                            FFT_CAL_BUFF[n] = maxval - cool_fft.fr[n];
+                        }
+                        
+                        
+                    } else {
+                        for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
+                            FFT_AVG_BUFF[n] += cool_fft.fr[n];
+                            cool_fft.fr[n] = (FFT_AVG_BUFF[n] >>= 1);    
+                            cool_fft.fr[n] += FFT_CAL_BUFF[n];
+                        }
                     }
                 } else {
                     for(uint16_t n = 0; n < ICTXFR_A.len; ++n){
                         cool_fft.fr[n] = ICTXFR_A.data[n];
+                        // Debug
+                        //cool_fft.fr[n] = (Q15)n;
                     }    
+                    cool_fft.num_samples = ICTXFR_A.len;
                 }
                 
 
@@ -376,11 +402,12 @@ static void core_0_main(){
                 //  stall for limiting packets per second
                 if(!SKIP_FFT) while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
                 // LMS Sends 2x as many bytes as usual FFT packets, so slow down A LOT
-                else while(timer_hw->timerawl - pace_timer < pace_time_limit) tud_task();
+                else while(timer_hw->timerawl - pace_timer < (pace_time_limit << 1)) tud_task();
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
                 tud_task();
 
-                USB_NEXT_STATE = USB_SEND_TUSB;
+                if(is_calibration_data) USB_NEXT_STATE = USB_FFT_DATA_COLLECT;
+                else USB_NEXT_STATE = USB_SEND_TUSB;
             }
             break;
 
@@ -394,14 +421,6 @@ static void core_0_main(){
                 //    cool_fft.fr[n] = cool_fft.fr[cool_fft.log2_num_samples - 1];
                 //}
                 cool_fft.fr[0] = cool_fft.fr[1];
-                //cool_fft.fr[0] = cool_fft.fr[8];
-                //cool_fft.fr[1] = cool_fft.fr[8];
-                //cool_fft.fr[2] = cool_fft.fr[8];
-                //cool_fft.fr[3] = cool_fft.fr[8];
-                //cool_fft.fr[4] = cool_fft.fr[8];
-                //cool_fft.fr[5] = cool_fft.fr[8];
-                //cool_fft.fr[6] = cool_fft.fr[8];
-                //cool_fft.fr[7] = cool_fft.fr[8];
 #endif                
                 send_f_packets(cool_fft.fr, cool_fft.num_samples);
                 tud_task();
@@ -466,6 +485,7 @@ static void core_1_main(){
     DFL_LMS_Inst.iteration_ct = STD_MAX_SAMPLES;
     DFL_LMS_Inst.d_n_offset = 0;
     DFL_LMS_Inst.learning_rate = 0x0020;    // 0.001
+    DFL_LMS_Inst.averaging_counts_limit = 2;
     //DFL_LMS_Inst.learning_rate = 0x0003;    // 0.0001
     //DFL_LMS_Inst.learning_rate = 0x0008;    // 0.00025
 
@@ -480,6 +500,8 @@ static void core_1_main(){
     LMS_FIR.taps = LMS_H_HATS;
     
     LMS_Inst.max_convergence_attempts = 4;
+    LMS_Inst.averaging_counts_limit = 2;
+    LMS_Inst.averaging_counts = 0;
 
     /*
         For Tap Length Update:
@@ -709,7 +731,7 @@ start_refdac_cal:
     uint8_t CORE_1_FRANGE   = DOWNSAMPLE_1X_250K_CUT;
     bool CORE_1_SEND_UNPROCESSED = false;
     bool CORE_1_SEND_INTERLEAVED = false;
-
+    bool sending_calib_data = true;
 
     // Configure- White Noise Generation Signal Chain
     // Setup AWGN Generation from overdriven ROSC -> DMA -> PIO
@@ -727,6 +749,8 @@ start_refdac_cal:
     }
     //spin_unlock(SETTINGS_LOCK, spinlock_irq_status_B);
     Release_Lock(INTERCORE_SETTINGS_LOCK);
+
+    for(uint16_t n = 0; n < count_of(LMS_H_HATS_AVG); ++n) LMS_H_HATS_AVG[n] = 0;
 
     // Main Loop for Core 1
     //  All peripherals should be configured by now :)
@@ -753,9 +777,10 @@ debug_no_adc_setup_label:
                     error_attempts = 0;
                     flush_FIR_buffer_and_taps(&LMS_FIR);
 
-                    set_ULED_level(Bandit_RGBU.U = 0);
+                    //set_ULED_level(Bandit_RGBU.U = 0);
                     
                     LMS_Inst.samples_processed = 0;
+                    LMS_Inst.averaging_counts = 0;
 
                     CORE_1_STATE = CORE_1_SET_SETTINGS;
                 }
@@ -785,6 +810,10 @@ debug_no_adc_setup_label:
 
                     if(LMS_Inst.tap_len > MAX_TAPS || LMS_Inst.tap_len < DEFAULT_LMS_TAP_LEN) LMS_Inst.tap_len = DEFAULT_LMS_TAP_LEN;
 
+                    LMS_Inst.max_convergence_attempts = get_log_2(LMS_Inst.tap_len);
+
+                    if(!LMS_Inst.max_convergence_attempts || LMS_Inst.max_convergence_attempts > 10) LMS_Inst.max_convergence_attempts = 4;
+
                     if(((Global_Bandit_Settings.manual_lms_offset < 0) ? Global_Bandit_Settings.manual_lms_offset * -1 : Global_Bandit_Settings.manual_lms_offset) 
                             > ((LMS_Inst.tap_len >> 1) + (LMS_Inst.tap_len >> 2) + (LMS_Inst.tap_len >> 3))) {
                                 Global_Bandit_Settings.manual_lms_offset = 0;
@@ -796,9 +825,12 @@ debug_no_adc_setup_label:
                     LMS_Inst.max_convergence_attempts = Global_Bandit_Settings.manual_lms_attempts;
 
                     LMS_Inst.learning_rate = Global_Bandit_Settings.manual_learning_rate;
+
                     if(!LMS_Inst.learning_rate) LMS_Inst.learning_rate = 0x0003;
 
                     setup_Q15_FIR(&LMS_FIR, LMS_Inst.tap_len);
+
+                    for(uint16_t n = 0; n < count_of(LMS_H_HATS_AVG); ++n) LMS_H_HATS_AVG[n] = 0;
 
                     LMS_FIR.curr_zero = 0;
 
@@ -808,7 +840,9 @@ debug_no_adc_setup_label:
                    // flush_FIR_buffer_and_taps(&LMS_FIR);
 
                     Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
+                    set_ULED_level(Bandit_RGBU.U = 0);
                     Global_Bandit_Settings.updated = false;
+                    sending_calib_data = true;
                     CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
@@ -865,10 +899,10 @@ debug_no_adc_setup_label:
                 }
 
                 LMS_Inst.error = 0;
-                for(uint16_t n = 0; n < count_of(LMS_FIR_BANK); ++n){
-                    LMS_FIR.taps[n] = 0;
-                    LMS_FIR.data[n] = 0;
-                }
+                //for(uint16_t n = 0; n < count_of(LMS_FIR_BANK); ++n){
+                //    LMS_FIR.taps[n] = 0;
+                //    LMS_FIR.data[n] = 0;
+                //}
 
                 CORE_1_STATE = CORE_1_SAMPLE;
 
@@ -950,7 +984,7 @@ debug_no_adc_setup_label:
                 // Go white for DC Cal done, Idle return
                 set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 127);
                // busy_wait_ms(1000);
-                set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
+                //set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_DC_CAL_DONE);
 
                 CORE_1_STATE = CORE_1_IDLE;
             }
@@ -1013,7 +1047,7 @@ debug_no_adc_setup_label:
                     for(n = 0; n < DOWNSAMPLE_LEN; ++n){
                         run_2n_FIR_cycle(torun, D_N_0[n]);
                     }
-                    for(n; n < STD_MAX_SAMPLES; ++n){
+                    for(; n < STD_MAX_SAMPLES; ++n){
                         D_N_0[n - DOWNSAMPLE_LEN] = run_2n_FIR_cycle(torun, D_N_0[n]);
                     }
 
@@ -1021,7 +1055,7 @@ debug_no_adc_setup_label:
                     for(n = 0; n < DOWNSAMPLE_LEN; ++n){
                         run_2n_FIR_cycle(torun, X_N_0[n]);
                     }
-                    for(n; n < STD_MAX_SAMPLES; ++n){
+                    for(; n < STD_MAX_SAMPLES; ++n){
                         X_N_0[n - DOWNSAMPLE_LEN] = run_2n_FIR_cycle(torun, X_N_0[n]);
                     }
                 }
@@ -1045,19 +1079,12 @@ debug_no_adc_setup_label:
 
             case CORE_1_LMS: {
                 set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-#ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-                //set_RGB_levels(BANDIT_PINK_SUPER_ARGUMENT);
-#endif
+
                 Q15 LMS_Error = LMS_Looper(&LMS_Inst, &LMS_FIR);
 
-#ifndef NO_DEBUG_LED
-                set_RGB_levels(Bandit_RGBU.R = 127, Bandit_RGBU.G = 127, Bandit_RGBU.B = 255);
-#endif
                 //if(LMS_Error != LMS_OK){
                     // Handle the error
                     //  Sample again and try again
-                    error_attempts++;
                     CORE_1_STATE = CORE_1_SAMPLE;
                 //} else {
                 //    CORE_1_STATE = CORE_1_POST_PROC;
@@ -1066,7 +1093,7 @@ debug_no_adc_setup_label:
                 //}
 
                 // If we've errored out too many times...
-                if(error_attempts > LMS_Inst.max_convergence_attempts){
+                if(++error_attempts > LMS_Inst.max_convergence_attempts){
                     set_RGB_levels(Bandit_RGBU.R = 255, Bandit_RGBU.G = 0, Bandit_RGBU.B = 0);
                     CORE_1_STATE = CORE_1_POST_PROC;
                 } 
@@ -1086,27 +1113,50 @@ debug_no_adc_setup_label:
                     for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
                         LMS_H_HATS_CORRECTION[n] = LMS_FIR.taps[n];
                     }
+                    
 
                     // Set PGA to EXTERNAL input x1 GAIN
-                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
-                    MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+                    if(++LMS_Inst.averaging_counts >= LMS_Inst.averaging_counts_limit){
+                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_CHANNEL_REGISTER), MCP6S92_CHAN_0, PGA_CSN_PAD);
+                        MCP6S92_Send_Command_Raw(mcp_spi, MCP6S92_INSTR(MCP6S92_REG_WRITE, MCP6S92_GAIN_REGISTER), MCP6S92_x1_GAIN, PGA_CSN_PAD);
+    
+                        // PGA Settling Time
+                        busy_wait_us_32(MCP6S92_SETTLING_TIME);
+    
+                        Bandit_Calibration_State = BANDIT_FULLY_CALIBRATED;
+                    
+                        sending_calib_data = true;
 
-                    // PGA Settling Time
-                    busy_wait_us_32(MCP6S92_SETTLING_TIME);
+                        // Indicate full CAL with green LEDs
+                        set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
+                        //set_ULED_level(Bandit_RGBU.U = 255);
+                    }
 
-                    Bandit_Calibration_State = BANDIT_FULLY_CALIBRATED;
-
-                    // Indicate full CAL with green LEDs
-                    set_RGB_levels(Bandit_RGBU.R = 0, Bandit_RGBU.G = 127, Bandit_RGBU.B = 0);
-                    set_ULED_level(Bandit_RGBU.U = USER_LED_BANDIT_RDY);
+                    
                     
                     // Calibration Acquired, go back to do first run
-                    CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+                    if(LMS_Inst.averaging_counts){
+                        for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                            LMS_H_HATS_AVG[n] = (LMS_H_HATS_AVG[n] + LMS_FIR.taps[n]) >> 1;
+                            //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                        }
+                    } else {
+                        for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                            LMS_H_HATS_AVG[n] = LMS_FIR.taps[n];
+                        }
+                    }
+
+                    if(LMS_Inst.averaging_counts >= LMS_Inst.averaging_counts_limit) CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                    else CORE_1_STATE = CORE_1_SAMPLE;
+
+                    //CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
                     
                     // Select what data is shipped over to core 0
+                    sending_calib_data = false;
 
                     if(CORE_1_SEND_UNPROCESSED){
+                        set_ULED_level(Bandit_RGBU.U = 255);
                         if(CORE_1_SEND_INTERLEAVED) {
                             // Send both D_N and X_N data, D_N first then X_N each filling half the buffer
                             for(uint16_t n = 0; n < LMS_Inst.tap_len >> 1; ++n){
@@ -1121,25 +1171,26 @@ debug_no_adc_setup_label:
                         }
                         
                         busy_wait_ms(10);
+                        CORE_1_STATE = CORE_1_SHIP_RESULTS;
 
                     } else {
-                        for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
-                            //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
-                            // Deboog only
-                            //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
-                            //LMS_FIR.taps[n] = X_N_0[n] - D_N_0[n];
-                            //LMS_FIR.taps[n] = D_N_0[n];
-                            //LMS_FIR.taps[n] = Bandit_DC_Offset_Cal;
-                            //LMS_H_HATS[n] = 0xAB;
-                            //LMS_FIR.taps[n] = 0xBC;
-                        //    LMS_FIR.taps[n] = LMS_Inst.error;
-                        //    LMS_FIR.taps[n + 1] = LMS_Inst.samples_processed;
-                            //LMS_FIR.taps[n] = LMS_H_HATS_CORRECTION[n];
+
+                        if(LMS_Inst.averaging_counts){
+                            for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                                LMS_H_HATS_AVG[n] = (LMS_H_HATS_AVG[n] + LMS_FIR.taps[n]) >> 1;
+                                //LMS_FIR.taps[n] -= LMS_H_HATS_CORRECTION[n];
+                            }
+                        } else {
+                            for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                                LMS_H_HATS_AVG[n] = LMS_FIR.taps[n];
+                            }
                         }
+
+                        if(++LMS_Inst.averaging_counts >= LMS_Inst.averaging_counts_limit) CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                        else CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                     }
                     
-
-                    CORE_1_STATE = CORE_1_SHIP_RESULTS;
+                    
                 }
 
                 // Turn off WGN if always on is disabled
@@ -1161,6 +1212,12 @@ debug_no_adc_setup_label:
                 // If this didn't need to be serialized DMA would be sick here
                 //  but really no benefit due to overall processing structure
                 //  1000% could be better tho
+                if(!CORE_1_SEND_UNPROCESSED){
+                    for(uint16_t n = 0; n < LMS_Inst.tap_len; ++n){
+                        LMS_FIR.taps[n] = LMS_H_HATS_AVG[n];
+                    }
+                }
+                
 
                 Acquire_Lock_Blocking(INTERCORE_FFTMEM_LOCK_A);
 
@@ -1172,8 +1229,11 @@ debug_no_adc_setup_label:
                 ICTXFR_A.lms_error = LMS_Inst.error;
                 ICTXFR_A.lms_samples_processed = LMS_Inst.samples_processed;
                 ICTXFR_A.lms_error_attempts = error_attempts;
+                ICTXFR_A.calibration_data = sending_calib_data;
 
                 Release_Lock(INTERCORE_FFTMEM_LOCK_A);
+
+                LMS_Inst.averaging_counts = 0;
 
                 // Open window for potential settings memory access here,
                 //  prevent loop from spinning too quickly
@@ -1347,7 +1407,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         Global_Bandit_Settings.settings_bf = new_settings_value;
 
         Global_Bandit_Settings.skip_lms = (BS_RX_BF[USBBSRX_RAW_RQ]) ? true : false;
-
+        
         SKIP_FFT = (BS_RX_BF[USBBSRX_TIME_DOMAIN_DATA]) ? true : false;
 
         // Set settings updated flag
@@ -1362,6 +1422,9 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsoffset, 2);                        // Decoded LMS offset   
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&newlmsmaxattempts, 2);                   // Decoded manual error limit
         tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&learnin_rate, 2);                        // Decoded manual Learning Rate
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&Global_Bandit_Settings.skip_lms, 1);     // Decoded Skip LMS
+        tud_cdc_n_write(CDC_CTRL_CHAN, (uint8_t *)&SKIP_FFT, 1);                            // Decoded Skip FFT
+
 
         // Flush outgoing transmissions
         tud_cdc_n_write_flush(CDC_DATA_CHAN);
