@@ -274,6 +274,7 @@ static void core_0_main(){
     uint32_t pace_time_limit = 100000;
 
     bool is_calibration_data = false;
+    Q15 calibration_max = 0;
 
     while(1){
         tud_cdc_n_set_wanted_char(CDC_CTRL_CHAN, START_CHAR);
@@ -365,12 +366,20 @@ static void core_0_main(){
                             FFT_CAL_BUFF[n] = maxval - cool_fft.fr[n];
                         }
                         
+                        calibration_max = maxval;
                         
                     } else {
+                        Q15 maxval = 0;
+                        for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n) if(cool_fft.fr[n] > maxval) maxval = cool_fft.fr[n];
+
+                        Q15 normalize_calibration = div_Q15(calibration_max, maxval);
+
                         for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
                             FFT_AVG_BUFF[n] += cool_fft.fr[n];
-                            cool_fft.fr[n] = (FFT_AVG_BUFF[n] >>= 1);    
-                            cool_fft.fr[n] += FFT_CAL_BUFF[n];
+                            FFT_AVG_BUFF[n] >>= 1;
+                            cool_fft.fr[n] = FFT_AVG_BUFF[n];
+                           // cool_fft.fr[n] -= mul_Q15(FFT_CAL_BUFF[n], normalize_calibration);
+                            //cool_fft.fr[n] <<= 3;    
                         }
                     }
                 } else {
@@ -814,13 +823,18 @@ debug_no_adc_setup_label:
 
                     if(!LMS_Inst.max_convergence_attempts || LMS_Inst.max_convergence_attempts > 10) LMS_Inst.max_convergence_attempts = 4;
 
+//#define BANDIT_SHIFT_HT     ((int16_t)((LMS_Inst.tap_len >> 1) + (LMS_Inst.tap_len >> 2) + (LMS_Inst.tap_len >> 3)))
+#define BANDIT_SHIFT_HT     ((int16_t)((LMS_Inst.tap_len >> 1)))
+
                     if(((Global_Bandit_Settings.manual_lms_offset < 0) ? Global_Bandit_Settings.manual_lms_offset * -1 : Global_Bandit_Settings.manual_lms_offset) 
-                            > ((LMS_Inst.tap_len >> 1) + (LMS_Inst.tap_len >> 2) + (LMS_Inst.tap_len >> 3))) {
+                            > BANDIT_SHIFT_HT) {
                                 Global_Bandit_Settings.manual_lms_offset = 0;
                             }
 
                     // Shift by num taps / 2 + some manual offset 04/24/2024 jdv
-                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + (int16_t)(LMS_Inst.tap_len >> 1) + (int16_t)(LMS_Inst.tap_len >> 2) + (LMS_Inst.tap_len >> 3);
+                    LMS_Inst.d_n_offset = Global_Bandit_Settings.manual_lms_offset + BANDIT_SHIFT_HT;
+
+#undef BANDIT_SHIFT_HT
 
                     LMS_Inst.max_convergence_attempts = Global_Bandit_Settings.manual_lms_attempts;
 

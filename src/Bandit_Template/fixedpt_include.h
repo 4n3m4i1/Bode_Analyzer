@@ -21,6 +21,8 @@ typedef uint32_t    _uns2xFix;
 #define sub_Q15(a,b)        (a - b)
 #define mul_Q15(a,b)        ((Q15)((((_sn2xFix)(a))*((_sn2xFix)(b)))>>SHAMT)) //multiply two fixed 16.15
 
+#define div_Q15(a,b)        ((Q15)(((_sn2xFix)a << SHAMT)) / (_sn2xFix)b)
+
 #define abs_Q15(a)          abs(a)
 #define int_2_Q15(a)        ((Q15)(a << SHAMT))
 #define Q15_2_int32(a)      ((_sn2xFix)(a >> SHAMT))
