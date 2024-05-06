@@ -233,15 +233,28 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                 frange = frange_queue.get()
                 if negative_allowed_event.is_set():
                     axis.xaxis.set_major_locator(ticker.LinearLocator(11))
-                    # axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                        
                     axis.xaxis.set_minor_locator(ticker.NullLocator())
-                    # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                        # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.yaxis.set_major_locator(ticker.LinearLocator(11))
                     axis.grid(True)
                 else:
-                    axis.xaxis.set_major_locator(ticker.LogLocator(11))
-                    # axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
-                    axis.xaxis.set_minor_locator(ticker.NullLocator())
-                    # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.xaxis.set_major_locator(ticker.LogLocator(
+                            base=10,
+                            subs='auto'
+
+                        ))
+                    axis.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: "{0:g}".format(frange / (len(data) - 1) * x)))
+
+                    axis.yaxis.set_major_formatter(ticker.ScalarFormatter())
+                        # axis.xaxis.set_minor_locator(ticker.Log)
+                        # axis.xaxis.set_minor_formatter(ticker.FuncFormatter(lambda x, pos: '{0:g}'.format((x / (len(data) - 1)) * frange)))
+                    axis.yaxis.set_major_locator(ticker.LogLocator(
+                            base=10,
+                            subs='auto',
+                            numticks = 10
+                        ))
                     axis.grid(True)
                 
             if data:
