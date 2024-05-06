@@ -49,9 +49,10 @@ PLOT_TITLE = "BANDIT Output"
 PLOT_XLABEL = "FREQUENCY"
 PLOT_YLABEL = "dB"
 
-PLOT_XUNIT = "linear"
-PLOT_YUNIT = "linear"
-
+PLOT_XUNIT_linear = "linear"
+PLOT_YUNIT_linear = "linear"
+PLOT_YUNIT_log = "log"
+PLOT_XUNIT_log = "log"
 
 WGN_LABEL = "Toggle WGN Mode"
 WGN_LABEL_OFF = "Default White Noise Operation"
