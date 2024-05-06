@@ -15,12 +15,12 @@
 
 #define SAMPLING_SLICE  3
 
-static void Sampling_Setup(uint32_t fs_khz){
-    pwm_hw->slice[SAMPLING_SLICE].div = (1u) << PWM_CH3_DIV_INT_LSB;
-    pwm_hw->slice[SAMPLING_SLICE].top = ((SYS_CLK_KHZ / fs_khz)) + ADC_FS_CALIB_OFFSET;
-    //pwm_hw->slice[SAMPLING_SLICE].top = 250;
-    pwm_hw->slice[SAMPLING_SLICE].ctr = 0;
-}
+//static void Sampling_Setup(uint32_t fs_khz){
+//    pwm_hw->slice[SAMPLING_SLICE].div = (1u) << PWM_CH3_DIV_INT_LSB;
+//    pwm_hw->slice[SAMPLING_SLICE].top = ((SYS_CLK_KHZ / fs_khz)) + ADC_FS_CALIB_OFFSET;
+//    //pwm_hw->slice[SAMPLING_SLICE].top = 250;
+//    pwm_hw->slice[SAMPLING_SLICE].ctr = 0;
+//}
 
 static inline bool Sample_Now(){
     // 4.5.2.7 "A slice will assert an ISR flag whenever the counter wraps"
