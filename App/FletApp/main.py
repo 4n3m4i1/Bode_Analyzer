@@ -1427,15 +1427,6 @@ def main(page: ft.Page):
         ]
     )
 
-    page.bottom_appbar= ft.BottomAppBar(
-        bgcolor= BANNER_COLOR,
-        content=ft.Row([
-            ft.Text(COPYRIGHT_TXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM, color = ft.colors.BLACK),
-            ft.Container(expand=True), 
-            ft.Text(SDSU_CE_TEXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM, color = ft.colors.BLACK)
-            ]
-        ),
-    )
 
     #page.add(ft.Column([Controls]) ,chart ) 
     #page.add(ft.Column([Controls]),config_table,chart)
