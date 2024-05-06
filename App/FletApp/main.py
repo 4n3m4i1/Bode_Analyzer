@@ -68,6 +68,10 @@ for index1 in range(size1):
 
 data_port = Port()
 ctrl_port = Port()
+
+# init_graph = [0 for i in range(NUM_VALUES)]
+
+Settings_Queue = Queue()
 GraphEvent = Event()
 ##########################################################################################SERIALREAD
 def serial_read(dataPort: Port, ctrlPort: Port, data_Queue: Queue, settings_Queue: Queue, page, lock):
@@ -701,17 +705,24 @@ def main(page: ft.Page):
             actions=[ft.TextButton(CLOSE_STR, on_click=close_banner),]
             )
     
-    
-    ## CONTAINERS for the about us page
-    # logo = ft.Container(
-    #     content = ft.Image(
-    #         src= BANDIT_LOGO_SRC,
-    #         width=140,
-    #         height=140,
-    #         fit=ft.ImageFit.CONTAIN,
-    #     ),
-    #     alignment = ft.alignment.center,
-    # )
+    ## Content for the about us page
+    logo = ft.Container(
+        ft.Image(
+            src= BANDIT_LOGO_SRC,
+            width=150,
+            height=150,
+            fit=ft.ImageFit.CONTAIN,
+        ),
+
+        alignment = ft.alignment.center
+    )
+
+    logo_appbar = ft.Container(
+        content = ft.Image(
+            src= BANDIT_LOGO_SRC,
+            fit=ft.ImageFit.CONTAIN,
+        )
+    )
     
         
     overview_title = ft.Container(
@@ -1024,7 +1035,7 @@ def main(page: ft.Page):
 
         content= ft.OutlinedButton(
         text=START_BUTTON_TEXT,
-        width=150,
+        width=250,
         on_click = handle_start_button_clicked,
     ),
         bgcolor='#ecd4df',
@@ -1034,7 +1045,7 @@ def main(page: ft.Page):
     stop_container = ft.Container (
         content= ft.OutlinedButton(
         text=STOP_BUTTON_TEXT,
-        width=150,
+        width=250,
         on_click = handle_stop_button_clicked,
     ),
         bgcolor='#c27ba0',
@@ -1089,30 +1100,80 @@ def main(page: ft.Page):
     config_table = ft.DataTable(
         border=ft.border.all(1, "black"),
         bgcolor = 'white',
+        heading_row_color= TABLE_HEAD_COLOR,
+        width = 1150,
 
             columns=[
-                ft.DataColumn(ft.Text("Control Port")),
-                ft.DataColumn(ft.Text("Data Port")),
-                ft.DataColumn(ft.Text("Taps")),
-                ft.DataColumn(ft.Text("Frequency Range")),
+                ft.DataColumn(ft.Text(CONTROL_PORT_STR, color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(DATA_PORT_STR,color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(TAPS_STR, color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(FREQ_RANGE_STR, color = ft.colors.BLACK)),
             ],
             rows=[
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text("Not Selected")),
-                        ft.DataCell(ft.Text("Not Selected")),
-                        ft.DataCell(ft.Text("Not Selected")),
-                        ft.DataCell(ft.Text("Not Selected")),
-                    ],
-            ),
+                        ft.DataCell(ft.Text(" ")),
+                        ft.DataCell(ft.Text(" ")),
+                        ft.DataCell(ft.Text(" ")),
+                        ft.DataCell(ft.Text(" ")),
+                    ],),
+            ],
+        )
+
+    config_table2 = ft.DataTable(
+        border=ft.border.all(1, "black"),
+        bgcolor = 'white',
+        column_spacing=0,
+        data_row_max_height= 78,
+        height = 450,
+        width = 240,
+        heading_row_color= TABLE_HEAD_COLOR,
+
+            columns=[
+                ft.DataColumn(ft.Text(SETTING_STR, color = ft.colors.BLACK)),
+                ft.DataColumn(ft.Text(STATUS_STR, color = ft.colors.BLACK)),
+            ],
+            rows=[
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(WGN_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(SINGLE_SHOT_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                        
+                    ],),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(AUTO_RUN_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(RAW_DATA_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(TD_STR, color = ft.colors.BLACK)),
+                        ft.DataCell(ft.Text(OFF_STR, color = ft.colors.RED)),
+                    ],),
             ],
         )
     
 
-    Controls = ft.Row(
-        [start_container
-        ,stop_container,
-        ] 
+    # Controls = ft.Row(
+    #     [start_container
+    #     ,stop_container,
+    #     ] 
+    #     )
+    
+    Controls = ft.Column(
+    [start_container
+    ,stop_container,
+    ] 
         )
     
     # switches = ft.Row(
@@ -1141,33 +1202,78 @@ def main(page: ft.Page):
         if max(temp_settings) != 0 and start_event.is_set(): 
             Settings_Queue.put(temp_settings)
             settings_event.set()
+
         updated_table = ft.DataTable(
             border=ft.border.all(1, "black"),
             bgcolor = 'white',
-
+            width = 1150,
+            heading_row_color= TABLE_HEAD_COLOR,
                 columns=[
-                    ft.DataColumn(ft.Text("Control Port")),
-                    ft.DataColumn(ft.Text("Data Port")),
-                    ft.DataColumn(ft.Text("Taps")),
-                    ft.DataColumn(ft.Text("Frequency Range")),
+                    ft.DataColumn(ft.Text(CONTROL_PORT_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(DATA_PORT_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(TAPS_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(FREQ_RANGE_STR, color = ft.colors.BLACK)),
                 ],
                 rows=[
                     ft.DataRow(
                         cells=[
-                            ft.DataCell(ft.Text(data_select.value)),
-                            ft.DataCell(ft.Text(ctrl_select.value)),
-                            ft.DataCell(ft.Text(tap_select.value)) if tap_select.value else ft.DataCell(ft.Text(parametric_taps[0])),
-                            ft.DataCell(ft.Text(frequency_ranges[int(freq_range_select.value)]))
+                            ft.DataCell(ft.Text(data_select.value, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ctrl_select.value, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(tap_select.value, color = ft.colors.BLACK)) if tap_select.value else ft.DataCell(ft.Text(parametric_taps[0], color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(frequency_ranges[int(freq_range_select.value)], color = ft.colors.BLACK))
                                 if freq_range_select.value
-                                else ft.DataCell(ft.Text(frequency_ranges[0]))
-                        ],
-                        
-                ),
+                                else ft.DataCell(ft.Text(frequency_ranges[0], color = ft.colors.BLACK))
+                        ],),
                 ],
             )
 
+        updated_table2 = ft.DataTable(
+                border=ft.border.all(1, "black"),
+                bgcolor = 'white',
+                column_spacing=0,
+                data_row_max_height= 78,
+                height = 450,
+                width = 240,
+                heading_row_color= TABLE_HEAD_COLOR,
+                columns=[
+                    ft.DataColumn(ft.Text(SETTING_STR, color = ft.colors.BLACK)),
+                    ft.DataColumn(ft.Text(STATUS_STR, color = ft.colors.BLACK)),
+                    ],
+                rows=[
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(WGN_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR if wgn_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if wgn_switch.value == 1 else ft.colors.RED)),
+                        ],),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(SINGLE_SHOT_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR  if single_shot_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if single_shot_switch.value == 1 else ft.colors.RED)),
+                        ],),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(AUTO_RUN_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR  if auto_run_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if auto_run_switch.value == 1 else ft.colors.RED)),
+                        ],),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(RAW_DATA_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR if raw_requect_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if raw_requect_switch.value == 1 else ft.colors.RED)),
+                        ],),
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(TD_STR, color = ft.colors.BLACK)),
+                            ft.DataCell(ft.Text(ON_STR  if time_domain_switch.value == 1 else OFF_STR, color = ft.colors.GREEN if time_domain_switch.value == 1 else ft.colors.RED)),
+                        ],),
+                ],
+            )
+
+    
+        
+
         page.controls.clear()
-        page.add(ft.Column([Controls]),updated_table,chart)
+        #page.add(ft.Column([Controls]),updated_table,chart)
+        page.add(ft.Row([Controls,updated_table]),ft.Row([updated_table2,chart,]))
 
         page.update()
 
@@ -1307,20 +1413,33 @@ def main(page: ft.Page):
         actions_alignment=ft.MainAxisAlignment.END,
     )
     page.appbar = ft.AppBar(
-        leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
+        #leading=ft.IconButton(ft.icons.BREAKFAST_DINING_OUTLINED),
+        leading=logo_appbar,
 
-        title=ft.Text(APPBAR_TITLE),
+        title=ft.Text(APPBAR_TITLE, color = ft.colors.BLACK),
+        #bgcolor=ft.colors.SURFACE_VARIANT,
+        #bgcolor= '#f08dbf',
         bgcolor= '#d5a6bd',
         actions=[
             ft.TextButton(ABOUT_US_TEXT, on_click = lambda _: page.go("/about")), 
-            ft.IconButton(ft.icons.SETTINGS, on_click=open_modal),
-            ft.IconButton(icon=ft.icons.UNDO)
-            
+            ft.IconButton(ft.icons.SETTINGS, on_click=open_modal, icon_color = ft.colors.BLACK),
+            ft.IconButton(icon=ft.icons.UNDO, icon_color = ft.colors.BLACK)
         ]
     )
 
+    page.bottom_appbar= ft.BottomAppBar(
+        bgcolor= BANNER_COLOR,
+        content=ft.Row([
+            ft.Text(COPYRIGHT_TXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM, color = ft.colors.BLACK),
+            ft.Container(expand=True), 
+            ft.Text(SDSU_CE_TEXT,theme_style=ft.TextThemeStyle.TITLE_MEDIUM, color = ft.colors.BLACK)
+            ]
+        ),
+    )
+
     #page.add(ft.Column([Controls]) ,chart ) 
-    page.add(ft.Column([Controls]),config_table,chart)
+    #page.add(ft.Column([Controls]),config_table,chart)
+    page.add(ft.Row([Controls,config_table]),ft.Row([config_table2,chart,]))
 
     serial_reader = Thread(target=serial_read, args=(data_port, ctrl_port, FFT_real_queue, Settings_Queue, page, lock))
     serial_reader.daemon = True
