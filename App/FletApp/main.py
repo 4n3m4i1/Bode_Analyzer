@@ -228,6 +228,9 @@ def update_graph(data_Queue: Queue, chart: MatplotlibChart, line: matplotlib.lin
                         #plt.ylim(min(data[1:len(data)-1])*1.1, max(data[1:len(data)-1])*1.1)
                     else:
                         #plt.ylim(0, max(data[1:len(data)-1])*1.1)
+                        for n in range(len(data)):
+                            data[n] = 20 * np.log(data[n] + 1e-15) + 90
+
                         plt.ylim(min(data)*1.1, max(data)*1.1)
                         #plt.ylim(0, max(data)*1.1)
                         #plt.ylim(-0.005, 0.1)

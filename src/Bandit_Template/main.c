@@ -95,6 +95,7 @@ volatile CORE_0_MEM uint16_t USB_STATE;
 volatile CORE_0_MEM uint16_t USB_NEXT_STATE;
 
 volatile CORE_0_MEM bool SKIP_FFT = false;
+volatile CORE_0_MEM bool SKIP_LMS = false;
 
 CORE_0_MEM uint8_t  BS_RX_BF[BS_BF_LEN];
 volatile CORE_0_MEM bool CORE_0_SKIP_FFT = false;
@@ -369,18 +370,25 @@ static void core_0_main(){
                         calibration_max = maxval;
                         
                     } else {
-                        Q15 maxval = 0;
-                        for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n) if(cool_fft.fr[n] > maxval) maxval = cool_fft.fr[n];
+                        if(SKIP_LMS){
+                            Q15 maxval = 0;
+                            for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n) if(cool_fft.fr[n] > maxval) maxval = cool_fft.fr[n];
 
-                        Q15 normalize_calibration = div_Q15(calibration_max, maxval);
+                            Q15 normalize_calibration = div_Q15(calibration_max, maxval);
 
-                        for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
-                            FFT_AVG_BUFF[n] += cool_fft.fr[n];
-                            FFT_AVG_BUFF[n] >>= 1;
-                            cool_fft.fr[n] = FFT_AVG_BUFF[n];
-                           // cool_fft.fr[n] -= mul_Q15(FFT_CAL_BUFF[n], normalize_calibration);
-                            //cool_fft.fr[n] <<= 3;    
+                            for(uint_fast16_t n = 0; n < cool_fft.num_samples; ++n){
+                                FFT_AVG_BUFF[n] += cool_fft.fr[n];
+                                FFT_AVG_BUFF[n] >>= 1;
+                                cool_fft.fr[n] = FFT_AVG_BUFF[n];
+                                //cool_fft.fr[n] -= mul_Q15(FFT_CAL_BUFF[n], normalize_calibration);
+                                cool_fft.fr[n] -= mul_Q15(normalize_calibration, FFT_CAL_BUFF[n]);
+                                cool_fft.fr[n] <<= 3;   
+
+                            }
+                        } else {
+                            
                         }
+                        
                     }
                 } else {
                     for(uint16_t n = 0; n < ICTXFR_A.len; ++n){
@@ -784,7 +792,7 @@ debug_no_adc_setup_label:
                     CORE_1_STATE = CORE_1_SAMPLE;
                 } else {
                     error_attempts = 0;
-                    flush_FIR_buffer_and_taps(&LMS_FIR);
+                    //flush_FIR_buffer_and_taps(&LMS_FIR);
 
                     //set_ULED_level(Bandit_RGBU.U = 0);
                     
@@ -851,13 +859,15 @@ debug_no_adc_setup_label:
                     CORE_1_SEND_UNPROCESSED = Global_Bandit_Settings.skip_lms;
 
                     // Delete me if problem
-                   // flush_FIR_buffer_and_taps(&LMS_FIR);
+                    flush_FIR_buffer_and_taps(&LMS_FIR);
 
                     Bandit_Calibration_State = BANDIT_CAL_AA_TXFR_FUNC_IN_PROG;
                     set_ULED_level(Bandit_RGBU.U = 0);
                     Global_Bandit_Settings.updated = false;
                     sending_calib_data = true;
-                    CORE_1_STATE = CORE_1_APPLY_SETTINGS;
+
+                    if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
+                        CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN)) CORE_1_STATE = CORE_1_APPLY_SETTINGS;
                 } else {
                     if(CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_AUTO_RUN) || 
                         CHK_BANDIT_SETTING(Global_Bandit_Settings.settings_bf, BS_SINGLE_SHOT_RUN)){
@@ -1420,7 +1430,7 @@ void tud_cdc_rx_wanted_cb(uint8_t itf, char wanted_char) {
 
         Global_Bandit_Settings.settings_bf = new_settings_value;
 
-        Global_Bandit_Settings.skip_lms = (BS_RX_BF[USBBSRX_RAW_RQ]) ? true : false;
+        SKIP_LMS = Global_Bandit_Settings.skip_lms = (BS_RX_BF[USBBSRX_RAW_RQ]) ? true : false;
         
         SKIP_FFT = (BS_RX_BF[USBBSRX_TIME_DOMAIN_DATA]) ? true : false;
 
